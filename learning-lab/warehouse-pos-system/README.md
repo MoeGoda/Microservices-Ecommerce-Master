@@ -30,7 +30,7 @@ a distributed transaction.
 - [x] **A1 — Identity service**: Users/Roles, JWT issuing (User Management Module)
 - [x] **A2 — Shared exception handling + ProblemDetails**
 - [x] **A3 — Ocelot API Gateway + JWT validation at the gateway**
-- [ ] A4 — Angular SPA skeleton (login, auth, toaster wiring)
+- [x] **A4 — Angular SPA skeleton (login, auth, toaster wiring)**
 
 **Phase B — Warehouse (barcodes)**
 - [ ] B1 — Domain + Infrastructure (Items, barcodes, stock, locations)
@@ -286,3 +286,98 @@ and hit with real HTTP requests:
 - `GET /Identity/Auth/me` with a JWT signed using the correct shared secret → `200`, proxied through, `Authorization` header intact
 - `GET /Identity/Auth/me` with a JWT signed using the *wrong* secret → `401`
 - 6 rapid `POST /Identity/Auth/login` calls → the first 5 succeeded, the 6th returned `429`
+
+## A4 — Angular SPA skeleton
+
+**What it does:** `client/` is a standalone Angular 20 app (kept as a sibling
+of `src/`, since it's a completely different toolchain — npm/Node instead
+of dotnet/NuGet) with a login page, a placeholder admin area behind a route
+guard, and the two pieces of plumbing (an auth interceptor and an error
+interceptor) that every future screen in this system — the Admin Panel
+(B3), the POS screen (C4), Reporting dashboards (D2) — builds on top of
+without re-solving.
+
+**A dependency decision that mattered more than expected:** the scaffold
+started on Angular 19 (the newest version this sandbox's Node could run).
+Checking `npm audit` on the *fresh, untouched* scaffold turned up two real
+high-severity XSS advisories in `@angular/core` and `@angular/compiler`
+that Angular's 19.x line never received a backport for — only 20.3.27+ and
+21.2.19+ are patched. Angular 20 turned out to need a Node version this
+sandbox's Node (22.22.2) does satisfy, so the whole app was rescaffolded on
+Angular 20 before writing any custom code on top of it — the same
+"check before you build on it" instinct as the AutoMapper/MediatR calls
+earlier in this project, just on the frontend side this time.
+
+**How the pieces fit together — tracing a login:**
+```
+LoginComponent.submit()
+  → AuthService.login(credentials)          — POST /Identity/Auth/login
+    → authInterceptor                        — (no token yet, passes through unchanged)
+    → [ request leaves the browser, hits Gateway.Ocelot, A3 ]
+    ← response comes back
+    → errorInterceptor                       — only acts on non-2xx; success flows through untouched
+  → AuthService stores the AuthResponse in localStorage, sets the `currentUser` signal
+  → LoginComponent navigates to /admin
+    → authGuard checks AuthService.isAuthenticated() — true now — lets it through
+```
+And for every subsequent request to anything protected:
+```
+any HttpClient call
+  → authInterceptor attaches `Authorization: Bearer <token>` from AuthService
+  → [ request hits the gateway, which validates the JWT itself (A3) ]
+  ← if the gateway (or the downstream service) rejects it with 401
+  → errorInterceptor: AuthService.logout() + toast + redirect to /login
+```
+
+**Concepts introduced:**
+- **Functional interceptors and guards** (`HttpInterceptorFn`, `CanActivateFn`)
+  — the modern Angular 15+ style: plain functions registered in
+  `app.config.ts`/`app.routes.ts`, not classes implementing an interface
+  registered in an `NgModule`. No NgModule exists anywhere in this app —
+  every component is standalone, which has been Angular's default shape
+  since well before this app's version.
+- **Signals for simple synchronous state.** `AuthService.currentUser` is a
+  `signal<CurrentUser | null>`, not a `BehaviorSubject`. Nothing here needs
+  RxJS's operators (the actual HTTP calls still return Observables, because
+  `HttpClient` does) — a signal is simpler for "the current value, and
+  re-render when it changes," which is all this state needs to be.
+- **The frontend mirror of A2.** `errorInterceptor` reads the exact
+  `ProblemDetails` shape `GlobalExceptionHandler` produces — `detail` for a
+  single message, `errors` for the field-level validation dictionary — and
+  turns it into one toast. The two pieces (A2's backend shape, A4's
+  frontend reader) were designed together on purpose: change one without
+  the other and error messages silently stop working.
+- **A guard is UX, not security.** `authGuard` keeps a signed-out user from
+  seeing a half-loaded admin screen full of failed API calls — it is not
+  what stops that user from calling the API directly. The actual security
+  boundary is the gateway's JWT validation (A3) and each service's own
+  `[Authorize]`. Said directly in the guard's own comment so it's not
+  mistaken for more than it is.
+- **A known, named tradeoff: localStorage vs. an httpOnly cookie.** The
+  token lives in localStorage — simple, framework-agnostic, and readable by
+  any script running on the page, meaning a successful XSS attack anywhere
+  in this app could steal it. An httpOnly cookie closes that hole but needs
+  CSRF protection in exchange. This is Phase F2's problem to solve
+  properly, not something to quietly get wrong here and forget about.
+
+**Verified in a real browser, not just built:** Karma's default headless
+Chrome launcher needs `--no-sandbox` to run as root, and wiring that up
+without losing Angular's own auto-generated test configuration turned out
+to be more trouble than it was worth for what it would have checked. A
+Playwright-driven, real-browser end-to-end run against the actual built app
+(served statically) and a stub gateway (mimicking the login endpoint's
+success/failure JSON, deleted after) was more valuable anyway — it
+exercises the whole chain at once instead of one unit in isolation. All 10
+checks passed: the guard redirects signed-out visitors away from `/admin`;
+wrong credentials produce a toast containing the backend's exact
+`"Invalid username or password."` message; correct credentials navigate to
+`/admin` and show the signed-in username and role; the session survives a
+page reload; the token is actually in `localStorage`; and signing out both
+clears storage and makes the guard block `/admin` again.
+
+**Run it locally (requires the gateway + Identity.API running, per A1/A3):**
+```bash
+cd client
+npm install
+npm start   # ng serve — http://localhost:4200
+```
