@@ -1,13 +1,15 @@
 using FluentValidation.Results;
 
-namespace Identity.Application.Exceptions
+namespace Common.Exceptions
 {
-    // Thrown by the MediatR ValidationBehaviour (see Behaviours/) when
-    // FluentValidation rejects a command *before* the handler ever runs.
-    // Errors is grouped by property name so the API layer can turn this into
-    // a field-by-field 400 response instead of one flat error string.
-    public class ValidationException : Exception
+    // Thrown by every service's MediatR ValidationBehaviour when
+    // FluentValidation rejects a command before its handler runs. Grouped by
+    // property name so the client gets a field-by-field 400, not one flat
+    // error string it has to parse itself.
+    public class ValidationException : Exception, IHasStatusCode
     {
+        public int StatusCode => 400;
+
         public IDictionary<string, string[]> Errors { get; }
 
         public ValidationException()

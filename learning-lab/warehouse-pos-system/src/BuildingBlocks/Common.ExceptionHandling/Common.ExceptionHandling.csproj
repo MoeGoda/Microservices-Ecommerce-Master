@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common.Exceptions\Common.Exceptions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The one place in this pair of packages that actually knows about
+         ASP.NET Core (ProblemDetails, IExceptionHandler, HttpContext). Only
+         Web API projects (Identity.API and friends) reference this package;
+         Application-layer projects reference Common.Exceptions alone and
+         never pull this FrameworkReference into their own build. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,4 +1,5 @@
 using System.Text;
+using Common.ExceptionHandling;
 using Identity.Application;
 using Identity.Infrastructure;
 using Identity.Infrastructure.Persistence;
@@ -12,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddCommonExceptionHandling();
 
 // --- JWT Bearer authentication ---
 // This is the piece that turns "a string in the Authorization header" into
@@ -82,6 +84,13 @@ using (var scope = app.Services.CreateScope())
     context.Database.Migrate();
     await IdentityContextSeed.SeedAdminUserAsync(context);
 }
+
+// First in the pipeline, on purpose: it can only catch exceptions thrown by
+// middleware registered after it. Authentication/authorization/routing/
+// controllers all run "inside" this, so anything any of them throws — a
+// ValidationException from a MediatR handler, an unexpected NullReferenceException,
+// anything — gets caught here and turned into a consistent ProblemDetails response.
+app.UseCommonExceptionHandling();
 
 if (app.Environment.IsDevelopment())
 {

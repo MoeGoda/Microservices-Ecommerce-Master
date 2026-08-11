@@ -1,5 +1,8 @@
 using FluentValidation;
 using MediatR;
+// FluentValidation and Common.Exceptions both define a "ValidationException" —
+// alias the one we mean so the reference below isn't ambiguous.
+using ValidationException = Common.Exceptions.ValidationException;
 
 namespace Identity.Application.Behaviours
 {
@@ -34,7 +37,7 @@ namespace Identity.Application.Behaviours
 
                 if (failures.Count != 0)
                 {
-                    throw new Exceptions.ValidationException(failures);
+                    throw new ValidationException(failures);
                 }
             }
 

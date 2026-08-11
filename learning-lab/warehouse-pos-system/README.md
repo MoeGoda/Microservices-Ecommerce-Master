@@ -28,7 +28,7 @@ a distributed transaction.
 
 **Phase A — Foundation**
 - [x] **A1 — Identity service**: Users/Roles, JWT issuing (User Management Module)
-- [ ] A2 — Shared exception handling + ProblemDetails
+- [x] **A2 — Shared exception handling + ProblemDetails**
 - [ ] A3 — Ocelot API Gateway + JWT validation at the gateway
 - [ ] A4 — Angular SPA skeleton (login, auth, toaster wiring)
 
@@ -148,3 +148,63 @@ way to log in as an Admin on day one.
 > environment variable or a secret manager, never from a committed file —
 > this is one of the things Phase F2 (security hardening) will come back to
 > make explicit across every service.
+
+## A2 — Shared exception handling + ProblemDetails
+
+**What it does:** two small BuildingBlocks packages that every future
+microservice's Web API project (Warehouse.API, Pos.API, ...) will reference,
+so no controller anywhere in this system ever needs its own try/catch to
+return a clean error response.
+
+**Two packages, not one — and the split matters:**
+```
+Common.Exceptions        — pure C#. NotFoundException, ValidationException,
+                            ConflictException, UnauthorizedException, and the
+                            IHasStatusCode interface they all implement.
+                            Zero ASP.NET Core dependency.
+Common.ExceptionHandling — GlobalExceptionHandler (ASP.NET Core 8's
+                            IExceptionHandler) + the DI wiring. This is the
+                            only place that touches ProblemDetails/HttpContext.
+```
+The first draft put everything in one package — until it became clear that
+an Application-layer project (which should never reference a web framework)
+would end up with ASP.NET Core in its dependency graph just by referencing
+shared *exception types*. Splitting them means `Identity.Application`
+references only `Common.Exceptions` (plain classes, no framework), while
+only `Identity.API` (a Web project already) references
+`Common.ExceptionHandling`. This is the same Dependency Inversion idea from
+A1 applied to a library boundary instead of an interface.
+
+**Concepts introduced:**
+- **`IExceptionHandler`** — ASP.NET Core 8's purpose-built interface for
+  this (older code bases hand-roll a middleware class instead; this is the
+  now-idiomatic way). Registered via `AddExceptionHandler<T>()`, dispatched
+  by `app.UseExceptionHandler()`, which must sit first in the pipeline —
+  it can only catch exceptions thrown by middleware registered *after* it.
+- **The Open/Closed Principle, concretely.** `GlobalExceptionHandler` never
+  references `NotFoundException` or `ConflictException` by name — it checks
+  `is IHasStatusCode` and reads `.StatusCode`. When Warehouse later needs its
+  own `InsufficientStockException`, it implements `IHasStatusCode` and gets
+  full ProblemDetails handling for free, without this shared handler ever
+  being modified.
+- **Never leak an unexpected exception's message.** Anything *not*
+  implementing `IHasStatusCode` is treated as a genuine bug (500) — logged
+  server-side with the full exception via `ILogger`, but the client only
+  ever sees `"An unexpected error occurred."` A raw exception message can
+  contain connection strings, file paths, or other internals that have no
+  business leaving the server; a 400/401/404's message is safe to return
+  because those exceptions were written with a client-safe message in the
+  first place.
+- **`IProblemDetailsService`**, not manual JSON serialization — the built-in
+  service that both `GlobalExceptionHandler` and ASP.NET Core's own
+  automatic model-validation 400s go through, via `AddProblemDetails()`.
+  One consistent error shape for both "our code threw" and "framework
+  rejected the request before it even got to a controller."
+
+**Verified with a focused test:** a throwaway minimal-API host (deleted
+after, not part of this repo) mapped one endpoint per exception type and
+hit each over real HTTP via `TestServer`. All 6 checks passed: 404/409/401
+map correctly, the validation case includes a field-by-field `errors`
+object, an unexpected `InvalidOperationException` returns 500 with its
+message correctly *not* present in the response body, and a healthy
+endpoint is unaffected by any of it.
