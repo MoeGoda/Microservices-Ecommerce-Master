@@ -1,6 +1,6 @@
+using Common.Exceptions;
 using Identity.Application.Contracts.Infrastructure;
 using Identity.Application.Contracts.Persistence;
-using Identity.Application.Exceptions;
 using Identity.Application.Models;
 using Identity.Domain.Entities;
 using MediatR;
@@ -30,7 +30,7 @@ namespace Identity.Application.Features.Auth.Commands.Register
         {
             if (await _userRepository.UserNameExists(request.UserName))
             {
-                throw new AuthenticationException($"Username '{request.UserName}' is already taken.");
+                throw new ConflictException($"Username '{request.UserName}' is already taken.");
             }
 
             var role = await _roleRepository.GetByName(request.Role)

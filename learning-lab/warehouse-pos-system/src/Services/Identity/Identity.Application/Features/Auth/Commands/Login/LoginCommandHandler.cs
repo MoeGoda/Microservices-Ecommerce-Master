@@ -1,6 +1,6 @@
+using Common.Exceptions;
 using Identity.Application.Contracts.Infrastructure;
 using Identity.Application.Contracts.Persistence;
-using Identity.Application.Exceptions;
 using Identity.Application.Models;
 using MediatR;
 
@@ -27,16 +27,16 @@ namespace Identity.Application.Features.Auth.Commands.Login
         public async Task<AuthResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
         {
             var user = await _userRepository.GetByUserName(request.UserName)
-                ?? throw new AuthenticationException(InvalidCredentialsMessage);
+                ?? throw new UnauthorizedException(InvalidCredentialsMessage);
 
             if (!user.IsActive)
             {
-                throw new AuthenticationException(InvalidCredentialsMessage);
+                throw new UnauthorizedException(InvalidCredentialsMessage);
             }
 
             if (!_passwordHasher.Verify(user, user.PasswordHash, request.Password))
             {
-                throw new AuthenticationException(InvalidCredentialsMessage);
+                throw new UnauthorizedException(InvalidCredentialsMessage);
             }
 
             var (token, expiresAtUtc) = _jwtTokenGenerator.GenerateToken(user);

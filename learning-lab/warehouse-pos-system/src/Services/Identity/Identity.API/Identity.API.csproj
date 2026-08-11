@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Identity.Application\Identity.Application.csproj" />
     <ProjectReference Include="..\Identity.Infrastructure\Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.ExceptionHandling\Common.ExceptionHandling.csproj" />
   </ItemGroup>
 
 </Project>
