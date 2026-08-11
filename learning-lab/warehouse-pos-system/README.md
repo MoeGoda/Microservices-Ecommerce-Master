@@ -385,22 +385,49 @@ npm start   # ng serve — http://localhost:4200
 ## B1 — Warehouse domain + infrastructure
 
 **What it does:** the data model behind the Warehouse Management Module —
-`Item` (with a unique `Barcode`), `Category`, `Location`, `StockLevel`
-(how many of an item are at a location, right now), and
-`StockTransaction` (an append-only ledger of every change to that
-number). No business operations yet (no "adjust stock," no "create item"
-command) — that's B2. This step is deliberately just the shape of the data
-and how it's stored.
+`Item`, `Category`, `Location`, `UnitOfMeasure`, `StockLevel` (how many of
+an item are at a location, right now), and `StockTransaction` (an
+append-only ledger of every change to that number). No business operations
+yet (no "adjust stock," no "create item" command) — that's B2. This step
+is deliberately just the shape of the data and how it's stored.
+
+**Revised after a real design question.** The first draft gave `Item` a
+single `Barcode` string. That breaks the moment an item legitimately has
+more than one valid barcode (a manufacturer's own vs. a relabeled supplier
+variant, say) while still needing to share one stock count — a case the
+single-barcode design couldn't represent at all without creating a second,
+disconnected `Item` row. The fix, worked out from that question:
+
+```
+Item             — the product definition. Its identity is Sku, not a
+                   barcode. Picks one UnitOfMeasure as its BaseUnitOfMeasure.
+ItemBarcode      — 1-to-many. Every barcode on this table resolves to the
+                   same Item (and therefore the same shared StockLevel).
+                   At most one row per item may be IsPrimary = true.
+UnitOfMeasure    — master data: PCS, KG, BOX, CARTON, LITER, ...
+ItemUnit         — an item's ALTERNATE units, each with a ConversionFactor
+                   into its base unit (e.g. "1 BOX of Cola = 12 PCS").
+                   The base unit itself has no row here — it's implicitly
+                   a factor of 1.
+```
+The rule that makes this hang together: **every inventory quantity —
+`StockLevel.QuantityOnHand`, `StockTransaction.QuantityChange` — is always
+expressed in the item's base unit.** A "receive 2 BOX" operation converts
+through `ItemUnit.ConversionFactor` before it ever touches those two
+tables; inventory never has to ask "in what unit, though?" A `Sku` is the
+item's own internal identifier, kept distinct from `Barcode` (an external,
+scannable identifier) on purpose — conflating the two is exactly what made
+the first draft brittle.
 
 **Same three-project layering as Identity, spread differently this time:**
 `Warehouse.Domain` (entities) and `Warehouse.Infrastructure` (EF Core, the
 real work of this step) exist in full. `Warehouse.Application` exists too,
 but only with `Contracts/Persistence` interfaces — no MediatR, no
 commands, nothing that needs FluentValidation yet. Identity built all four
-layers (including the API) in one step; Warehouse has more moving parts
-(five entities instead of two), so it's spread across B1/B2/B3 instead —
-persistence and business logic and the outward-facing API each get their
-own step to actually explain, rather than landing all at once.
+layers (including the API) in one step; Warehouse has more moving parts,
+so it's spread across B1/B2/B3 instead — persistence and business logic
+and the outward-facing API each get their own step to actually explain,
+rather than landing all at once.
 
 **The balance-vs-ledger split, and why it exists:**
 ```
@@ -418,6 +445,12 @@ where that handler gets written; B1 only builds the two tables it has to
 keep in sync.
 
 **Concepts introduced:**
+- **A filtered unique index.** "At most one `ItemBarcode` per item may be
+  primary" isn't "exactly one row per item" (an item can have many
+  non-primary barcodes) — it's a unique index on `ItemId` that only
+  applies `WHERE IsPrimary = 1`. Two non-primary barcodes for the same
+  item coexist fine; two primary ones for the same item are rejected by
+  the database itself.
 - **`IDesignTimeDbContextFactory<T>`.** Identity's migrations were
   generated with `--startup-project Identity.API`, because that's where a
   real `DbContextOptions` (with an actual connection string) got built.
@@ -438,14 +471,22 @@ keep in sync.
   living in a completely different service's database. A real FK
   constraint can't span that boundary; representing the link as plain data
   instead is how a microservices system has to handle it.
+- **A deliberate scope cut.** Serialized/lot-tracked inventory (one row
+  per physical unit — warranty devices, lots with expiry dates) is a
+  different, heavier model (`InventoryUnit`: `ItemId`, `SerialNumber`,
+  `Status`, ...) than quantity-based inventory. Nothing built here needs
+  it yet, so it isn't built — it's a documented extension point for if a
+  future item genuinely requires per-unit tracking, not a speculative
+  table sitting unused.
 
 **Verified with a focused runtime test (SQLite, deleted after — same
-approach as A1, since SQL Server isn't reachable in this sandbox):** 12
-checks, all passing — the 3 migration-seeded categories and 3 locations
-exist, the 3 runtime-seeded sample items exist, `GetByBarcode` finds a
-seeded item (`Cola 330ml Can`, barcode `5901234123457`) with its `Category`
-correctly joined, an unknown barcode returns `null` rather than throwing,
-the seeded `StockLevel` shows exactly 50 units at shelf A1, **a second
-item with a duplicate barcode is genuinely rejected by the database's own
-unique index** (not just application-level checking), and a manually
-recorded `StockTransaction` persists and reads back correctly.
+approach as A1, since SQL Server isn't reachable in this sandbox):** 13
+checks, all passing, aimed straight at the scenario that prompted the
+revision — a seeded item (`Cola 330ml Can`) with **two** barcodes, both
+resolving to the same `ItemId`, sharing **one** `StockLevel` row at 50
+units (not split across barcodes); a second *primary* barcode for the same
+item is genuinely rejected by the filtered unique index, while a second
+*non-primary* one is accepted fine; a different item (`Sparkling Water`)
+carries its own independent base unit; Cola's `ItemUnit` conversion
+(1 BOX = 12 PCS) computes correctly; and `Sku` lookups are confirmed
+independent of any barcode.

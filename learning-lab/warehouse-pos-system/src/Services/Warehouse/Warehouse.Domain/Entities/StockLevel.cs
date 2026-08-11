@@ -30,5 +30,16 @@ namespace Warehouse.Domain.Entities
         // global constant: the back shelf might reasonably run leaner than
         // the front-of-store display location for the same item.
         public int ReorderThreshold { get; set; }
+
+        // Always equal to Item.BaseUnitOfMeasureId — duplicated here on
+        // purpose (set once, when this row is created) so a stock report
+        // can print "50 PCS" without an extra join back to Item for every
+        // row. QuantityOnHand is ALWAYS in this unit; nothing here ever
+        // converts it on read. If an item's base unit could ever change
+        // after stock exists (this design doesn't support that), this
+        // copy would need updating too — one more reason base units are
+        // meant to be fixed at item-creation time, not edited later.
+        public int UnitOfMeasureId { get; set; }
+        public UnitOfMeasure UnitOfMeasure { get; set; } = null!;
     }
 }

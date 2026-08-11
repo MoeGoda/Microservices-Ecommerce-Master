@@ -12,7 +12,7 @@ using Warehouse.Infrastructure.Persistence;
 namespace Warehouse.Infrastructure.Migrations
 {
     [DbContext(typeof(WarehouseContext))]
-    [Migration("20260811143531_InitialCreate")]
+    [Migration("20260811150158_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -77,10 +77,8 @@ namespace Warehouse.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Barcode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<int>("BaseUnitOfMeasureId")
+                        .HasColumnType("int");
 
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
@@ -100,17 +98,92 @@ namespace Warehouse.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BaseUnitOfMeasureId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("Sku")
+                        .IsUnique();
+
+                    b.ToTable("Items");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemBarcode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("BarcodeType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Barcode")
                         .IsUnique();
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex("ItemId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ItemBarcodes_ItemId_Primary")
+                        .HasFilter("[IsPrimary] = 1");
 
-                    b.ToTable("Items");
+                    b.ToTable("ItemBarcodes");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemUnit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ConversionFactor")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UnitOfMeasureId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UnitOfMeasureId");
+
+                    b.HasIndex("ItemId", "UnitOfMeasureId")
+                        .IsUnique();
+
+                    b.ToTable("ItemUnits");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.Location", b =>
@@ -188,9 +261,14 @@ namespace Warehouse.Infrastructure.Migrations
                     b.Property<int>("ReorderThreshold")
                         .HasColumnType("int");
 
+                    b.Property<int>("UnitOfMeasureId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("LocationId");
+
+                    b.HasIndex("UnitOfMeasureId");
 
                     b.HasIndex("ItemId", "LocationId")
                         .IsUnique();
@@ -234,15 +312,119 @@ namespace Warehouse.Infrastructure.Migrations
                     b.ToTable("StockTransactions");
                 });
 
+            modelBuilder.Entity("Warehouse.Domain.Entities.UnitOfMeasure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("UnitsOfMeasure");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "PCS",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Name = "Pieces"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "KG",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Name = "Kilogram"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "BOX",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Name = "Box"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "CARTON",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Name = "Carton"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "LITER",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Name = "Liter"
+                        });
+                });
+
             modelBuilder.Entity("Warehouse.Domain.Entities.Item", b =>
                 {
+                    b.HasOne("Warehouse.Domain.Entities.UnitOfMeasure", "BaseUnitOfMeasure")
+                        .WithMany()
+                        .HasForeignKey("BaseUnitOfMeasureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Warehouse.Domain.Entities.Category", "Category")
                         .WithMany()
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("BaseUnitOfMeasure");
+
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemBarcode", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemUnit", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Warehouse.Domain.Entities.UnitOfMeasure", "UnitOfMeasure")
+                        .WithMany()
+                        .HasForeignKey("UnitOfMeasureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+
+                    b.Navigation("UnitOfMeasure");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.StockLevel", b =>
@@ -259,9 +441,17 @@ namespace Warehouse.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Warehouse.Domain.Entities.UnitOfMeasure", "UnitOfMeasure")
+                        .WithMany()
+                        .HasForeignKey("UnitOfMeasureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Item");
 
                     b.Navigation("Location");
+
+                    b.Navigation("UnitOfMeasure");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.StockTransaction", b =>
