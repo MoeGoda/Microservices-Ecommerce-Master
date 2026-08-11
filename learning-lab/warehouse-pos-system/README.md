@@ -33,7 +33,7 @@ a distributed transaction.
 - [x] **A4 — Angular SPA skeleton (login, auth, toaster wiring)**
 
 **Phase B — Warehouse (barcodes)**
-- [ ] B1 — Domain + Infrastructure (Items, barcodes, stock, locations)
+- [x] **B1 — Domain + Infrastructure (Items, barcodes, stock, locations)**
 - [ ] B2 — Application layer (CQRS/MediatR/FluentValidation)
 - [ ] B3 — API + Angular Admin Panel screen (master data)
 
@@ -381,3 +381,71 @@ cd client
 npm install
 npm start   # ng serve — http://localhost:4200
 ```
+
+## B1 — Warehouse domain + infrastructure
+
+**What it does:** the data model behind the Warehouse Management Module —
+`Item` (with a unique `Barcode`), `Category`, `Location`, `StockLevel`
+(how many of an item are at a location, right now), and
+`StockTransaction` (an append-only ledger of every change to that
+number). No business operations yet (no "adjust stock," no "create item"
+command) — that's B2. This step is deliberately just the shape of the data
+and how it's stored.
+
+**Same three-project layering as Identity, spread differently this time:**
+`Warehouse.Domain` (entities) and `Warehouse.Infrastructure` (EF Core, the
+real work of this step) exist in full. `Warehouse.Application` exists too,
+but only with `Contracts/Persistence` interfaces — no MediatR, no
+commands, nothing that needs FluentValidation yet. Identity built all four
+layers (including the API) in one step; Warehouse has more moving parts
+(five entities instead of two), so it's spread across B1/B2/B3 instead —
+persistence and business logic and the outward-facing API each get their
+own step to actually explain, rather than landing all at once.
+
+**The balance-vs-ledger split, and why it exists:**
+```
+StockLevel        — "Item X has 50 units at Location Y," right now.
+                     A maintained cache: fast to read, no aggregation
+                     needed for a POS screen or barcode scan to check it.
+StockTransaction   — every event that ever changed that number, signed
+                     (+50 received, -1 sold), never updated or deleted.
+```
+Summing every `StockTransaction.QuantityChange` for an item+location
+should always equal its `StockLevel.QuantityOnHand`. That invariant isn't
+enforced by a database constraint — it's a rule whichever command handler
+changes stock has to uphold by writing both, in the same transaction. B2 is
+where that handler gets written; B1 only builds the two tables it has to
+keep in sync.
+
+**Concepts introduced:**
+- **`IDesignTimeDbContextFactory<T>`.** Identity's migrations were
+  generated with `--startup-project Identity.API`, because that's where a
+  real `DbContextOptions` (with an actual connection string) got built.
+  There's no `Warehouse.API` yet — it's B3 — so there's nothing to point
+  `dotnet ef` at. This factory is EF Core's answer: a class `dotnet ef`
+  discovers and uses *only* at design time, with a connection string that
+  the real running app will never read (`Warehouse.API`'s own
+  `appsettings.json` supplies the real one once it exists).
+- **A repository contract can say what it *won't* do.**
+  `IStockLevelRepository` deliberately has no `AdjustQuantity`/`Upsert`
+  method — deciding whether a `StockLevel` needs creating vs. updating,
+  and what `StockTransaction` that produces, is a business decision, not a
+  persistence primitive. Putting it here now would mean guessing at B2's
+  design before writing it.
+- **A cross-service reference that can't be a foreign key.**
+  `StockTransaction.Reference` is a plain nullable string, not a foreign
+  key to anything — once POS (Phase C) exists, it'll point at a `Sale.Id`
+  living in a completely different service's database. A real FK
+  constraint can't span that boundary; representing the link as plain data
+  instead is how a microservices system has to handle it.
+
+**Verified with a focused runtime test (SQLite, deleted after — same
+approach as A1, since SQL Server isn't reachable in this sandbox):** 12
+checks, all passing — the 3 migration-seeded categories and 3 locations
+exist, the 3 runtime-seeded sample items exist, `GetByBarcode` finds a
+seeded item (`Cola 330ml Can`, barcode `5901234123457`) with its `Category`
+correctly joined, an unknown barcode returns `null` rather than throwing,
+the seeded `StockLevel` shows exactly 50 units at shelf A1, **a second
+item with a duplicate barcode is genuinely rejected by the database's own
+unique index** (not just application-level checking), and a manually
+recorded `StockTransaction` persists and reads back correctly.
