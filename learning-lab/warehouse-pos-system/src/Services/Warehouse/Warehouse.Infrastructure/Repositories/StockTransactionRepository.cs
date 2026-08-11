@@ -14,10 +14,11 @@ namespace Warehouse.Infrastructure.Repositories
             _context = context;
         }
 
+        // Stages only — see IUnitOfWork. Always committed together with
+        // the StockLevel change it explains.
         public async Task<StockTransaction> AddAsync(StockTransaction transaction)
         {
             await _context.StockTransactions.AddAsync(transaction);
-            await _context.SaveChangesAsync();
             return transaction;
         }
 

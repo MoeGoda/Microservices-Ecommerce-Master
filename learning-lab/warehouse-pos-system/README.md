@@ -526,3 +526,126 @@ near-term item (Phase C, POS/pricing — not Warehouse, since price and
 promotion rules are a selling-side concern, not a stock-shape one). The
 rest stays an unscoped list for now rather than half-built tables nothing
 yet needs.
+
+## B2 — Warehouse application layer
+
+**What it does:** the business operations on top of B1's schema —
+creating an item (with its first barcode), adding an extra barcode or an
+alternate unit to an existing item, receiving stock, adjusting stock, and
+the read side (item detail/list, barcode lookup, variants, per-location
+stock, master-data dropdowns). Same CQRS/MediatR/FluentValidation shape as
+Identity's Auth commands (A1) — `Features/<Area>/{Commands,Queries}/<Name>/`,
+one command or query per folder, a `ValidationBehaviour` running
+FluentValidation ahead of every handler, an `UnhandledExceptionBehaviour`
+logging anything that isn't an expected `IHasStatusCode` failure.
+
+**The one real addition to that pattern: `IUnitOfWork`.** B1 flagged this
+gap explicitly — receiving or adjusting stock has to write a `StockLevel`
+change *and* the `StockTransaction` that explains it, together, or the
+ledger stops matching the balance. Identity's repositories never needed
+this (`RegisterCommandHandler` only ever adds one `User`), so they call
+`SaveChangesAsync()` themselves, inside `AddAsync`. Warehouse's
+repositories don't — every `AddAsync`/`UpdateAsync` now only stages a
+change on the tracked `DbContext`; a handler that needs several staged
+changes to succeed or fail together calls `IUnitOfWork.SaveChangesAsync()`
+itself, exactly once, at the end:
+```
+ReceiveStockCommandHandler:
+  stage: StockLevel created-or-updated (+baseQuantity)
+  stage: StockTransaction inserted (Reason = Received)
+  IUnitOfWork.SaveChangesAsync()   <- both commit in ONE transaction
+```
+The same mechanism solves a second problem for free: `CreateItemCommand`
+stages a new `Item` and its first `ItemBarcode` together, but the
+barcode's `ItemId` can't be set directly — the `Item`'s `Id` is
+database-generated and doesn't exist until it's saved. Setting
+`itemBarcode.Item = item` (the navigation, not the FK value) and staging
+both lets EF Core's change tracker fix up the real `ItemId` once
+`SaveChanges` resolves the new `Item`'s key — both rows are created or
+neither is.
+
+**Unit conversion happens once, in the write path, never on read.**
+`ReceiveStockCommand` accepts a quantity in *whatever unit the goods
+arrived in* (`UnitOfMeasureId`) — receive 2 `CARTON`, say. The handler
+resolves the item's `ItemUnit.ConversionFactor` for that unit (or treats
+it as 1:1 if it's already the item's base unit) and converts to the base
+unit *before* touching `StockLevel`/`StockTransaction`, which — per B1's
+invariant — only ever speak the item's base unit. A conversion that
+doesn't land on a whole number (`StockLevel.QuantityOnHand` is an `int`)
+is rejected loudly (`ConflictException`) rather than silently rounded —
+that would quietly corrupt a stock count.
+
+**`AdjustStockCommand` and `ReceiveStockCommand` look similar but encode
+different intent on purpose:** Receive may *create* a `StockLevel` (goods
+can arrive somewhere for the first time); Adjust never does — adjusting a
+balance that doesn't exist yet doesn't mean anything, so it's a
+`NotFoundException`. Receive is always positive and always
+`StockTransactionReason.Received`; Adjust is signed either direction and
+always `StockTransactionReason.Adjustment` — the *command* the caller
+chose to call carries that intent, so neither command exposes a `Reason`
+parameter a caller could set inconsistently (e.g. an "Adjustment" that's
+actually a sale — that's Phase C/C3's own event-driven path, not this).
+
+**`InsufficientStockException`, filling in a prediction from B1.** B1's
+`IHasStatusCode` comment predicted this almost by name: *"a future service
+(Warehouse's 'InsufficientStockException', say) can opt into the same
+handling just by implementing this interface — it never has to be added
+to this shared library."* `AdjustStockCommand` rejecting a change that
+would take `QuantityOnHand` negative is exactly that case — the exception
+lives in `Warehouse.Application`, implements `Common.Exceptions.IHasStatusCode`
+(409), and `Common.Exceptions` never had to change.
+
+**Two DTO shapes for `Item`, not one.** `ItemSummaryDto` (list rows —
+`GetAllItemsQuery`, `GetItemVariantsQuery`) carries no barcodes or unit
+conversions; `ItemDetailDto` (`GetItemByIdQuery`, `ResolveBarcodeQuery`)
+carries both plus the item's pack variants. Fetching those three
+collections is a real per-item cost that a list of many items shouldn't
+pay for every row it isn't going to show — the same list-vs-detail split
+a REST API would make, just expressed as two DTO types instead of one
+endpoint with an optional `?expand=` parameter.
+
+**A query can return `null` instead of throwing.** Every command and
+most queries throw `NotFoundException` on a missing id — but
+`ResolveBarcodeQuery` (what a POS scan, Phase C, or an admin "look up by
+barcode" box actually calls) returns `ItemDetailDto?` and hands back
+`null` for an unknown barcode. Scanning something that isn't in the
+catalog is an ordinary, expected outcome of using a barcode scanner, not
+an exceptional one — the caller decides what a "not found" scan means
+(show "unknown item," most likely), rather than having that decision
+forced on it by a thrown exception.
+
+**Concepts introduced:**
+- **Manual DTO mapping, deliberately.** No AutoMapper — every DTO has a
+  static `FromEntity(...)` method, same reasoning FluentValidation and
+  MediatR get used explicitly rather than hidden behind a mapping
+  convention: a reader can see exactly which entity fields end up where,
+  and a mapper that needs a related entity already loaded (e.g.
+  `ItemUnitDto.FromEntity` needs `itemUnit.UnitOfMeasure` `Include`d) says
+  so in a comment instead of failing silently at runtime.
+- **Business/existence checks live in the handler, not the validator.**
+  FluentValidation validators here only ever check input *shape* (is the
+  string empty, is the number positive) — whether a `Sku` is already
+  taken, whether a `CategoryId` refers to a real `Category`, needs a
+  database round trip, which is exactly why `RegisterCommandHandler` (A1)
+  does its `UserNameExists` check in the handler rather than the
+  validator. Same split here, applied consistently across five commands
+  instead of one.
+
+**Verified with a focused runtime test (SQLite, deleted after) run
+through actual MediatR dispatch — not calling handlers directly, so the
+`ValidationBehaviour`/`UnhandledExceptionBehaviour` pipeline is exercised
+exactly as `Warehouse.API` (B3) will call it:** 25 checks, all passing.
+Among them: creating an item and reading back its Id (proving the EF
+navigation fixup actually worked, not a leftover temporary key);
+promoting a new barcode to primary and confirming the *old* primary was
+demoted in the same call, leaving exactly one primary; receiving 10 `PCS`
+then 2 `CARTON` (2×24) on the same item and getting a `StockLevel` of 58;
+adjusting -8 to reach 50, then confirming an adjustment that would go
+negative throws `InsufficientStockException` while a location with no
+existing `StockLevel` throws `NotFoundException` instead; rejecting a
+duplicate `Sku`, a duplicate barcode, a duplicate `ItemUnit` conversion,
+and a base-unit-as-conversion attempt, each with `ConflictException`; an
+empty `Sku` rejected by `ValidationException` before the handler ever
+runs; `GetItemVariantsQuery` finding B1's seeded pack-of-6 from its base
+item; and `ResolveBarcodeQuery` returning the right item for a known
+barcode and `null` — no exception — for an unknown one.

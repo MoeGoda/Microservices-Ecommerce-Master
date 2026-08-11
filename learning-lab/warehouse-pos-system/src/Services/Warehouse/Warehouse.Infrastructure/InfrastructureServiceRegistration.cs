@@ -22,6 +22,7 @@ namespace Warehouse.Infrastructure
             services.AddScoped<IItemUnitRepository, ItemUnitRepository>();
             services.AddScoped<IStockLevelRepository, StockLevelRepository>();
             services.AddScoped<IStockTransactionRepository, StockTransactionRepository>();
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             return services;
         }

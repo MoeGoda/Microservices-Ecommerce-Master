@@ -7,6 +7,7 @@ namespace Warehouse.Application.Contracts.Persistence
         Task<StockLevel?> GetByItemAndLocation(int itemId, int locationId);
         Task<IEnumerable<StockLevel>> GetByItem(int itemId);
         Task<StockLevel> AddAsync(StockLevel stockLevel);
+        Task UpdateAsync(StockLevel stockLevel);
 
         // Deliberately no "AdjustQuantity" or "Upsert" method here — that's
         // a business operation (find-or-create a StockLevel AND write a

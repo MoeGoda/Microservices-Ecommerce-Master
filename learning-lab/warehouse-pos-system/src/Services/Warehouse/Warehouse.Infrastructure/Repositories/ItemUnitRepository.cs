@@ -29,10 +29,10 @@ namespace Warehouse.Infrastructure.Repositories
                 .FirstOrDefaultAsync(u => u.ItemId == itemId && u.UnitOfMeasureId == unitOfMeasureId);
         }
 
+        // Stages only — see IUnitOfWork.
         public async Task<ItemUnit> AddAsync(ItemUnit itemUnit)
         {
             await _context.ItemUnits.AddAsync(itemUnit);
-            await _context.SaveChangesAsync();
             return itemUnit;
         }
     }

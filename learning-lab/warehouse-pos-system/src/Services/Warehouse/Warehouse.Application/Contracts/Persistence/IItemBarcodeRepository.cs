@@ -12,6 +12,12 @@ namespace Warehouse.Application.Contracts.Persistence
 
         Task<bool> BarcodeExists(string barcode);
         Task<IEnumerable<ItemBarcode>> GetByItem(int itemId);
+
+        // Null if the item has no primary barcode yet (allowed — see
+        // ItemBarcode.IsPrimary) or doesn't exist.
+        Task<ItemBarcode?> GetPrimary(int itemId);
+
         Task<ItemBarcode> AddAsync(ItemBarcode itemBarcode);
+        Task UpdateAsync(ItemBarcode itemBarcode);
     }
 }

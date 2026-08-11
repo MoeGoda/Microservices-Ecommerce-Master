@@ -34,11 +34,24 @@ namespace Warehouse.Infrastructure.Repositories
             return await _context.ItemBarcodes.Where(b => b.ItemId == itemId).ToListAsync();
         }
 
+        public async Task<ItemBarcode?> GetPrimary(int itemId)
+        {
+            return await _context.ItemBarcodes.FirstOrDefaultAsync(b => b.ItemId == itemId && b.IsPrimary);
+        }
+
+        // Stages the insert only — does not call SaveChangesAsync. See
+        // IUnitOfWork: the caller decides when (and what else) commits
+        // together with this.
         public async Task<ItemBarcode> AddAsync(ItemBarcode itemBarcode)
         {
             await _context.ItemBarcodes.AddAsync(itemBarcode);
-            await _context.SaveChangesAsync();
             return itemBarcode;
+        }
+
+        public Task UpdateAsync(ItemBarcode itemBarcode)
+        {
+            _context.ItemBarcodes.Update(itemBarcode);
+            return Task.CompletedTask;
         }
     }
 }
