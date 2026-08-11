@@ -1,12 +1,9 @@
-using System.Text;
 using Common.ExceptionHandling;
+using Common.Security;
 using Identity.Application;
 using Identity.Infrastructure;
 using Identity.Infrastructure.Persistence;
-using Identity.Infrastructure.Security;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,33 +12,12 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
 
-// --- JWT Bearer authentication ---
 // This is the piece that turns "a string in the Authorization header" into
-// a populated User.Claims on every controller. Once this is configured, the
-// same [Authorize]/[Authorize(Roles="Admin")] attributes work identically
-// in every other microservice in this system, as long as they're handed the
-// same JwtSettings:Secret/Issuer/Audience.
-var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>()!;
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidIssuer = jwtSettings.Issuer,
-        ValidateAudience = true,
-        ValidAudience = jwtSettings.Audience,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.FromMinutes(1)
-    };
-});
-builder.Services.AddAuthorization();
+// a populated User.Claims on every controller. The same shared extension
+// (Common.Security) is what Gateway.Ocelot calls too — same
+// TokenValidationParameters, same JwtSettings:Secret/Issuer/Audience, so a
+// token accepted at the gateway is accepted here identically.
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

@@ -1,3 +1,4 @@
+using Common.Security;
 using Identity.Application.Contracts.Infrastructure;
 using Identity.Application.Contracts.Persistence;
 using Identity.Infrastructure.Persistence;
