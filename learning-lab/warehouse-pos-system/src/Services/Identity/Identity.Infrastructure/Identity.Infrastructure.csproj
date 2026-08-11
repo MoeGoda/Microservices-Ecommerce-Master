@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Identity.Application\Identity.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
   </ItemGroup>
 
   <ItemGroup>

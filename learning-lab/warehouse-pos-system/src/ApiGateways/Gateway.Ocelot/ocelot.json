@@ -1,0 +1,35 @@
+{
+  "Routes": [
+    {
+      "_comment": "Register/Login must stay anonymous at the gateway — there's no token to present yet.",
+      "DownstreamPathTemplate": "/api/v1/Auth/register",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5218 }],
+      "UpstreamPathTemplate": "/Identity/Auth/register",
+      "UpstreamHttpMethod": [ "POST" ]
+    },
+    {
+      "_comment": "Brute-force protection on this route is applied in Program.cs via ASP.NET Core's own RateLimiter, partitioned by client IP — NOT via Ocelot's RateLimitOptions. Ocelot's rate limiter identifies a 'client' by a self-declared request header, which an attacker mounting a credential-stuffing attack would simply omit or vary; it's meant for per-tenant/API-key throttling, not abuse protection. See the A3 writeup for how this was actually discovered (it silently failed with 503s in testing).",
+      "DownstreamPathTemplate": "/api/v1/Auth/login",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5218 }],
+      "UpstreamPathTemplate": "/Identity/Auth/login",
+      "UpstreamHttpMethod": [ "POST" ]
+    },
+    {
+      "_comment": "AuthenticationOptions is what makes Ocelot itself validate the JWT before proxying — an invalid/missing/expired token never reaches Identity.API at all.",
+      "DownstreamPathTemplate": "/api/v1/Auth/me",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5218 }],
+      "UpstreamPathTemplate": "/Identity/Auth/me",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    }
+  ],
+  "GlobalConfiguration": {
+    "BaseUrl": "http://localhost:5010"
+  }
+}

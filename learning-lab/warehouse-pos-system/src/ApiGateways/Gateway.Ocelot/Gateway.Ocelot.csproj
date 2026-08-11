@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\Common.ExceptionHandling\Common.ExceptionHandling.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- JwtBearer comes in transitively via Common.Security. -->
+    <PackageReference Include="Ocelot" Version="25.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Web SDK already includes *.json as Content by default (that's
+         why this isn't a duplicate-item error) — but unlike appsettings*.json
+         it doesn't automatically get CopyToOutputDirectory, so without this
+         it exists next to the source (fine for `dotnet run`, whose content
+         root is the project directory) but not next to the built DLL. -->
+    <Content Update="ocelot.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

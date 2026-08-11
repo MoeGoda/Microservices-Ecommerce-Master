@@ -29,7 +29,7 @@ a distributed transaction.
 **Phase A — Foundation**
 - [x] **A1 — Identity service**: Users/Roles, JWT issuing (User Management Module)
 - [x] **A2 — Shared exception handling + ProblemDetails**
-- [ ] A3 — Ocelot API Gateway + JWT validation at the gateway
+- [x] **A3 — Ocelot API Gateway + JWT validation at the gateway**
 - [ ] A4 — Angular SPA skeleton (login, auth, toaster wiring)
 
 **Phase B — Warehouse (barcodes)**
@@ -208,3 +208,81 @@ map correctly, the validation case includes a field-by-field `errors`
 object, an unexpected `InvalidOperationException` returns 500 with its
 message correctly *not* present in the response body, and a healthy
 endpoint is unaffected by any of it.
+
+## A3 — Ocelot API Gateway + JWT validation at the gateway
+
+**What it does:** `Gateway.Ocelot` is the single entry point into the
+system. Right now it only proxies to Identity.API (`/Identity/Auth/*`), but
+every future service (Warehouse, POS, Reporting, ...) will add routes here
+rather than being called directly — clients only ever need to know one
+address.
+
+**A third shared package, for the same reason as A2:** `Common.Security`
+holds `JwtSettings` and one `AddJwtAuthentication()` extension method.
+Every service that validates a JWT — the gateway now, every downstream
+service later, as defense in depth — needs byte-identical
+`TokenValidationParameters`. Writing that block out by hand in each
+`Program.cs` is exactly the kind of duplication that drifts silently (one
+service tweaks `ClockSkew`, the others don't, and now token expiry behaves
+inconsistently depending which service you hit). `Identity.API` was
+refactored to use this shared extension instead of its own inline copy.
+
+**Concepts introduced:**
+- **JWT validation moves to the edge.** `ocelot.json`'s `/Identity/Auth/me`
+  route carries `"AuthenticationOptions": { "AuthenticationProviderKey": "Bearer" }`.
+  A request with no token, an expired token, or a token signed with the
+  wrong secret is rejected *by the gateway* — it never reaches Identity.API
+  at all. `/register` and `/login` deliberately have no `AuthenticationOptions`:
+  you can't present a token for an endpoint whose entire job is to give you one.
+- **The JWT secret is now a genuinely shared secret.** Gateway.Ocelot's
+  `appsettings.json` has to carry the exact same `JwtSettings:Secret`/`Issuer`/`Audience`
+  as Identity.API's. There's no code sharing that enforces this — it's a
+  deployment/config discipline, and duplicating it by hand in two
+  `appsettings.json` files (as done here, for now) is a real gap Phase F2
+  will close with one shared secret source instead of copy-pasted values.
+- **The Authorization header passes through untouched.** Ocelot forwards
+  every request header to the downstream service by default — verified
+  below by having the (stubbed) downstream echo the header back. That's
+  what lets Identity.API's own `[Authorize]` on `/me` still work: the
+  gateway validating the token doesn't replace the service validating it
+  again if it chooses to (defense in depth, not "trust the gateway blindly").
+
+**Two real bugs found while verifying this — both worth knowing about, not just fixing quietly:**
+
+1. **A health check that silently returned 404.** `app.MapHealthChecks("/hc")`
+   was mapped before `await app.UseOcelot()`, which looked right — but
+   top-level `Map*()` calls in minimal hosting are deferred to run
+   *implicitly at the very end* of the middleware pipeline, after
+   `UseOcelot()`'s own catch-all middleware has already handled (or
+   404'd) the request. Ocelot's middleware is terminal — it never calls
+   `next()` for a path it doesn't recognize. The fix is calling
+   `app.UseRouting()` / `app.UseEndpoints(...)` *explicitly*, which
+   dispatches endpoint matches at that exact point in the pipeline instead
+   of at the implicit end.
+2. **Ocelot's own `RateLimitOptions` doesn't do what you'd assume.** The
+   original plan put `RateLimitOptions` directly on the `/login` route in
+   `ocelot.json` to slow down credential stuffing. Testing it immediately
+   returned `503` on every request — Ocelot's rate limiter identifies a
+   "client" via a self-declared request header, and with no client sending
+   that header, it couldn't identify *anyone*, including a legitimate
+   caller. Worse: even if configured correctly, this mechanism is the wrong
+   tool for the job — an actual attacker would simply omit the header to
+   get an unlimited budget. It's built for per-tenant/API-key throttling,
+   not abuse protection. The real fix uses ASP.NET Core's own
+   `RateLimiter` middleware with a global limiter partitioned by
+   `HttpContext.Connection.RemoteIpAddress` — an attacker can't opt out of
+   having an IP address the way they can opt out of sending a header.
+
+**Verified against a real gateway process, not just compiled:** with no
+Docker/SQL Server available in this sandbox, Identity.API itself couldn't
+run, so a stand-in stub server (mimicking its three endpoints, deleted
+after) stood on its port instead — isolating the test to exactly what's new
+in A3 (Ocelot's routing + auth + rate limiting), the same principle as A2's
+focused test. The real `Gateway.Ocelot.dll` was run as an actual process
+and hit with real HTTP requests:
+- `GET /hc` → `200 Healthy`
+- `POST /Identity/Auth/register` (no token) → `200`, proxied to the stub
+- `GET /Identity/Auth/me` with no token → `401`, **from the gateway** (confirmed the stub never saw the request)
+- `GET /Identity/Auth/me` with a JWT signed using the correct shared secret → `200`, proxied through, `Authorization` header intact
+- `GET /Identity/Auth/me` with a JWT signed using the *wrong* secret → `401`
+- 6 rapid `POST /Identity/Auth/login` calls → the first 5 succeeded, the 6th returned `429`
