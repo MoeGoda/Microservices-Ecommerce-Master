@@ -28,5 +28,18 @@ namespace Warehouse.Domain.Entities
         // asking "in what unit, though?" every time.
         public int BaseUnitOfMeasureId { get; set; }
         public UnitOfMeasure BaseUnitOfMeasure { get; set; } = null!;
+
+        // Set only when this Item is itself a retail pack/variant of
+        // another Item — e.g. "Water 500ml – Pack of 6" pointing back to
+        // "Water 500ml – Single." This is deliberately a SEPARATE Item
+        // (its own Sku, barcode, price, StockLevel) rather than an
+        // ItemUnit conversion, because a pack like this is independently
+        // priced and shelved, not just a different counting unit for the
+        // same sellable thing — see ItemUnit for the case where it IS
+        // just a counting unit (e.g. "received by the BOX, sold by the
+        // PCS, one price per PCS"). Null for a standalone item or a base
+        // product with no pack variants.
+        public int? ParentItemId { get; set; }
+        public Item? ParentItem { get; set; }
     }
 }

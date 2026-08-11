@@ -61,6 +61,16 @@ namespace Warehouse.Infrastructure.Persistence
                        .WithMany()
                        .HasForeignKey(i => i.BaseUnitOfMeasureId)
                        .OnDelete(DeleteBehavior.Restrict);
+
+                // Self-referencing, optional: a pack/variant Item points
+                // back at its base product. Restrict so a base product
+                // with existing pack variants can't be deleted out from
+                // under them — that has to be an explicit decision made
+                // somewhere in B2, not something a delete silently cascades.
+                builder.HasOne(i => i.ParentItem)
+                       .WithMany()
+                       .HasForeignKey(i => i.ParentItemId)
+                       .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<ItemBarcode>(builder =>

@@ -44,6 +44,15 @@ namespace Warehouse.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<Item>> GetVariants(int parentItemId)
+        {
+            return await _context.Items
+                .Include(i => i.BaseUnitOfMeasure)
+                .Where(i => i.ParentItemId == parentItemId)
+                .OrderBy(i => i.Name)
+                .ToListAsync();
+        }
+
         public async Task<Item> AddAsync(Item item)
         {
             await _context.Items.AddAsync(item);

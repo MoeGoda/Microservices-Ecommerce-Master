@@ -70,6 +70,7 @@ namespace Warehouse.Infrastructure.Migrations
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     CategoryId = table.Column<int>(type: "int", nullable: false),
                     BaseUnitOfMeasureId = table.Column<int>(type: "int", nullable: false),
+                    ParentItemId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -79,6 +80,12 @@ namespace Warehouse.Infrastructure.Migrations
                         name: "FK_Items_Categories_CategoryId",
                         column: x => x.CategoryId,
                         principalTable: "Categories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Items_Items_ParentItemId",
+                        column: x => x.ParentItemId,
+                        principalTable: "Items",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -266,6 +273,11 @@ namespace Warehouse.Infrastructure.Migrations
                 name: "IX_Items_CategoryId",
                 table: "Items",
                 column: "CategoryId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Items_ParentItemId",
+                table: "Items",
+                column: "ParentItemId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Items_Sku",

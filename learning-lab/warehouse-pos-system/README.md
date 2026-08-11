@@ -490,3 +490,39 @@ item is genuinely rejected by the filtered unique index, while a second
 carries its own independent base unit; Cola's `ItemUnit` conversion
 (1 BOX = 12 PCS) computes correctly; and `Sku` lookups are confirmed
 independent of any barcode.
+
+**A second revision: `Item.ParentItemId`, from a supermarket-specific
+design review.** A follow-up review of this schema for supermarket use
+raised a real fork `ItemUnit` doesn't cover: is a retail pack (e.g. "Water
+500ml – Pack of 6") the *same sellable thing* as the single bottle, just
+counted differently — or a genuinely separate product with its own shelf
+price and barcode, where the pack price isn't simply 6× the single price?
+The two cases need different models:
+```
+Same item, different counting unit    -> ItemUnit conversion (Cola/BOX,
+ (one price, receive-by-carton,          already built above)
+  sell-by-piece)
+
+Independently priced/shelved pack     -> a SEPARATE Item, linked back via
+ (its own barcode, its own price,        the new nullable ParentItemId
+  its own StockLevel)                    (self-referencing FK, Restrict
+                                          on delete)
+```
+Seeded as a concrete example: `BEV-WATER-500-PACK6` is its own `Item`
+(own `Sku`, own barcode, priced at 6.50 rather than 6× the 1.20
+single-bottle price) with `ParentItemId` pointing at the base
+`BEV-WATER-500` item — and, correctly, its own independent `StockLevel`,
+not a share of the single bottle's. `IItemRepository.GetVariants(id)`
+answers "what pack variants exist for this base product." Verified with a
+second focused SQLite test, 10/10 checks passing, including that scanning
+the pack's barcode resolves to the pack `Item` (not the single bottle),
+and that the two items' `StockLevel` rows are genuinely separate.
+
+That same review listed several other real supermarket concepts — batch
+numbers, expiry dates, purchase price vs. selling price, price history,
+promotions, supplier tracking. Rather than absorbing all of it into B1,
+only **selling price history + promotions** got filed as an explicit
+near-term item (Phase C, POS/pricing — not Warehouse, since price and
+promotion rules are a selling-side concern, not a stock-shape one). The
+rest stays an unscoped list for now rather than half-built tables nothing
+yet needs.

@@ -32,6 +32,30 @@ namespace Warehouse.Infrastructure.Persistence
             context.Items.AddRange(items);
             await context.SaveChangesAsync();
 
+            // A pack of 6 isn't "6 waters counted differently" — it's its
+            // own shelf item with its own barcode and its own price that
+            // isn't simply 6x the single-bottle price. That's why this is
+            // a separate Item (linked back via ParentItemId) rather than
+            // an ItemUnit conversion on the water Item itself: compare
+            // with Cola's BOX below, which IS just a counting unit for
+            // the same sellable thing.
+            var waterPack6 = new Item
+            {
+                Sku = "BEV-WATER-500-PACK6",
+                Name = "Sparkling Water 500ml - Pack of 6",
+                UnitPrice = 6.50m,
+                CategoryId = beverages.Id,
+                Category = beverages,
+                BaseUnitOfMeasureId = pcs.Id,
+                BaseUnitOfMeasure = pcs,
+                ParentItemId = water.Id,
+                ParentItem = water,
+            };
+            context.Items.Add(waterPack6);
+            await context.SaveChangesAsync();
+
+            var allItems = new[] { cola, water, chips, waterPack6 };
+
             // Cola ships this quarter with two valid barcodes — the
             // manufacturer's own, and a relabeled supplier variant — both
             // resolving to the same item and the same shared stock count.
@@ -41,6 +65,7 @@ namespace Warehouse.Infrastructure.Persistence
                 new ItemBarcode { ItemId = cola.Id, Barcode = "5901234123457", BarcodeType = BarcodeType.EAN13, IsPrimary = true },
                 new ItemBarcode { ItemId = cola.Id, Barcode = "5901234199999", BarcodeType = BarcodeType.EAN13, IsPrimary = false },
                 new ItemBarcode { ItemId = water.Id, Barcode = "5901234123464", BarcodeType = BarcodeType.EAN13, IsPrimary = true },
+                new ItemBarcode { ItemId = waterPack6.Id, Barcode = "5901234177777", BarcodeType = BarcodeType.EAN13, IsPrimary = true },
                 new ItemBarcode { ItemId = chips.Id, Barcode = "5901234123471", BarcodeType = BarcodeType.EAN13, IsPrimary = true }
             );
 
@@ -52,7 +77,7 @@ namespace Warehouse.Infrastructure.Persistence
 
             await context.SaveChangesAsync();
 
-            foreach (var item in items)
+            foreach (var item in allItems)
             {
                 context.StockLevels.Add(new StockLevel
                 {

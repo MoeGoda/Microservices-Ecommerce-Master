@@ -12,7 +12,7 @@ using Warehouse.Infrastructure.Persistence;
 namespace Warehouse.Infrastructure.Migrations
 {
     [DbContext(typeof(WarehouseContext))]
-    [Migration("20260811150158_InitialCreate")]
+    [Migration("20260811151658_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -98,6 +98,9 @@ namespace Warehouse.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int?>("ParentItemId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -111,6 +114,8 @@ namespace Warehouse.Infrastructure.Migrations
                     b.HasIndex("BaseUnitOfMeasureId");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("ParentItemId");
 
                     b.HasIndex("Sku")
                         .IsUnique();
@@ -392,9 +397,16 @@ namespace Warehouse.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Warehouse.Domain.Entities.Item", "ParentItem")
+                        .WithMany()
+                        .HasForeignKey("ParentItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("BaseUnitOfMeasure");
 
                     b.Navigation("Category");
+
+                    b.Navigation("ParentItem");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.ItemBarcode", b =>
