@@ -16,28 +16,50 @@ namespace Warehouse.Infrastructure.Repositories
 
         public async Task<Item?> GetById(int id)
         {
-            return await _context.Items.Include(i => i.Category).FirstOrDefaultAsync(i => i.Id == id);
+            return await _context.Items
+                .Include(i => i.Category)
+                .Include(i => i.BaseUnitOfMeasure)
+                .FirstOrDefaultAsync(i => i.Id == id);
         }
 
-        public async Task<Item?> GetByBarcode(string barcode)
+        public async Task<Item?> GetBySku(string sku)
         {
-            return await _context.Items.Include(i => i.Category).FirstOrDefaultAsync(i => i.Barcode == barcode);
+            return await _context.Items
+                .Include(i => i.Category)
+                .Include(i => i.BaseUnitOfMeasure)
+                .FirstOrDefaultAsync(i => i.Sku == sku);
         }
 
-        public async Task<bool> BarcodeExists(string barcode)
+        public async Task<bool> SkuExists(string sku)
         {
-            return await _context.Items.AnyAsync(i => i.Barcode == barcode);
+            return await _context.Items.AnyAsync(i => i.Sku == sku);
         }
 
         public async Task<IEnumerable<Item>> GetAll()
         {
-            return await _context.Items.Include(i => i.Category).OrderBy(i => i.Name).ToListAsync();
+            return await _context.Items
+                .Include(i => i.Category)
+                .Include(i => i.BaseUnitOfMeasure)
+                .OrderBy(i => i.Name)
+                .ToListAsync();
         }
 
+        public async Task<IEnumerable<Item>> GetVariants(int parentItemId)
+        {
+            return await _context.Items
+                .Include(i => i.Category)
+                .Include(i => i.BaseUnitOfMeasure)
+                .Where(i => i.ParentItemId == parentItemId)
+                .OrderBy(i => i.Name)
+                .ToListAsync();
+        }
+
+        // Stages only — see IUnitOfWork. CreateItemCommand stages this
+        // together with the item's first ItemBarcode and commits both at
+        // once, linked via navigation rather than a not-yet-assigned Id.
         public async Task<Item> AddAsync(Item item)
         {
             await _context.Items.AddAsync(item);
-            await _context.SaveChangesAsync();
             return item;
         }
     }

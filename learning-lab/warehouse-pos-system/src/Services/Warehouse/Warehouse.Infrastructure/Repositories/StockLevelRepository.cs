@@ -17,6 +17,7 @@ namespace Warehouse.Infrastructure.Repositories
         public async Task<StockLevel?> GetByItemAndLocation(int itemId, int locationId)
         {
             return await _context.StockLevels
+                .Include(s => s.Location)
                 .FirstOrDefaultAsync(s => s.ItemId == itemId && s.LocationId == locationId);
         }
 
@@ -28,11 +29,18 @@ namespace Warehouse.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        // Stages only — see IUnitOfWork. Receiving/adjusting stock needs
+        // this AND a StockTransaction insert to commit together.
         public async Task<StockLevel> AddAsync(StockLevel stockLevel)
         {
             await _context.StockLevels.AddAsync(stockLevel);
-            await _context.SaveChangesAsync();
             return stockLevel;
+        }
+
+        public Task UpdateAsync(StockLevel stockLevel)
+        {
+            _context.StockLevels.Update(stockLevel);
+            return Task.CompletedTask;
         }
     }
 }

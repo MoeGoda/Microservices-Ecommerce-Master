@@ -34,14 +34,15 @@ a distributed transaction.
 
 **Phase B — Warehouse (barcodes)**
 - [x] **B1 — Domain + Infrastructure (Items, barcodes, stock, locations)**
-- [ ] B2 — Application layer (CQRS/MediatR/FluentValidation)
-- [ ] B3 — API + Angular Admin Panel screen (master data)
+- [x] **B2 — Application layer (CQRS/MediatR/FluentValidation)**
+- [x] **B3 — API + Angular Admin Panel screen (master data)**
 
 **Phase C — POS using warehouse barcodes**
-- [ ] C1 — Domain/Application/Infrastructure (Sale, checkout)
+- [x] **C1 — Domain/Application/Infrastructure (Sale, checkout)**
 - [ ] C2 — Sync call to Warehouse (barcode + stock check)
 - [ ] C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)
 - [ ] C4 — Angular POS screen
+- [ ] C5 — Selling price history + promotions (POS pricing rules)
 
 **Phase D — Reporting**
 - [ ] D1 — Event-driven read models
@@ -385,22 +386,49 @@ npm start   # ng serve — http://localhost:4200
 ## B1 — Warehouse domain + infrastructure
 
 **What it does:** the data model behind the Warehouse Management Module —
-`Item` (with a unique `Barcode`), `Category`, `Location`, `StockLevel`
-(how many of an item are at a location, right now), and
-`StockTransaction` (an append-only ledger of every change to that
-number). No business operations yet (no "adjust stock," no "create item"
-command) — that's B2. This step is deliberately just the shape of the data
-and how it's stored.
+`Item`, `Category`, `Location`, `UnitOfMeasure`, `StockLevel` (how many of
+an item are at a location, right now), and `StockTransaction` (an
+append-only ledger of every change to that number). No business operations
+yet (no "adjust stock," no "create item" command) — that's B2. This step
+is deliberately just the shape of the data and how it's stored.
+
+**Revised after a real design question.** The first draft gave `Item` a
+single `Barcode` string. That breaks the moment an item legitimately has
+more than one valid barcode (a manufacturer's own vs. a relabeled supplier
+variant, say) while still needing to share one stock count — a case the
+single-barcode design couldn't represent at all without creating a second,
+disconnected `Item` row. The fix, worked out from that question:
+
+```
+Item             — the product definition. Its identity is Sku, not a
+                   barcode. Picks one UnitOfMeasure as its BaseUnitOfMeasure.
+ItemBarcode      — 1-to-many. Every barcode on this table resolves to the
+                   same Item (and therefore the same shared StockLevel).
+                   At most one row per item may be IsPrimary = true.
+UnitOfMeasure    — master data: PCS, KG, BOX, CARTON, LITER, ...
+ItemUnit         — an item's ALTERNATE units, each with a ConversionFactor
+                   into its base unit (e.g. "1 BOX of Cola = 12 PCS").
+                   The base unit itself has no row here — it's implicitly
+                   a factor of 1.
+```
+The rule that makes this hang together: **every inventory quantity —
+`StockLevel.QuantityOnHand`, `StockTransaction.QuantityChange` — is always
+expressed in the item's base unit.** A "receive 2 BOX" operation converts
+through `ItemUnit.ConversionFactor` before it ever touches those two
+tables; inventory never has to ask "in what unit, though?" A `Sku` is the
+item's own internal identifier, kept distinct from `Barcode` (an external,
+scannable identifier) on purpose — conflating the two is exactly what made
+the first draft brittle.
 
 **Same three-project layering as Identity, spread differently this time:**
 `Warehouse.Domain` (entities) and `Warehouse.Infrastructure` (EF Core, the
 real work of this step) exist in full. `Warehouse.Application` exists too,
 but only with `Contracts/Persistence` interfaces — no MediatR, no
 commands, nothing that needs FluentValidation yet. Identity built all four
-layers (including the API) in one step; Warehouse has more moving parts
-(five entities instead of two), so it's spread across B1/B2/B3 instead —
-persistence and business logic and the outward-facing API each get their
-own step to actually explain, rather than landing all at once.
+layers (including the API) in one step; Warehouse has more moving parts,
+so it's spread across B1/B2/B3 instead — persistence and business logic
+and the outward-facing API each get their own step to actually explain,
+rather than landing all at once.
 
 **The balance-vs-ledger split, and why it exists:**
 ```
@@ -418,6 +446,12 @@ where that handler gets written; B1 only builds the two tables it has to
 keep in sync.
 
 **Concepts introduced:**
+- **A filtered unique index.** "At most one `ItemBarcode` per item may be
+  primary" isn't "exactly one row per item" (an item can have many
+  non-primary barcodes) — it's a unique index on `ItemId` that only
+  applies `WHERE IsPrimary = 1`. Two non-primary barcodes for the same
+  item coexist fine; two primary ones for the same item are rejected by
+  the database itself.
 - **`IDesignTimeDbContextFactory<T>`.** Identity's migrations were
   generated with `--startup-project Identity.API`, because that's where a
   real `DbContextOptions` (with an actual connection string) got built.
@@ -438,14 +472,411 @@ keep in sync.
   living in a completely different service's database. A real FK
   constraint can't span that boundary; representing the link as plain data
   instead is how a microservices system has to handle it.
+- **A deliberate scope cut.** Serialized/lot-tracked inventory (one row
+  per physical unit — warranty devices, lots with expiry dates) is a
+  different, heavier model (`InventoryUnit`: `ItemId`, `SerialNumber`,
+  `Status`, ...) than quantity-based inventory. Nothing built here needs
+  it yet, so it isn't built — it's a documented extension point for if a
+  future item genuinely requires per-unit tracking, not a speculative
+  table sitting unused.
 
 **Verified with a focused runtime test (SQLite, deleted after — same
-approach as A1, since SQL Server isn't reachable in this sandbox):** 12
-checks, all passing — the 3 migration-seeded categories and 3 locations
-exist, the 3 runtime-seeded sample items exist, `GetByBarcode` finds a
-seeded item (`Cola 330ml Can`, barcode `5901234123457`) with its `Category`
-correctly joined, an unknown barcode returns `null` rather than throwing,
-the seeded `StockLevel` shows exactly 50 units at shelf A1, **a second
-item with a duplicate barcode is genuinely rejected by the database's own
-unique index** (not just application-level checking), and a manually
-recorded `StockTransaction` persists and reads back correctly.
+approach as A1, since SQL Server isn't reachable in this sandbox):** 13
+checks, all passing, aimed straight at the scenario that prompted the
+revision — a seeded item (`Cola 330ml Can`) with **two** barcodes, both
+resolving to the same `ItemId`, sharing **one** `StockLevel` row at 50
+units (not split across barcodes); a second *primary* barcode for the same
+item is genuinely rejected by the filtered unique index, while a second
+*non-primary* one is accepted fine; a different item (`Sparkling Water`)
+carries its own independent base unit; Cola's `ItemUnit` conversion
+(1 BOX = 12 PCS) computes correctly; and `Sku` lookups are confirmed
+independent of any barcode.
+
+**A second revision: `Item.ParentItemId`, from a supermarket-specific
+design review.** A follow-up review of this schema for supermarket use
+raised a real fork `ItemUnit` doesn't cover: is a retail pack (e.g. "Water
+500ml – Pack of 6") the *same sellable thing* as the single bottle, just
+counted differently — or a genuinely separate product with its own shelf
+price and barcode, where the pack price isn't simply 6× the single price?
+The two cases need different models:
+```
+Same item, different counting unit    -> ItemUnit conversion (Cola/BOX,
+ (one price, receive-by-carton,          already built above)
+  sell-by-piece)
+
+Independently priced/shelved pack     -> a SEPARATE Item, linked back via
+ (its own barcode, its own price,        the new nullable ParentItemId
+  its own StockLevel)                    (self-referencing FK, Restrict
+                                          on delete)
+```
+Seeded as a concrete example: `BEV-WATER-500-PACK6` is its own `Item`
+(own `Sku`, own barcode, priced at 6.50 rather than 6× the 1.20
+single-bottle price) with `ParentItemId` pointing at the base
+`BEV-WATER-500` item — and, correctly, its own independent `StockLevel`,
+not a share of the single bottle's. `IItemRepository.GetVariants(id)`
+answers "what pack variants exist for this base product." Verified with a
+second focused SQLite test, 10/10 checks passing, including that scanning
+the pack's barcode resolves to the pack `Item` (not the single bottle),
+and that the two items' `StockLevel` rows are genuinely separate.
+
+That same review listed several other real supermarket concepts — batch
+numbers, expiry dates, purchase price vs. selling price, price history,
+promotions, supplier tracking. Rather than absorbing all of it into B1,
+only **selling price history + promotions** got filed as an explicit
+near-term item (Phase C, POS/pricing — not Warehouse, since price and
+promotion rules are a selling-side concern, not a stock-shape one). The
+rest stays an unscoped list for now rather than half-built tables nothing
+yet needs.
+
+## B2 — Warehouse application layer
+
+**What it does:** the business operations on top of B1's schema —
+creating an item (with its first barcode), adding an extra barcode or an
+alternate unit to an existing item, receiving stock, adjusting stock, and
+the read side (item detail/list, barcode lookup, variants, per-location
+stock, master-data dropdowns). Same CQRS/MediatR/FluentValidation shape as
+Identity's Auth commands (A1) — `Features/<Area>/{Commands,Queries}/<Name>/`,
+one command or query per folder, a `ValidationBehaviour` running
+FluentValidation ahead of every handler, an `UnhandledExceptionBehaviour`
+logging anything that isn't an expected `IHasStatusCode` failure.
+
+**The one real addition to that pattern: `IUnitOfWork`.** B1 flagged this
+gap explicitly — receiving or adjusting stock has to write a `StockLevel`
+change *and* the `StockTransaction` that explains it, together, or the
+ledger stops matching the balance. Identity's repositories never needed
+this (`RegisterCommandHandler` only ever adds one `User`), so they call
+`SaveChangesAsync()` themselves, inside `AddAsync`. Warehouse's
+repositories don't — every `AddAsync`/`UpdateAsync` now only stages a
+change on the tracked `DbContext`; a handler that needs several staged
+changes to succeed or fail together calls `IUnitOfWork.SaveChangesAsync()`
+itself, exactly once, at the end:
+```
+ReceiveStockCommandHandler:
+  stage: StockLevel created-or-updated (+baseQuantity)
+  stage: StockTransaction inserted (Reason = Received)
+  IUnitOfWork.SaveChangesAsync()   <- both commit in ONE transaction
+```
+The same mechanism solves a second problem for free: `CreateItemCommand`
+stages a new `Item` and its first `ItemBarcode` together, but the
+barcode's `ItemId` can't be set directly — the `Item`'s `Id` is
+database-generated and doesn't exist until it's saved. Setting
+`itemBarcode.Item = item` (the navigation, not the FK value) and staging
+both lets EF Core's change tracker fix up the real `ItemId` once
+`SaveChanges` resolves the new `Item`'s key — both rows are created or
+neither is.
+
+**Unit conversion happens once, in the write path, never on read.**
+`ReceiveStockCommand` accepts a quantity in *whatever unit the goods
+arrived in* (`UnitOfMeasureId`) — receive 2 `CARTON`, say. The handler
+resolves the item's `ItemUnit.ConversionFactor` for that unit (or treats
+it as 1:1 if it's already the item's base unit) and converts to the base
+unit *before* touching `StockLevel`/`StockTransaction`, which — per B1's
+invariant — only ever speak the item's base unit. A conversion that
+doesn't land on a whole number (`StockLevel.QuantityOnHand` is an `int`)
+is rejected loudly (`ConflictException`) rather than silently rounded —
+that would quietly corrupt a stock count.
+
+**`AdjustStockCommand` and `ReceiveStockCommand` look similar but encode
+different intent on purpose:** Receive may *create* a `StockLevel` (goods
+can arrive somewhere for the first time); Adjust never does — adjusting a
+balance that doesn't exist yet doesn't mean anything, so it's a
+`NotFoundException`. Receive is always positive and always
+`StockTransactionReason.Received`; Adjust is signed either direction and
+always `StockTransactionReason.Adjustment` — the *command* the caller
+chose to call carries that intent, so neither command exposes a `Reason`
+parameter a caller could set inconsistently (e.g. an "Adjustment" that's
+actually a sale — that's Phase C/C3's own event-driven path, not this).
+
+**`InsufficientStockException`, filling in a prediction from B1.** B1's
+`IHasStatusCode` comment predicted this almost by name: *"a future service
+(Warehouse's 'InsufficientStockException', say) can opt into the same
+handling just by implementing this interface — it never has to be added
+to this shared library."* `AdjustStockCommand` rejecting a change that
+would take `QuantityOnHand` negative is exactly that case — the exception
+lives in `Warehouse.Application`, implements `Common.Exceptions.IHasStatusCode`
+(409), and `Common.Exceptions` never had to change.
+
+**Two DTO shapes for `Item`, not one.** `ItemSummaryDto` (list rows —
+`GetAllItemsQuery`, `GetItemVariantsQuery`) carries no barcodes or unit
+conversions; `ItemDetailDto` (`GetItemByIdQuery`, `ResolveBarcodeQuery`)
+carries both plus the item's pack variants. Fetching those three
+collections is a real per-item cost that a list of many items shouldn't
+pay for every row it isn't going to show — the same list-vs-detail split
+a REST API would make, just expressed as two DTO types instead of one
+endpoint with an optional `?expand=` parameter.
+
+**A query can return `null` instead of throwing.** Every command and
+most queries throw `NotFoundException` on a missing id — but
+`ResolveBarcodeQuery` (what a POS scan, Phase C, or an admin "look up by
+barcode" box actually calls) returns `ItemDetailDto?` and hands back
+`null` for an unknown barcode. Scanning something that isn't in the
+catalog is an ordinary, expected outcome of using a barcode scanner, not
+an exceptional one — the caller decides what a "not found" scan means
+(show "unknown item," most likely), rather than having that decision
+forced on it by a thrown exception.
+
+**Concepts introduced:**
+- **Manual DTO mapping, deliberately.** No AutoMapper — every DTO has a
+  static `FromEntity(...)` method, same reasoning FluentValidation and
+  MediatR get used explicitly rather than hidden behind a mapping
+  convention: a reader can see exactly which entity fields end up where,
+  and a mapper that needs a related entity already loaded (e.g.
+  `ItemUnitDto.FromEntity` needs `itemUnit.UnitOfMeasure` `Include`d) says
+  so in a comment instead of failing silently at runtime.
+- **Business/existence checks live in the handler, not the validator.**
+  FluentValidation validators here only ever check input *shape* (is the
+  string empty, is the number positive) — whether a `Sku` is already
+  taken, whether a `CategoryId` refers to a real `Category`, needs a
+  database round trip, which is exactly why `RegisterCommandHandler` (A1)
+  does its `UserNameExists` check in the handler rather than the
+  validator. Same split here, applied consistently across five commands
+  instead of one.
+
+**Verified with a focused runtime test (SQLite, deleted after) run
+through actual MediatR dispatch — not calling handlers directly, so the
+`ValidationBehaviour`/`UnhandledExceptionBehaviour` pipeline is exercised
+exactly as `Warehouse.API` (B3) will call it:** 25 checks, all passing.
+Among them: creating an item and reading back its Id (proving the EF
+navigation fixup actually worked, not a leftover temporary key);
+promoting a new barcode to primary and confirming the *old* primary was
+demoted in the same call, leaving exactly one primary; receiving 10 `PCS`
+then 2 `CARTON` (2×24) on the same item and getting a `StockLevel` of 58;
+adjusting -8 to reach 50, then confirming an adjustment that would go
+negative throws `InsufficientStockException` while a location with no
+existing `StockLevel` throws `NotFoundException` instead; rejecting a
+duplicate `Sku`, a duplicate barcode, a duplicate `ItemUnit` conversion,
+and a base-unit-as-conversion attempt, each with `ConflictException`; an
+empty `Sku` rejected by `ValidationException` before the handler ever
+runs; `GetItemVariantsQuery` finding B1's seeded pack-of-6 from its base
+item; and `ResolveBarcodeQuery` returning the right item for a known
+barcode and `null` — no exception — for an unknown one.
+
+## B3 — Warehouse.API + gateway route + Angular Admin Panel
+
+**What it does:** the outward-facing surface for everything B1/B2 built —
+`Warehouse.API` (three thin controllers dispatching straight to MediatR,
+same shape as Identity's `AuthController`), thirteen new Ocelot routes
+under `/Warehouse/...`, and a real Angular screen replacing A4's
+placeholder: create an item, browse the catalog, and manage one selected
+item's barcodes, alternate units, and stock — all the way through the
+actual JWT-protected HTTP pipeline, not a bypass.
+
+```
+ItemsController        GET/POST /Items, GET /Items/{id}, GET /Items/{id}/variants,
+                        GET /Items/barcodes/{barcode}, POST /Items/{id}/barcodes,
+                        POST /Items/{id}/units
+StockController        GET /Stock/{itemId}, POST /Stock/receive, POST /Stock/adjust
+MasterDataController   GET /MasterData/{categories,locations,units-of-measure}
+```
+Every route is `[Authorize]` — unlike Identity, there's no anonymous
+Warehouse route at all, so it sits once on each controller rather than
+repeated per action.
+
+**A gap in `WebApplicationFactory`-based testing that doesn't show up in a
+tutorial.** Verifying this step meant, for the first time, actually
+booting the real ASP.NET Core pipeline (routing, JWT auth, MediatR,
+exception handling) rather than calling handlers directly against EF Core
+— B1/B2's tests never exercised any of that. Two real problems came up
+doing it properly:
+- `WebApplicationFactory<T>` locates its target's content root by walking
+  up from the *test* assembly looking for a `.sln` — a throwaway test
+  project living outside this repo's solution tree has nothing for that
+  search to find, and just fails outright (`UseContentRoot` alone doesn't
+  fix it; the factory's own internal `ConfigureWebHost` call runs the
+  search regardless). The actual fix was placing the test project as a
+  sibling *inside* `Services/Warehouse/` — deleted afterward, never
+  committed — so the walk-up naturally reaches `WarehousePos.sln`.
+- `Program.cs`'s own startup code calls `context.Database.Migrate()` —
+  and `Migrate()` replays the *already-compiled* migration's literal DDL
+  text, which is SQL Server dialect (`nvarchar(max)`, `datetime2`) because
+  `WarehouseContextFactory` targets SqlServer at `dotnet ef migrations
+  add` time. Swapping the DbContext to SQLite for the test doesn't help —
+  that compiled text can't run against SQLite no matter which provider
+  the *context* is configured for. The fix mirrors what real EF Core
+  tooling does: build the schema fresh from the live model via
+  `EnsureCreated()` (correct for whichever provider is actually active),
+  then pre-seed the `__EFMigrationsHistory` table with this migration's
+  Id so `Migrate()` sees nothing pending and skips straight through,
+  rather than trying to replay incompatible SQL. `public partial class
+  Program { }` was added to the end of `Program.cs` for this — top-level
+  statements normally generate an invisible `Program` class;
+  `WebApplicationFactory<Program>` needs a real type to target.
+
+**The URL is authoritative over the body, not merely checked against
+it.** `AddItemBarcodeCommand`/`AddItemUnitCommand` both carry `ItemId` as
+a property (B2), and their controller routes are nested under a specific
+item (`POST /Items/{id}/barcodes`). Rather than validating that the
+route's `{id}` matches whatever `ItemId` the client put in the request
+body — and rejecting a mismatch — the controller action just overwrites
+`command.ItemId = id` unconditionally after binding. A route-says-item-5,
+body-says-item-9 mismatch becomes structurally impossible rather than a
+validation error to catch; verified directly by sending a deliberately
+wrong `ItemId` in the body and confirming the barcode still landed on the
+item named in the URL.
+
+**A query returning `null` becomes an HTTP 404 at this layer, not
+before.** B2 made `ResolveBarcodeQuery` return `ItemDetailDto?` rather
+than throw `NotFoundException`, because an unknown scan is an ordinary
+outcome of using a barcode scanner, not an exceptional one — and that
+reasoning doesn't change here. What the controller adds is the HTTP
+translation: `return result is null ? NotFound() : Ok(result);`. 404 *is*
+the correct status for "this resource doesn't exist" — the controller
+isn't overriding B2's decision, it's just the seam where an ordinary
+domain-level `null` becomes the HTTP vocabulary a caller actually expects.
+
+**Angular: replacing A4's placeholder for real.** `AdminShellComponent`
+used to be the whole point of A4 — proving the auth chain (login → token
+stored → guard lets you in → `currentUser` signal populated) worked end
+to end, with a placeholder note saying master-data management "lands here
+in Step B3." It still shows who's signed in; it now also hosts
+`ItemsAdminComponent`, one screen (no lazy-loaded sub-routes — nothing
+else in this app has that precedent yet, and one screen with a selection
+panel doesn't need it) covering:
+- **Create item** — a reactive form (`Sku`, `Name`, `Description`,
+  `UnitPrice`, `Category`/`BaseUnitOfMeasure` selects populated from
+  `MasterDataController`, an optional `ParentItem` select for pack
+  variants, and the required first `Barcode`).
+- **Items table** — every item, with a "Manage" action per row.
+- **Selected item panel** — barcodes as chips (the primary one visually
+  highlighted), alternate units, pack variants, current stock per
+  location, and three mini-forms: add a barcode, receive stock (any unit
+  the item supports, converted server-side per B2), and adjust stock
+  (signed, only against a location that already has a `StockLevel`).
+
+`WarehouseService` mirrors `AuthService`'s own shape exactly — one
+`Injectable` wrapping `HttpClient`, every call built on
+`${environment.apiBaseUrl}/Warehouse/...` (the gateway's upstream path,
+never Warehouse.API's own port directly), no extra "API service"
+abstraction layer, since none exists anywhere else in this app either.
+`shared/models/warehouse.models.ts` mirrors every backend DTO and command
+shape 1:1, same convention as `auth.models.ts`.
+
+**Verified two ways.** The backend: a `WebApplicationFactory`-based test
+(SQLite, deleted after) sending real HTTP requests through the real
+pipeline — 21 checks, all passing, including a request with no token
+(401), an expired token (401), a token signed with the wrong secret
+(401), the URL-overrides-body barcode case above, the null→404 barcode
+resolution, a validation failure surfacing as an actual 400
+`ProblemDetails` body over HTTP (not just inside the Application layer),
+and `InsufficientStockException` surfacing as a real 409. The frontend:
+since this sandbox has no SQL Server, there's no live backend to
+actually sign in against — `ng build` was verified clean, then the dev
+server was driven with Playwright: first with a session token injected
+directly into `localStorage` (bypassing the login call, matching exactly
+what `AuthService` itself reads) to confirm the screen renders and the
+create-item form is interactive with real network failures surfacing as
+the expected toast (proving `errorInterceptor` still works for this new
+feature) rather than a broken page; then again with the gateway's
+`/Warehouse/...` routes mocked via Playwright's request interception,
+returning realistic `ItemDetailDto`/`StockLevelDto` payloads, to actually
+render and screenshot the selected-item panel — barcode chips, the
+primary one highlighted, the BOX=12 PCS conversion, the stock table, and
+all three mini-forms — confirming the whole template renders correctly
+with real data, something `ng build` alone can't prove. No Angular
+console errors in either run beyond the expected network failures.
+
+**Try it locally** (needs SQL Server, which this sandbox doesn't have):
+```bash
+# From src/, in three terminals:
+dotnet run --project Services/Identity/Identity.API
+dotnet run --project Services/Warehouse/Warehouse.API
+dotnet run --project ApiGateways/Gateway.Ocelot
+
+# From client/:
+npm start
+# → http://localhost:4300, sign in as admin / Admin@12345
+```
+
+## C1 — POS domain + application + infrastructure
+
+**What it does:** the third and final "layer" pattern in this codebase,
+using the one Identity chose (A1) — Domain, Application, and
+Infrastructure built together in a single step, rather than spread across
+three like Warehouse (B1/B2/B3). POS's footprint is closer to Identity's
+(two entities, a handful of commands) than to Warehouse's, so it gets
+Identity's shape: `Sale`/`SaleLine`, five commands (`StartSale`,
+`AddSaleLine`, `RemoveSaleLine`, `Checkout`, `CancelSale`), one query
+(`GetSaleById`), all wired through the same `ValidationBehaviour`/
+`UnhandledExceptionBehaviour` pipeline every other service uses. No
+`POS.API` yet — same reasoning as B1 not having a `Warehouse.API`: there's
+nothing for `dotnet ef` to point at, so `PosContextFactory` fills in at
+design time, and this step is verified at the MediatR/EF Core level, not
+over HTTP.
+
+**A completed sale never touches Warehouse's database — on purpose.**
+POS and Warehouse are separate services with separate databases;
+`CheckoutCommand` only ever changes `Sale.Status`/`CompletedAt` in POS's
+*own* database. Decrementing Warehouse's stock for what was just sold has
+to happen as a *reaction* to this sale completing, not as a second write
+folded into the same local transaction — there is no transaction that can
+span two different databases here. `CheckoutCommandHandler` has a comment
+marking exactly where that reaction plugs in once it exists: a
+`SaleCompleted` event, fired from right after this commit, consumed by a
+saga on Warehouse's side. That's Step C3, entirely unbuilt right now —
+today, checking out a sale genuinely does nothing to Warehouse's stock.
+
+**`SaleLine` snapshots `Sku`/`ItemName`/`UnitPrice` instead of reading
+them live from Warehouse.** This is the same instinct as
+`StockTransaction.Reference` (B1) applied to a different problem: a
+completed sale is a *historical record* — a receipt printed today has to
+keep reading the same tomorrow even if Warehouse's price or name for that
+item changes next week. Only `ItemId` is kept as a live reference,
+because C3's stock decrement genuinely needs to know which Warehouse item
+this line refers to; everything a customer would see printed on a
+receipt is captured once, at the moment the line was added, and never
+re-read afterward.
+
+**`AddSaleLineCommand` trusts its caller completely, and that's
+deliberate, temporary scope, not an oversight.** It takes `Sku`/
+`ItemName`/`UnitPrice` as plain input rather than resolving them itself —
+nothing in this command reaches out to Warehouse to verify any of it.
+That's exactly what makes Step C2 ("sync call to Warehouse: barcode
+validation + stock check") a real, necessary next step rather than
+already-done-by-accident: C2 is where a genuine cross-service call gets
+inserted *in front of* this command, so the values it receives become
+verified instead of merely assumed. Building that trust boundary
+backwards — having `AddSaleLineCommand` itself reach into Warehouse right
+now — would tangle a cross-service HTTP/gRPC call into a step that's
+supposed to be about POS's own domain shape only.
+
+**The same `IUnitOfWork` lesson from B2, recurring for the same reason.**
+`AddSaleLineCommand` inserts a new `SaleLine` *and* updates its parent
+`Sale.Total` — two writes that have to commit together, or the running
+total stops matching the sum of its lines, exactly the
+`StockLevel`/`StockTransaction` problem B2 solved for Warehouse.
+`POS.Infrastructure` repositories only ever stage changes; `IUnitOfWork`
+commits them. Identity never needed this (no Identity command touches
+more than one entity) — POS does, the same way Warehouse did, which is
+why this pattern keeps showing up in exactly the services whose commands
+have to keep two rows in sync and never in the services that don't.
+
+**Concepts introduced:**
+- **A richer, three-state lifecycle enforced entirely by handlers, not
+  by the entity.** `SaleStatus` (`InProgress` → `Completed`/`Cancelled`)
+  has real transition rules — lines can only be added/removed while
+  `InProgress`; only an `InProgress` sale can be checked out or
+  cancelled; checkout refuses an empty sale. Every one of those checks
+  lives in a command handler (`ConflictException`), not in `Sale` itself
+  — `Sale`/`SaleLine` stay exactly as anemic as `Item`/`StockLevel` did in
+  Warehouse. Consistency over introducing a richer domain-model style
+  just because POS's lifecycle happens to be a good fit for one.
+- **A deliberately narrow `Cancelled`.** It means "abandoned before
+  payment," nothing more. A *post-completion* return/refund is a
+  materially different feature — it needs a compensating stock increase
+  on Warehouse's side, not just a status flip in POS — and doesn't exist
+  yet. The enum's own comment says so explicitly, so a future "add
+  returns" step finds a clear, named gap instead of ambiguous room to
+  misuse `Cancelled` for something it was never designed to mean.
+
+**Verified with a focused runtime test (SQLite, deleted after — same
+approach as B1/B2), dispatched through actual MediatR, not calling
+handlers directly:** 16 checks, all passing. Among them: starting a sale
+and adding two lines gives the exact expected running `Total` (3.00, then
+8.00); removing a line brings `Total` back down correctly (5.00) and a
+second attempt to remove the *same* line is rejected as not found;
+checkout refuses an empty sale but succeeds on one with a line,
+correctly stamping `CompletedAt`; a completed sale rejects *both* another
+line being added to it and being checked out a second time; cancelling
+an in-progress sale works but cancelling an already-completed one is
+rejected; and `GetSaleByIdQuery` returns the right sale with the right
+remaining line, or `NotFoundException` for an unknown one.
