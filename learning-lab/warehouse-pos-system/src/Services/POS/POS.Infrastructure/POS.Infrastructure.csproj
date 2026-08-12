@@ -2,6 +2,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\POS.Application\POS.Application.csproj" />
+    <!--
+      Needed for JwtTokenFactory/JwtSettings (ServiceAuthHandler mints its
+      own token to call Warehouse.API) — the same reason
+      Identity.Infrastructure references this, just for a different kind
+      of token. POS.Domain/POS.Application have no reason to know JWTs
+      exist; only this Infrastructure layer does.
+    -->
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -10,6 +18,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
   </ItemGroup>
 
   <PropertyGroup>

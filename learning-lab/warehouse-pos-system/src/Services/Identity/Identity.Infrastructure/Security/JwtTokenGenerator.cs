@@ -1,11 +1,9 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using Common.Security;
 using Identity.Application.Contracts.Infrastructure;
 using Identity.Domain.Entities;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Identity.Infrastructure.Security
 {
@@ -42,17 +40,12 @@ namespace Identity.Infrastructure.Security
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Secret));
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            // The actual signing/encoding is shared with every other
+            // service that needs to mint a token — see JwtTokenFactory
+            // (Common.Security) for why this moved out of here in Step C2.
+            var token = JwtTokenFactory.CreateToken(_settings, claims, expiresAtUtc);
 
-            var token = new JwtSecurityToken(
-                issuer: _settings.Issuer,
-                audience: _settings.Audience,
-                claims: claims,
-                expires: expiresAtUtc,
-                signingCredentials: credentials);
-
-            return (new JwtSecurityTokenHandler().WriteToken(token), expiresAtUtc);
+            return (token, expiresAtUtc);
         }
     }
 }
