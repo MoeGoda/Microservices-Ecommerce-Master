@@ -17,6 +17,7 @@ namespace Warehouse.Infrastructure.Persistence
         public DbSet<ItemUnit> ItemUnits => Set<ItemUnit>();
         public DbSet<StockLevel> StockLevels => Set<StockLevel>();
         public DbSet<StockTransaction> StockTransactions => Set<StockTransaction>();
+        public DbSet<ProcessedSaleEvent> ProcessedSaleEvents => Set<ProcessedSaleEvent>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -151,6 +152,15 @@ namespace Warehouse.Infrastructure.Persistence
                        .WithMany()
                        .HasForeignKey(t => t.LocationId)
                        .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ProcessedSaleEvent>(builder =>
+            {
+                // The whole point of this table — a SaleId can appear
+                // here at most once, so a retried delivery of the same
+                // SaleCompleted event is detectable as a duplicate rather
+                // than silently decrementing stock twice.
+                builder.HasIndex(p => p.SaleId).IsUnique();
             });
 
             // Categories, Locations, and Units of Measure are fixed

@@ -40,7 +40,7 @@ a distributed transaction.
 **Phase C — POS using warehouse barcodes**
 - [x] **C1 — Domain/Application/Infrastructure (Sale, checkout)**
 - [x] **C2 — Sync call to Warehouse (barcode + stock check)**
-- [ ] C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)
+- [x] **C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)**
 - [ ] C4 — Angular POS screen
 - [ ] C5 — Selling price history + promotions (POS pricing rules)
 
@@ -987,3 +987,146 @@ rather than erroring; a simulated network failure surfaces as
 `WarehouseUnavailableException`, not a raw `HttpRequestException`; and
 every captured outgoing request carried a validly-signed Bearer token
 identifying the caller as `pos-service`.
+
+## C3 — SaleCompleted event + saga
+
+**What it does:** decouples "the sale completed" from "Warehouse's stock
+is now correct" — C2's sync call happens *before* checkout, to stop an
+impossible sale from being rung up in the first place; this step is
+about what happens *after* checkout, when the actual stock decrement
+shouldn't block the cashier's request/response cycle or risk losing the
+sale-vs-stock relationship if Warehouse is briefly unreachable.
+
+```
+CheckoutCommandHandler (POS)
+  1. Sale is InProgress, has lines?             (C1, unchanged)
+  2. Sale.Status = Completed, StockSyncStatus = Pending
+  3. Write a SaleCompletedOutboxEntry (Pending) — SAME SaveChanges call as #2
+  4. Return — the cashier's screen doesn't wait for Warehouse at all
+
+SaleCompletedOutboxDispatcher (POS, polled every 10s)
+  1. Load all Pending outbox entries
+  2. POST to Warehouse.API /api/v1/StockEvents/sale-completed
+     success → entry.Status = Sent, Sale.StockSyncStatus = Synced
+     failure → entry.Attempts++; Attempts >= 5 → entry.Status = Failed,
+               Sale.StockSyncStatus = Failed  (the compensating signal)
+
+ApplySaleCommandHandler (Warehouse)
+  1. ProcessedSaleEvent already exists for this SaleId? → no-op, return
+     AlreadyProcessed = true   (idempotent receiver — safe against
+     at-least-once delivery/retries)
+  2. For every line: stage a stock decrement via StockAdjustmentStager
+     (same "fetch → check → mutate" the direct AdjustStock command uses)
+  3. Record a ProcessedSaleEvent, SaveChanges ONCE for the whole sale
+```
+
+**The outbox pattern, not a direct HTTP call from inside checkout.** A
+POST to Warehouse straight out of `CheckoutCommandHandler` would create a
+real failure window: if POS crashes (or Warehouse is down) between
+committing the sale and making that call, the sale is Completed and
+Warehouse never finds out — money taken, stock never adjusted, with no
+record anything went wrong. Writing `SaleCompletedOutboxEntry` in the
+*same* `SaveChangesAsync()` that completes the sale makes "sale
+completed" and "an event was queued" atomic by construction — either
+both happen or neither does, because they're one database transaction.
+Actually delivering that event is a separate concern, handled by
+`SaleCompletedOutboxDispatcher` on its own poll loop, so checkout's
+response time never depends on Warehouse's.
+
+**Idempotent receiver on Warehouse's side, because an outbox implies
+at-least-once, not exactly-once, delivery.** A dispatcher that crashes
+after POST-ing successfully but before marking the entry `Sent` will
+retry it — Warehouse has to be able to see the same `SaleId` twice and
+apply it exactly once. `ProcessedSaleEvent` (unique index on `SaleId`) is
+the inbox side of the same idea `ProcessedSaleEvent` sounds like it
+should have on the sending side: check-then-insert, `ApplySaleCommand`'s
+very first statement, before any stock is touched.
+
+**Atomicity across a multi-line sale doesn't need a hand-rolled
+compensating transaction — because every line lands in the same
+database.** A "saga" is machinery for coordinating a transaction that
+spans *multiple* databases/services, each with its own local commit,
+where a failure partway through means manually undoing whatever already
+committed elsewhere. That's not this. All of a sale's lines decrement
+stock in Warehouse's *one* database, so simply deferring
+`SaveChangesAsync()` until every line has been staged gets atomicity for
+free from the database's own transaction — if line 2 throws
+`InsufficientStockException`, line 1's in-memory stock mutation was never
+saved, so there's nothing to undo. Verified directly: a two-line sale
+where the second line is short-stock leaves the *first* line's item
+stock unchanged and records no `ProcessedSaleEvent`, so a retried
+delivery starts clean rather than double-applying half a sale.
+
+**The real compensating action only exists at the one boundary that's
+actually cross-service: the outbox dispatcher giving up.** After
+`MaxAttempts` (5) failed delivery attempts — Warehouse.API down for an
+extended stretch — `SaleCompletedOutboxDispatcher` does not try to
+un-complete the sale (the cashier already gave the customer a receipt;
+the money is already taken) or spin forever. It sets
+`Sale.StockSyncStatus = Failed` and dead-letters the outbox entry
+(`OutboxStatus.Failed`) — a durable, queryable flag meaning "this sale's
+effect on stock needs a human to reconcile," rather than an automatic
+reversal that could itself go wrong in a different way.
+
+**Concepts introduced:**
+- **Outbox pattern** (`SaleCompletedOutboxEntry`) — write the "event to
+  send" as an ordinary row in the same transaction as the state change
+  it describes, then deliver it out-of-band. Named specifically for one
+  event type rather than a generic `Type`/`Payload` envelope — the
+  natural next step is generalizing it the moment a *second* event type
+  shows up (D1's reporting events, E1's notifications), not before.
+- **Inbox / idempotent receiver** (`ProcessedSaleEvent`) — the
+  receiving-side counterpart to at-least-once delivery: a unique
+  constraint that turns "processed this exact event already" into a
+  cheap existence check instead of a re-derived side effect.
+- **`StockAdjustmentStager`** — extracted the moment `ApplySaleCommand`
+  needed the exact "fetch item/location/stock, validate, mutate,
+  record a StockTransaction, don't save yet" sequence `AdjustStockCommand`
+  (B2) already had; both commands now share one implementation of what
+  a stock change *is*, and only differ in who's asking and why
+  (`StockTransactionReason.Sale` vs. `.Adjustment`).
+- **A background dispatcher that exists without a host to run it.**
+  `SaleCompletedOutboxBackgroundService` is written and ready
+  (`AddHostedService` away from running for real) but deliberately not
+  registered anywhere — there's no `POS.API` yet, the same "built ahead
+  of the API that will use it" situation `WarehouseContextFactory` was
+  in during B1. This step's verification calls
+  `SaleCompletedOutboxDispatcher.DispatchPendingAsync()` directly instead
+  of through the background service, since exercising the poll loop
+  itself would need a real host and add nothing the direct call doesn't
+  already prove.
+
+**A real bug this step's own verification caught:** `CheckoutCommandHandler`
+originally serialized each outbox line as an anonymous type with
+lowercase property names (`new { itemId, quantity }`), while the
+dispatcher on the read side deserialized into `List<SaleCompletedLine>`
+(`ItemId`/`Quantity`, PascalCase) using default, case-sensitive
+`System.Text.Json` options. That mismatch doesn't throw — it silently
+produces `ItemId = 0, Quantity = 0` for every line, which then failed
+`ApplySaleCommandValidator`'s checks and surfaced as a generic "publish
+failed" with no obvious cause. Fixed by serializing the *same* shared
+`SaleCompletedLine` type on both the write and read sides, so the two
+ends of the round trip can't drift out of casing sync again — caught
+only because the verification asserted the actual resulting
+`QuantityOnHand`, not just "the dispatch call didn't throw."
+
+**Verified with a runtime test against two separate SQLite databases
+(one per service, deleted after), 16 checks, all passing:** on the
+Warehouse side alone — a first `ApplySaleCommand` for a `SaleId` applies
+and records the correct `StockTransactionReason.Sale`; a *repeated*
+delivery of that same `SaleId` returns `AlreadyProcessed = true` without
+touching stock again; a two-line sale with one line short on stock
+throws `InsufficientStockException` and leaves *both* lines' stock
+untouched, with no `ProcessedSaleEvent` recorded. End to end — a real
+`CheckoutCommand` against POS's database writes the outbox entry
+atomically with completing the sale; dispatching it routes into
+Warehouse's *actual* `ApplySaleCommandHandler` (via a publisher stub
+that calls Warehouse's own mediator in-process instead of over HTTP,
+each call through its own fresh DI scope so it mirrors the request-scoped
+`DbContext` lifetime a real HTTP-hosted request would get) and Warehouse's
+stock genuinely drops by the sold quantity; the outbox entry flips to
+`Sent` and the `Sale.StockSyncStatus` flips to `Synced`. And the
+compensating path — a publisher that always fails, dispatched 5 times,
+dead-letters the outbox entry, flips `Sale.StockSyncStatus` to `Failed`
+while `Sale.Status` stays `Completed`, and leaves Warehouse's stock
+completely untouched for that sale.

@@ -12,7 +12,7 @@ using Warehouse.Infrastructure.Persistence;
 namespace Warehouse.Infrastructure.Migrations
 {
     [DbContext(typeof(WarehouseContext))]
-    [Migration("20260811151658_InitialCreate")]
+    [Migration("20260812184120_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -241,6 +241,28 @@ namespace Warehouse.Infrastructure.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Name = "Aisle B, Shelf 1"
                         });
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ProcessedSaleEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId")
+                        .IsUnique();
+
+                    b.ToTable("ProcessedSaleEvents");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.StockLevel", b =>

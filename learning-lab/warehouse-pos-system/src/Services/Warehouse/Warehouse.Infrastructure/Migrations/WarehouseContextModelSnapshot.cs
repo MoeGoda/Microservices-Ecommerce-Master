@@ -240,6 +240,28 @@ namespace Warehouse.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Warehouse.Domain.Entities.ProcessedSaleEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId")
+                        .IsUnique();
+
+                    b.ToTable("ProcessedSaleEvents");
+                });
+
             modelBuilder.Entity("Warehouse.Domain.Entities.StockLevel", b =>
                 {
                     b.Property<int>("Id")

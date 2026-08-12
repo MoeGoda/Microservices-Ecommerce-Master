@@ -20,6 +20,7 @@ namespace POS.Infrastructure
 
             services.AddScoped<ISaleRepository, SaleRepository>();
             services.AddScoped<ISaleLineRepository, SaleLineRepository>();
+            services.AddScoped<ISaleCompletedOutboxRepository, SaleCompletedOutboxRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             // Same JwtSettings section every service binds (Common.Security)
@@ -35,6 +36,19 @@ namespace POS.Infrastructure
                 client.BaseAddress = new Uri(options.BaseUrl);
             })
             .AddHttpMessageHandler<ServiceAuthHandler>();
+
+            // Same pattern, same target service, different endpoint — see
+            // WarehouseEventPublisher.
+            services.AddHttpClient<ISaleCompletedPublisher, WarehouseEventPublisher>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<WarehouseApiOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl);
+            })
+            .AddHttpMessageHandler<ServiceAuthHandler>();
+
+            // SaleCompletedOutboxBackgroundService is deliberately NOT
+            // registered via AddHostedService here — see its own comment.
+            // There's no POS.API host to run it in yet.
 
             return services;
         }

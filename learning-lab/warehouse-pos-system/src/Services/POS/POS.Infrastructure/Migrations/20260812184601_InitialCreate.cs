@@ -12,6 +12,26 @@ namespace POS.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "SaleCompletedOutboxEntries",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    SaleId = table.Column<int>(type: "int", nullable: false),
+                    LocationId = table.Column<int>(type: "int", nullable: false),
+                    LinesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    Attempts = table.Column<int>(type: "int", nullable: false),
+                    LastError = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    ProcessedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SaleCompletedOutboxEntries", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Sales",
                 columns: table => new
                 {
@@ -22,6 +42,7 @@ namespace POS.Infrastructure.Migrations
                     Status = table.Column<int>(type: "int", nullable: false),
                     Total = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    StockSyncStatus = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -56,6 +77,11 @@ namespace POS.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_SaleCompletedOutboxEntries_SaleId",
+                table: "SaleCompletedOutboxEntries",
+                column: "SaleId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SaleLines_SaleId",
                 table: "SaleLines",
                 column: "SaleId");
@@ -64,6 +90,9 @@ namespace POS.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "SaleCompletedOutboxEntries");
+
             migrationBuilder.DropTable(
                 name: "SaleLines");
 

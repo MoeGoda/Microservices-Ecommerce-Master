@@ -11,12 +11,25 @@ namespace POS.Infrastructure.Persistence
 
         public DbSet<Sale> Sales => Set<Sale>();
         public DbSet<SaleLine> SaleLines => Set<SaleLine>();
+        public DbSet<SaleCompletedOutboxEntry> SaleCompletedOutboxEntries => Set<SaleCompletedOutboxEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Sale>(builder =>
             {
                 builder.Property(s => s.Total).HasColumnType("decimal(18,2)");
+            });
+
+            modelBuilder.Entity<SaleCompletedOutboxEntry>(builder =>
+            {
+                builder.Property(e => e.LinesJson).IsRequired();
+                builder.Property(e => e.LastError).HasMaxLength(1000);
+
+                // No FK to Sale — this table has to survive independent
+                // of query patterns on Sale, and nothing here ever joins
+                // back to it; SaleId is looked up by value when the
+                // dispatcher needs to update the matching Sale.StockSyncStatus.
+                builder.HasIndex(e => e.SaleId);
             });
 
             modelBuilder.Entity<SaleLine>(builder =>

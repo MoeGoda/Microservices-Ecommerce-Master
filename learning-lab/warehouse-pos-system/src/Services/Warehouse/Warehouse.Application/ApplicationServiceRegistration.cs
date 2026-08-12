@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Warehouse.Application.Behaviours;
+using Warehouse.Application.Features.Stock;
 
 namespace Warehouse.Application
 {
@@ -17,6 +18,12 @@ namespace Warehouse.Application
 
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehaviour<,>));
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehaviour<,>));
+
+            // A plain Application-layer helper, not an Infrastructure
+            // concern — it only depends on already-abstracted repository
+            // interfaces (Contracts/Persistence), so it's registered here
+            // rather than needing Warehouse.Infrastructure to know it exists.
+            services.AddScoped<StockAdjustmentStager>();
 
             return services;
         }

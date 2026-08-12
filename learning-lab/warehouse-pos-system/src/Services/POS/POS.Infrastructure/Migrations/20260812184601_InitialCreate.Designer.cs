@@ -12,7 +12,7 @@ using POS.Infrastructure.Persistence;
 namespace POS.Infrastructure.Migrations
 {
     [DbContext(typeof(PosContext))]
-    [Migration("20260812181812_InitialCreate")]
+    [Migration("20260812184601_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -48,12 +48,56 @@ namespace POS.Infrastructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("StockSyncStatus")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("Total")
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
                     b.ToTable("Sales");
+                });
+
+            modelBuilder.Entity("POS.Domain.Entities.SaleCompletedOutboxEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("LinesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId");
+
+                    b.ToTable("SaleCompletedOutboxEntries");
                 });
 
             modelBuilder.Entity("POS.Domain.Entities.SaleLine", b =>

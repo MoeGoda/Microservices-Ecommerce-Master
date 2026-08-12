@@ -15,6 +15,10 @@ namespace POS.Application.Models
         public string Status { get; set; } = null!;
         public decimal Total { get; set; }
         public DateTime? CompletedAt { get; set; }
+
+        // Meaningful only once Status is Completed — see Sale.StockSyncStatus
+        // for what Pending/Synced/Failed actually mean.
+        public string StockSyncStatus { get; set; } = null!;
         public IReadOnlyList<SaleLineDto> Lines { get; set; } = Array.Empty<SaleLineDto>();
 
         public static SaleDto FromEntity(Sale sale, IEnumerable<SaleLine> lines)
@@ -27,6 +31,7 @@ namespace POS.Application.Models
                 Status = sale.Status.ToString(),
                 Total = sale.Total,
                 CompletedAt = sale.CompletedAt,
+                StockSyncStatus = sale.StockSyncStatus.ToString(),
                 Lines = lines.Select(SaleLineDto.FromEntity).ToList(),
             };
         }
