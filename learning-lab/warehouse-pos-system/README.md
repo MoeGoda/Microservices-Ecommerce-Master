@@ -41,7 +41,7 @@ a distributed transaction.
 - [x] **C1 — Domain/Application/Infrastructure (Sale, checkout)**
 - [x] **C2 — Sync call to Warehouse (barcode + stock check)**
 - [x] **C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)**
-- [ ] C4 — Angular POS screen
+- [x] **C4 — Angular POS screen**
 - [ ] C5 — Selling price history + promotions (POS pricing rules)
 
 **Phase D — Reporting**
@@ -1130,3 +1130,160 @@ compensating path — a publisher that always fails, dispatched 5 times,
 dead-letters the outbox entry, flips `Sale.StockSyncStatus` to `Failed`
 while `Sale.Status` stays `Completed`, and leaves Warehouse's stock
 completely untouched for that sale.
+
+## C4 — Angular POS screen
+
+**What it does:** the register a cashier actually uses — start a sale at
+a location, scan barcodes into a running cart, remove a mis-scanned line,
+checkout, and see the receipt. Everything C1–C3 built (checkout, the
+barcode/stock sync call, the outbox) had no UI in front of it yet; this
+step is the first time a person can run a sale end to end without going
+through `IMediator.Send` by hand.
+
+**POS.API didn't exist before this step, and had to be built first.**
+C1–C3 deliberately built POS.Domain/Application/Infrastructure ahead of
+any host — `SaleCompletedOutboxBackgroundService` (C3) was written and
+directly exercised by that step's own test, but had nowhere to actually
+run on a poll loop until something registered it. That's the exact
+situation `WarehouseContextFactory` was in before Warehouse.API showed up
+in B3, and the resolution is the same: stand up the API. `POS.API` is a
+line-for-line clone of Warehouse.API's own shape — same `Program.cs`
+structure (`AddApplicationServices`/`AddInfrastructureServices`/
+`AddCommonExceptionHandling`/`AddJwtAuthentication`, `Database.Migrate()`
+on startup, Swagger with a Bearer scheme, `public partial class Program`
+for testability) — with one addition Warehouse.API doesn't have:
+`builder.Services.AddHostedService<SaleCompletedOutboxBackgroundService>()`,
+finally giving C3's dispatcher a host to actually poll from.
+
+```
+SalesController (all actions [Authorize], no anonymous route — same as Warehouse.API)
+  POST   /api/v1/Sales                    → StartSaleCommand
+  GET    /api/v1/Sales/{id}                → GetSaleByIdQuery
+  POST   /api/v1/Sales/{id}/lines          → AddSaleLineCommand
+  DELETE /api/v1/Sales/{id}/lines/{lineId} → RemoveSaleLineCommand
+  POST   /api/v1/Sales/{id}/checkout       → CheckoutCommand
+  POST   /api/v1/Sales/{id}/cancel         → CancelSaleCommand
+```
+
+**`CashierUserId` is read from the caller's own JWT, not the request
+body.** `StartSaleCommand`'s own comment (C1) flagged `CashierUserId` as
+"trusted as given" input — nothing before this step ever closed that gap.
+`SalesController.Start` now does: `command.CashierUserId =
+int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!)`, overwriting
+whatever the body claims, the same "context is authoritative over the
+body" idiom `ItemsController.AddBarcode`/`AddUnit` (B3) established for
+route-supplied ids. A cashier can no longer open a sale claiming to be a
+different cashier just by editing the request payload — verified
+directly: a request body claiming `cashierUserId: 999` still produces a
+sale whose `CashierUserId` is the caller's real id from their token.
+`LocationId` still isn't validated against Warehouse's real location
+list; that's an open gap this step doesn't close either, same as before.
+
+**No new "receipt" concept — `SaleDto` already was one.** `Checkout` and
+`GetSaleById` both return the same `SaleDto` (with its `Lines`), so the
+Angular receipt view is just that DTO rendered once `Status` is
+`Completed` — there was never a reason to invent a second shape for what
+is, at the data level, the exact same sale before and after payment.
+
+**One Angular component drives all three states a sale moves through.**
+`PosRegisterComponent` (`no sale` → `InProgress` → `Completed`) is a
+single component with three template branches on `sale()`, the same
+single-screen-with-a-selection-panel reasoning `items-admin.component.ts`
+(B3) used rather than several routed sub-pages — a register's three
+states are sequential, not independently navigable, so routing between
+them would be fighting the domain rather than modeling it. It sits
+directly on the `/pos` route with no `AdminShellComponent`-style wrapper:
+that shell only exists because it was A4's own placeholder before B3's
+real content landed in it, and there's no equivalent placeholder history
+for POS to inherit.
+
+**The barcode field IS the scan target — there's no separate "scan"
+button.** A physical barcode scanner types the barcode's characters into
+whatever text input has focus, followed by an Enter keystroke, completely
+indistinguishable to the DOM from a cashier typing the digits by hand and
+pressing Enter themselves. Binding `(keyup.enter)` on the barcode
+`<input>` to the same `submitScan()` the Add button calls means the field
+is scanner-ready with zero scanner-specific code — and after every
+successful add, `focusBarcodeInput()` returns focus to it so the very
+next scan doesn't need a click first, the way a real register keeps the
+scanner "hot" between items.
+
+**A real timing bug the frontend's own Playwright verification caught:**
+the first call to `focusBarcodeInput()` — right after `StartSale`
+succeeds — used a bare `setTimeout(() => this.barcodeInput?.nativeElement.focus())`,
+reasoning that deferring to the next macrotask would give Angular's
+change detection enough time to render the newly-`InProgress` branch
+before the callback ran. On every *later* call (after adding a line) that
+held; on this *first* transition specifically, `this.barcodeInput` was
+still `undefined` when the macrotask fired — a bare `setTimeout` is not
+actually a guarantee that Angular has committed a signal-triggered DOM
+update, just a guess that it probably has by then. Fixed by switching to
+`afterNextRender(callback, { injector })` (Angular's own primitive for
+"run this once the pending render has actually happened"), which doesn't
+guess. Caught only because the verification checked which element
+actually had focus, rather than assuming a `setTimeout` had been enough
+time.
+
+**Concepts introduced:**
+- **`POS.API`** — the fourth ASP.NET Core host in this system, and the
+  reason `SaleCompletedOutboxBackgroundService` (C3) finally runs for
+  real rather than only under a test harness calling
+  `DispatchPendingAsync()` directly.
+- **Reading identity from the token instead of the request body** — the
+  first place in this codebase a controller pulls a *user* id
+  (`ClaimTypes.NameIdentifier`) out of the caller's own JWT to override
+  client-supplied input, rather than only doing this for route-path ids
+  (B3's `{id}`-overrides-body pattern). Same idiom, applied to "who is
+  this?" rather than "which resource?".
+- **`afterNextRender`** — Angular's guarantee for "run this after the
+  pending change-detection-triggered render has actually committed,"
+  distinct from `setTimeout`'s "run this on some later tick and hope."
+- **A scanner-ready input with no scanner-specific code** — `(keyup.enter)`
+  plus autofocus-after-every-add is the entire "barcode scanning" feature
+  from the frontend's point of view; the actual barcode *lookup* logic
+  already existed in `AddSaleLineCommandHandler` since C2.
+
+**Verified two ways.** Backend: a real ASP.NET Core pipeline (routing,
+JWT auth, MediatR, exception handling) hosted via `TestServer` against
+POS.API's own registration code — not `WebApplicationFactory<Program>`,
+which insists on finding a `.sln` next to whatever test project points at
+it and has none to find here — with `PosContext` swapped to SQLite and
+`IWarehouseCatalogClient`/`ISaleCompletedPublisher` swapped for stubs, 15
+checks, all passing: a request with no token (401), `CashierUserId`
+overridden from the JWT claim even when the body claims a different one,
+an unknown barcode (404) and over-stock quantity (409) both surfacing
+correctly through real HTTP rather than a 500, a line's `Sku`/`ItemName`/
+`UnitPrice` resolved from the (stubbed) Warehouse catalog rather than
+anything the request supplied, removing the only line dropping the total
+back to zero, checkout on an empty sale (409) and on an already-Completed
+sale (409) both rejected, the outbox entry existing immediately after
+checkout, and `GET /Sales/{id}` reflecting the same persisted total after
+the fact. Frontend: `ng build` verified clean, then the dev server driven
+with Playwright — a session token injected directly into `localStorage`
+(bypassing login, matching exactly what `AuthService` reads) with the
+gateway's `/Warehouse/MasterData/locations` and `/Pos/Sales...` routes
+mocked via request interception, walking the full screen through all
+three states: the start-sale card renders and lists the seeded location;
+starting a sale renders the register with the barcode field already
+focused; scanning an unknown barcode toasts an error without crashing;
+scanning a real one renders it in the cart with the correct running total
+and clears the field for the next scan; checkout renders the receipt with
+a matching total; "New sale" returns to the start card. No unexpected
+console errors in either run (an `HttpErrorResponse` logged after the
+unknown-barcode scan is RxJS's own default behavior for an unhandled
+observable error, not a bug — this component's `subscribe()` calls only
+supply a `next` handler, the same discipline `items-admin.component.ts`
+follows, on the reasoning that `errorInterceptor` already toasted it).
+
+**Try it locally** (needs SQL Server, which this sandbox doesn't have):
+```bash
+# From src/, in four terminals:
+dotnet run --project Services/Identity/Identity.API
+dotnet run --project Services/Warehouse/Warehouse.API
+dotnet run --project Services/POS/POS.API
+dotnet run --project ApiGateways/Gateway.Ocelot
+
+# From client/:
+npm start
+# → http://localhost:4300, sign in as a Cashier (see AuthController.Register), then /pos
+```

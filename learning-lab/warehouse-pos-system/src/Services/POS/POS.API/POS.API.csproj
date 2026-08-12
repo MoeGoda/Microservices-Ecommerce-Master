@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\POS.Application\POS.Application.csproj" />
+    <ProjectReference Include="..\POS.Infrastructure\POS.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.ExceptionHandling\Common.ExceptionHandling.csproj" />
+    <!--
+      POS.Infrastructure already references Common.Security for
+      ServiceAuthHandler (minting the outgoing pos-service token), but this
+      API layer needs its own explicit reference too — AddJwtAuthentication
+      (validating INCOMING cashier tokens) is a different use of the same
+      package, called from here, not from Infrastructure. Same reasoning as
+      Warehouse.API's own comment on this exact line.
+    -->
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
+  </ItemGroup>
+
+</Project>

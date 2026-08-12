@@ -1,5 +1,9 @@
 <mat-toolbar color="primary">
   <span>Warehouse &amp; POS</span>
+  @if (authService.currentUser()) {
+    <a mat-button routerLink="/admin" routerLinkActive="active-nav-link">Admin</a>
+    <a mat-button routerLink="/pos" routerLinkActive="active-nav-link">POS</a>
+  }
   <span class="spacer"></span>
   @if (authService.currentUser(); as user) {
     <span class="user-badge">{{ user.userName }} ({{ user.role }})</span>
