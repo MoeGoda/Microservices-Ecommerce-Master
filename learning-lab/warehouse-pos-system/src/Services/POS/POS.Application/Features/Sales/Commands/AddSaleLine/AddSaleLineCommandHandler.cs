@@ -1,6 +1,8 @@
 using Common.Exceptions;
 using MediatR;
+using POS.Application.Contracts.Infrastructure;
 using POS.Application.Contracts.Persistence;
+using POS.Application.Exceptions;
 using POS.Application.Models;
 using POS.Domain.Entities;
 
@@ -10,15 +12,18 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
     {
         private readonly ISaleRepository _saleRepository;
         private readonly ISaleLineRepository _saleLineRepository;
+        private readonly IWarehouseCatalogClient _warehouseCatalogClient;
         private readonly IUnitOfWork _unitOfWork;
 
         public AddSaleLineCommandHandler(
             ISaleRepository saleRepository,
             ISaleLineRepository saleLineRepository,
+            IWarehouseCatalogClient warehouseCatalogClient,
             IUnitOfWork unitOfWork)
         {
             _saleRepository = saleRepository;
             _saleLineRepository = saleLineRepository;
+            _warehouseCatalogClient = warehouseCatalogClient;
             _unitOfWork = unitOfWork;
         }
 
@@ -32,16 +37,33 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
                 throw new ConflictException($"Sale {sale.Id} is {sale.Status}; lines can only be added to a sale that is still InProgress.");
             }
 
-            var lineTotal = request.UnitPrice * request.Quantity;
+            // The barcode validation half of this step: an unknown scan is
+            // "not found," not a server error — a cashier scanning
+            // something outside the catalog is an everyday occurrence.
+            var item = await _warehouseCatalogClient.ResolveBarcodeAsync(request.Barcode, cancellationToken)
+                ?? throw new NotFoundException("Item", request.Barcode);
+
+            // The stock check half: against the SALE's own LocationId —
+            // this register's location — not something the caller supplies
+            // separately, since Sale already carries it (StartSaleCommand,
+            // C1) and a mismatched second LocationId would just be a way
+            // for the two to silently disagree.
+            var availableQuantity = await _warehouseCatalogClient.GetAvailableQuantityAsync(item.ItemId, sale.LocationId, cancellationToken);
+            if (availableQuantity < request.Quantity)
+            {
+                throw new InsufficientStockException(item.Sku, request.Quantity, availableQuantity);
+            }
+
+            var lineTotal = item.UnitPrice * request.Quantity;
 
             var line = new SaleLine
             {
                 SaleId = sale.Id,
                 Sale = sale,
-                ItemId = request.ItemId,
-                Sku = request.Sku,
-                ItemName = request.ItemName,
-                UnitPrice = request.UnitPrice,
+                ItemId = item.ItemId,
+                Sku = item.Sku,
+                ItemName = item.ItemName,
+                UnitPrice = item.UnitPrice,
                 Quantity = request.Quantity,
                 LineTotal = lineTotal,
             };
@@ -50,9 +72,6 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
             sale.Total += lineTotal;
             await _saleRepository.UpdateAsync(sale);
 
-            // The new line and the updated running Total commit in the same
-            // call — see IUnitOfWork. A crash between the two would
-            // otherwise leave Sale.Total not matching the sum of its lines.
             await _unitOfWork.SaveChangesAsync();
 
             var lines = await _saleLineRepository.GetBySale(sale.Id);

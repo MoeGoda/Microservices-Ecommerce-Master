@@ -39,7 +39,7 @@ a distributed transaction.
 
 **Phase C — POS using warehouse barcodes**
 - [x] **C1 — Domain/Application/Infrastructure (Sale, checkout)**
-- [ ] C2 — Sync call to Warehouse (barcode + stock check)
+- [x] **C2 — Sync call to Warehouse (barcode + stock check)**
 - [ ] C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)
 - [ ] C4 — Angular POS screen
 - [ ] C5 — Selling price history + promotions (POS pricing rules)
@@ -880,3 +880,110 @@ line being added to it and being checked out a second time; cancelling
 an in-progress sale works but cancelling an already-completed one is
 rejected; and `GetSaleByIdQuery` returns the right sale with the right
 remaining line, or `NotFoundException` for an unknown one.
+
+## C2 — POS → Warehouse sync call
+
+**What it does:** replaces the trust `AddSaleLineCommand` (C1) was built
+on with an actual cross-service call. C1's own README section named this
+exact gap: the command took `Sku`/`ItemName`/`UnitPrice` as plain input,
+verified by nothing. It now takes `Barcode`/`Quantity` instead — the
+handler resolves the barcode against Warehouse's real catalog and checks
+real stock at the sale's location *before* a `SaleLine` is ever written.
+REST over HTTP, not gRPC: everything else in this system is already
+HTTP/JSON (Ocelot, every controller), and introducing a second
+serialization/transport stack for one call would be new machinery this
+codebase doesn't otherwise need.
+
+```
+AddSaleLineCommandHandler
+  1. Sale exists and is InProgress?                      (C1, unchanged)
+  2. IWarehouseCatalogClient.ResolveBarcodeAsync(barcode) → item or null
+     null → NotFoundException  (barcode validation)
+  3. IWarehouseCatalogClient.GetAvailableQuantityAsync(item.Id, sale.LocationId)
+     < requested → InsufficientStockException  (stock check)
+  4. Snapshot item.Sku/ItemName/UnitPrice onto a new SaleLine (still C1's
+     own reasoning — see SaleLine.cs — just fed VERIFIED data now)
+```
+
+**This is a service call, not a browser call — so it doesn't go through
+the gateway.** Every Angular request goes through Ocelot (A3) because
+that's the boundary between an untrusted browser and the system; POS
+calling Warehouse is two backend services talking to each other, the kind
+of call a service mesh or internal DNS entry would route directly in a
+real deployment. Neither exists here, so `WarehouseApiOptions.BaseUrl`
+just points straight at Warehouse.API's own port.
+
+**Warehouse.API's routes are all `[Authorize]` (B3) — so this call still
+needs a valid token, from a caller with no signed-in user behind it.**
+`ServiceAuthHandler` mints one representing `pos-service` itself, signed
+with the *same shared secret* every service already reads
+(`JwtSettings:Secret`, `Common.Security`), attached to every outgoing
+request via `AddHttpMessageHandler`. That's the simplest form of
+service-to-service auth that works without adding anything new — no
+service-account database, no OAuth2 client-credentials flow — and it
+comes with an honest, named tradeoff: any service that can read this
+shared secret can mint a token claiming to be *any* service, including
+`pos-service`. A real deployment would want one dedicated token-issuing
+endpoint (Identity.API, most naturally) so only one place ever signs a
+token — that's Phase F2 (security hardening) territory, flagged here
+rather than fixed here, the same way A4 flagged `localStorage` token
+storage without fixing it on the spot.
+
+**A duplicate about to happen got extracted instead.** Minting that
+service token needs the exact same `SymmetricSecurityKey`/
+`SigningCredentials`/`JwtSecurityToken` construction
+`Identity.Infrastructure.JwtTokenGenerator` (A1) already had inline for
+issuing user tokens. Copy-pasting it a second time is exactly the kind of
+security-sensitive duplication that drifts — one call site changes the
+signing algorithm or a claim convention and the other quietly doesn't.
+`Common.Security.JwtTokenFactory.CreateToken(settings, claims, expiry)`
+is now the one implementation; `JwtTokenGenerator` was refactored to call
+it instead of constructing its own token, verified by minting through the
+factory and validating the result against the exact
+`TokenValidationParameters` shape `AddJwtAuthentication` builds — the
+refactor didn't just compile, it produces a token every existing
+validator still genuinely accepts.
+
+**Concepts introduced:**
+- **`IWarehouseCatalogClient` — a contract for something that isn't
+  persistence, same shape as `IJwtTokenGenerator`/`IPasswordHasher`
+  (Identity, A1).** `AddSaleLineCommandHandler` depends on the interface
+  only; it has no idea the real implementation makes an HTTP call, hits a
+  specific URL, or that Warehouse.API even exists. Swapping in a gRPC
+  client later — or a stub for a test — changes zero lines in the handler.
+- **A hand-rolled `HttpMessageHandler` stub instead of a real HTTP
+  server.** Verifying `WarehouseCatalogClient` doesn't need a live
+  Warehouse.API (no SQL Server here anyway) — a `DelegatingHandler`
+  chain (`ServiceAuthHandler` → a stub returning canned JSON keyed by
+  request path) exercises the *real* client code (JSON parsing,
+  404-means-null, non-2xx-means-`WarehouseUnavailableException`) with zero
+  network I/O and zero dependence on Warehouse actually running.
+- **"No stock record" and "stock is genuinely zero" are the same
+  answer, on purpose.** `GetAvailableQuantityAsync` returns `0` either
+  way — an item Warehouse has simply never received at a given location
+  isn't a special case worth a different code path from one that's been
+  sold down to nothing; both mean "you can't sell this here right now."
+- **A distinct exception for "the dependency itself is down."**
+  `WarehouseUnavailableException` (503) is deliberately not the same as
+  `NotFoundException` or `InsufficientStockException` — a barcode that
+  doesn't resolve and a barcode that *can't be checked because Warehouse
+  didn't answer* are different failures a cashier needs to react to
+  differently, and conflating them into a generic 500 would erase that
+  distinction right when it matters most (mid-sale, at a register).
+
+**Verified with a focused runtime test (deleted after), two parts:** (1)
+the `JwtTokenFactory` refactor — a token it mints validates against the
+exact `TokenValidationParameters` shape `AddJwtAuthentication` builds, and
+is correctly rejected when checked against a different secret; (2) the
+full sync-call flow through actual MediatR dispatch, against the stubbed
+Warehouse handler above — 10 checks total, all passing. Among them: a
+known barcode resolves and the resulting `SaleLine`'s `Sku`/`ItemName`
+come from Warehouse's (stubbed) response, not anything the test itself
+supplied, and the running `Total` (7.50 = 2.50 × 3) is computed from that
+resolved price; an unknown barcode throws `NotFoundException`; a
+quantity exceeding what's on hand throws `InsufficientStockException`;
+an item with no stock record at all correctly resolves to 0 available
+rather than erroring; a simulated network failure surfaces as
+`WarehouseUnavailableException`, not a raw `HttpRequestException`; and
+every captured outgoing request carried a validly-signed Bearer token
+identifying the caller as `pos-service`.
