@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Warehouse.Application\Warehouse.Application.csproj" />
+    <ProjectReference Include="..\Warehouse.Infrastructure\Warehouse.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.ExceptionHandling\Common.ExceptionHandling.csproj" />
+    <!--
+      Identity.API gets Common.Security transitively, through
+      Identity.Infrastructure (which needs it to *issue* tokens).
+      Warehouse never issues tokens, only validates them here at the API
+      layer, and Warehouse.Infrastructure has no reason to know JWTs exist
+      — so this reference has to be explicit.
+    -->
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
+  </ItemGroup>
+
+</Project>

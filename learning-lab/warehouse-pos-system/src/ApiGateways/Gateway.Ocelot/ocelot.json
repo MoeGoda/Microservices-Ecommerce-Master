@@ -27,6 +27,103 @@
         "AuthenticationProviderKey": "Bearer",
         "AllowedScopes": []
       }
+    },
+    {
+      "_comment": "Unlike Identity, there is no anonymous route anywhere under /Warehouse — every route below carries AuthenticationOptions.",
+      "DownstreamPathTemplate": "/api/v1/Items",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/barcodes/{barcode}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/barcodes/{barcode}",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/variants",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/variants",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/barcodes",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/barcodes",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/units",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/units",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Stock/{itemId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Stock/{itemId}",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Stock/receive",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Stock/receive",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Stock/adjust",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Stock/adjust",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/MasterData/categories",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/MasterData/categories",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/MasterData/locations",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/MasterData/locations",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/MasterData/units-of-measure",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/MasterData/units-of-measure",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     }
   ],
   "GlobalConfiguration": {

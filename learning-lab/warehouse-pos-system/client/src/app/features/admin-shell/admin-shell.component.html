@@ -1,0 +1,7 @@
+<div class="signed-in-as">
+  @if (authService.currentUser(); as user) {
+    <p>Signed in as <strong>{{ user.userName }}</strong> ({{ user.role }}).</p>
+  }
+</div>
+
+<app-items-admin></app-items-admin>

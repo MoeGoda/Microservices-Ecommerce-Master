@@ -34,14 +34,15 @@ a distributed transaction.
 
 **Phase B — Warehouse (barcodes)**
 - [x] **B1 — Domain + Infrastructure (Items, barcodes, stock, locations)**
-- [ ] B2 — Application layer (CQRS/MediatR/FluentValidation)
-- [ ] B3 — API + Angular Admin Panel screen (master data)
+- [x] **B2 — Application layer (CQRS/MediatR/FluentValidation)**
+- [x] **B3 — API + Angular Admin Panel screen (master data)**
 
 **Phase C — POS using warehouse barcodes**
 - [ ] C1 — Domain/Application/Infrastructure (Sale, checkout)
 - [ ] C2 — Sync call to Warehouse (barcode + stock check)
 - [ ] C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)
 - [ ] C4 — Angular POS screen
+- [ ] C5 — Selling price history + promotions (POS pricing rules)
 
 **Phase D — Reporting**
 - [ ] D1 — Event-driven read models
@@ -649,3 +650,139 @@ empty `Sku` rejected by `ValidationException` before the handler ever
 runs; `GetItemVariantsQuery` finding B1's seeded pack-of-6 from its base
 item; and `ResolveBarcodeQuery` returning the right item for a known
 barcode and `null` — no exception — for an unknown one.
+
+## B3 — Warehouse.API + gateway route + Angular Admin Panel
+
+**What it does:** the outward-facing surface for everything B1/B2 built —
+`Warehouse.API` (three thin controllers dispatching straight to MediatR,
+same shape as Identity's `AuthController`), thirteen new Ocelot routes
+under `/Warehouse/...`, and a real Angular screen replacing A4's
+placeholder: create an item, browse the catalog, and manage one selected
+item's barcodes, alternate units, and stock — all the way through the
+actual JWT-protected HTTP pipeline, not a bypass.
+
+```
+ItemsController        GET/POST /Items, GET /Items/{id}, GET /Items/{id}/variants,
+                        GET /Items/barcodes/{barcode}, POST /Items/{id}/barcodes,
+                        POST /Items/{id}/units
+StockController        GET /Stock/{itemId}, POST /Stock/receive, POST /Stock/adjust
+MasterDataController   GET /MasterData/{categories,locations,units-of-measure}
+```
+Every route is `[Authorize]` — unlike Identity, there's no anonymous
+Warehouse route at all, so it sits once on each controller rather than
+repeated per action.
+
+**A gap in `WebApplicationFactory`-based testing that doesn't show up in a
+tutorial.** Verifying this step meant, for the first time, actually
+booting the real ASP.NET Core pipeline (routing, JWT auth, MediatR,
+exception handling) rather than calling handlers directly against EF Core
+— B1/B2's tests never exercised any of that. Two real problems came up
+doing it properly:
+- `WebApplicationFactory<T>` locates its target's content root by walking
+  up from the *test* assembly looking for a `.sln` — a throwaway test
+  project living outside this repo's solution tree has nothing for that
+  search to find, and just fails outright (`UseContentRoot` alone doesn't
+  fix it; the factory's own internal `ConfigureWebHost` call runs the
+  search regardless). The actual fix was placing the test project as a
+  sibling *inside* `Services/Warehouse/` — deleted afterward, never
+  committed — so the walk-up naturally reaches `WarehousePos.sln`.
+- `Program.cs`'s own startup code calls `context.Database.Migrate()` —
+  and `Migrate()` replays the *already-compiled* migration's literal DDL
+  text, which is SQL Server dialect (`nvarchar(max)`, `datetime2`) because
+  `WarehouseContextFactory` targets SqlServer at `dotnet ef migrations
+  add` time. Swapping the DbContext to SQLite for the test doesn't help —
+  that compiled text can't run against SQLite no matter which provider
+  the *context* is configured for. The fix mirrors what real EF Core
+  tooling does: build the schema fresh from the live model via
+  `EnsureCreated()` (correct for whichever provider is actually active),
+  then pre-seed the `__EFMigrationsHistory` table with this migration's
+  Id so `Migrate()` sees nothing pending and skips straight through,
+  rather than trying to replay incompatible SQL. `public partial class
+  Program { }` was added to the end of `Program.cs` for this — top-level
+  statements normally generate an invisible `Program` class;
+  `WebApplicationFactory<Program>` needs a real type to target.
+
+**The URL is authoritative over the body, not merely checked against
+it.** `AddItemBarcodeCommand`/`AddItemUnitCommand` both carry `ItemId` as
+a property (B2), and their controller routes are nested under a specific
+item (`POST /Items/{id}/barcodes`). Rather than validating that the
+route's `{id}` matches whatever `ItemId` the client put in the request
+body — and rejecting a mismatch — the controller action just overwrites
+`command.ItemId = id` unconditionally after binding. A route-says-item-5,
+body-says-item-9 mismatch becomes structurally impossible rather than a
+validation error to catch; verified directly by sending a deliberately
+wrong `ItemId` in the body and confirming the barcode still landed on the
+item named in the URL.
+
+**A query returning `null` becomes an HTTP 404 at this layer, not
+before.** B2 made `ResolveBarcodeQuery` return `ItemDetailDto?` rather
+than throw `NotFoundException`, because an unknown scan is an ordinary
+outcome of using a barcode scanner, not an exceptional one — and that
+reasoning doesn't change here. What the controller adds is the HTTP
+translation: `return result is null ? NotFound() : Ok(result);`. 404 *is*
+the correct status for "this resource doesn't exist" — the controller
+isn't overriding B2's decision, it's just the seam where an ordinary
+domain-level `null` becomes the HTTP vocabulary a caller actually expects.
+
+**Angular: replacing A4's placeholder for real.** `AdminShellComponent`
+used to be the whole point of A4 — proving the auth chain (login → token
+stored → guard lets you in → `currentUser` signal populated) worked end
+to end, with a placeholder note saying master-data management "lands here
+in Step B3." It still shows who's signed in; it now also hosts
+`ItemsAdminComponent`, one screen (no lazy-loaded sub-routes — nothing
+else in this app has that precedent yet, and one screen with a selection
+panel doesn't need it) covering:
+- **Create item** — a reactive form (`Sku`, `Name`, `Description`,
+  `UnitPrice`, `Category`/`BaseUnitOfMeasure` selects populated from
+  `MasterDataController`, an optional `ParentItem` select for pack
+  variants, and the required first `Barcode`).
+- **Items table** — every item, with a "Manage" action per row.
+- **Selected item panel** — barcodes as chips (the primary one visually
+  highlighted), alternate units, pack variants, current stock per
+  location, and three mini-forms: add a barcode, receive stock (any unit
+  the item supports, converted server-side per B2), and adjust stock
+  (signed, only against a location that already has a `StockLevel`).
+
+`WarehouseService` mirrors `AuthService`'s own shape exactly — one
+`Injectable` wrapping `HttpClient`, every call built on
+`${environment.apiBaseUrl}/Warehouse/...` (the gateway's upstream path,
+never Warehouse.API's own port directly), no extra "API service"
+abstraction layer, since none exists anywhere else in this app either.
+`shared/models/warehouse.models.ts` mirrors every backend DTO and command
+shape 1:1, same convention as `auth.models.ts`.
+
+**Verified two ways.** The backend: a `WebApplicationFactory`-based test
+(SQLite, deleted after) sending real HTTP requests through the real
+pipeline — 21 checks, all passing, including a request with no token
+(401), an expired token (401), a token signed with the wrong secret
+(401), the URL-overrides-body barcode case above, the null→404 barcode
+resolution, a validation failure surfacing as an actual 400
+`ProblemDetails` body over HTTP (not just inside the Application layer),
+and `InsufficientStockException` surfacing as a real 409. The frontend:
+since this sandbox has no SQL Server, there's no live backend to
+actually sign in against — `ng build` was verified clean, then the dev
+server was driven with Playwright: first with a session token injected
+directly into `localStorage` (bypassing the login call, matching exactly
+what `AuthService` itself reads) to confirm the screen renders and the
+create-item form is interactive with real network failures surfacing as
+the expected toast (proving `errorInterceptor` still works for this new
+feature) rather than a broken page; then again with the gateway's
+`/Warehouse/...` routes mocked via Playwright's request interception,
+returning realistic `ItemDetailDto`/`StockLevelDto` payloads, to actually
+render and screenshot the selected-item panel — barcode chips, the
+primary one highlighted, the BOX=12 PCS conversion, the stock table, and
+all three mini-forms — confirming the whole template renders correctly
+with real data, something `ng build` alone can't prove. No Angular
+console errors in either run beyond the expected network failures.
+
+**Try it locally** (needs SQL Server, which this sandbox doesn't have):
+```bash
+# From src/, in three terminals:
+dotnet run --project Services/Identity/Identity.API
+dotnet run --project Services/Warehouse/Warehouse.API
+dotnet run --project ApiGateways/Gateway.Ocelot
+
+# From client/:
+npm start
+# → http://localhost:4300, sign in as admin / Admin@12345
+```

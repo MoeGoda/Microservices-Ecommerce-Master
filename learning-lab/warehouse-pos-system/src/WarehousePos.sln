@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warehouse.Application", "Se
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warehouse.Infrastructure", "Services\Warehouse\Warehouse.Infrastructure\Warehouse.Infrastructure.csproj", "{7059030F-41D8-4B80-B92A-9D813B832D05}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warehouse.API", "Services\Warehouse\Warehouse.API\Warehouse.API.csproj", "{D8364864-FECA-430F-B76B-E6316F421BE5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -88,6 +90,10 @@ Global
 		{7059030F-41D8-4B80-B92A-9D813B832D05}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7059030F-41D8-4B80-B92A-9D813B832D05}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7059030F-41D8-4B80-B92A-9D813B832D05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8364864-FECA-430F-B76B-E6316F421BE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8364864-FECA-430F-B76B-E6316F421BE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8364864-FECA-430F-B76B-E6316F421BE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8364864-FECA-430F-B76B-E6316F421BE5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F5FCB59D-D8B5-4D75-A92D-51D27952598F} = {D05275DE-5152-44FD-82D5-CB295EFA4B1B}
@@ -103,5 +109,6 @@ Global
 		{A65C7C6F-6921-42BE-A2CE-6B8B1B9DCCEF} = {E602B67D-CF8C-4277-8953-A114B8DAB602}
 		{CCE44039-C42F-4D3F-A5F6-739D83C85D4F} = {E602B67D-CF8C-4277-8953-A114B8DAB602}
 		{7059030F-41D8-4B80-B92A-9D813B832D05} = {E602B67D-CF8C-4277-8953-A114B8DAB602}
+		{D8364864-FECA-430F-B76B-E6316F421BE5} = {E602B67D-CF8C-4277-8953-A114B8DAB602}
 	EndGlobalSection
 EndGlobal
