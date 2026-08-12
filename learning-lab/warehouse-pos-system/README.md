@@ -38,7 +38,7 @@ a distributed transaction.
 - [x] **B3 — API + Angular Admin Panel screen (master data)**
 
 **Phase C — POS using warehouse barcodes**
-- [ ] C1 — Domain/Application/Infrastructure (Sale, checkout)
+- [x] **C1 — Domain/Application/Infrastructure (Sale, checkout)**
 - [ ] C2 — Sync call to Warehouse (barcode + stock check)
 - [ ] C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)
 - [ ] C4 — Angular POS screen
@@ -786,3 +786,97 @@ dotnet run --project ApiGateways/Gateway.Ocelot
 npm start
 # → http://localhost:4300, sign in as admin / Admin@12345
 ```
+
+## C1 — POS domain + application + infrastructure
+
+**What it does:** the third and final "layer" pattern in this codebase,
+using the one Identity chose (A1) — Domain, Application, and
+Infrastructure built together in a single step, rather than spread across
+three like Warehouse (B1/B2/B3). POS's footprint is closer to Identity's
+(two entities, a handful of commands) than to Warehouse's, so it gets
+Identity's shape: `Sale`/`SaleLine`, five commands (`StartSale`,
+`AddSaleLine`, `RemoveSaleLine`, `Checkout`, `CancelSale`), one query
+(`GetSaleById`), all wired through the same `ValidationBehaviour`/
+`UnhandledExceptionBehaviour` pipeline every other service uses. No
+`POS.API` yet — same reasoning as B1 not having a `Warehouse.API`: there's
+nothing for `dotnet ef` to point at, so `PosContextFactory` fills in at
+design time, and this step is verified at the MediatR/EF Core level, not
+over HTTP.
+
+**A completed sale never touches Warehouse's database — on purpose.**
+POS and Warehouse are separate services with separate databases;
+`CheckoutCommand` only ever changes `Sale.Status`/`CompletedAt` in POS's
+*own* database. Decrementing Warehouse's stock for what was just sold has
+to happen as a *reaction* to this sale completing, not as a second write
+folded into the same local transaction — there is no transaction that can
+span two different databases here. `CheckoutCommandHandler` has a comment
+marking exactly where that reaction plugs in once it exists: a
+`SaleCompleted` event, fired from right after this commit, consumed by a
+saga on Warehouse's side. That's Step C3, entirely unbuilt right now —
+today, checking out a sale genuinely does nothing to Warehouse's stock.
+
+**`SaleLine` snapshots `Sku`/`ItemName`/`UnitPrice` instead of reading
+them live from Warehouse.** This is the same instinct as
+`StockTransaction.Reference` (B1) applied to a different problem: a
+completed sale is a *historical record* — a receipt printed today has to
+keep reading the same tomorrow even if Warehouse's price or name for that
+item changes next week. Only `ItemId` is kept as a live reference,
+because C3's stock decrement genuinely needs to know which Warehouse item
+this line refers to; everything a customer would see printed on a
+receipt is captured once, at the moment the line was added, and never
+re-read afterward.
+
+**`AddSaleLineCommand` trusts its caller completely, and that's
+deliberate, temporary scope, not an oversight.** It takes `Sku`/
+`ItemName`/`UnitPrice` as plain input rather than resolving them itself —
+nothing in this command reaches out to Warehouse to verify any of it.
+That's exactly what makes Step C2 ("sync call to Warehouse: barcode
+validation + stock check") a real, necessary next step rather than
+already-done-by-accident: C2 is where a genuine cross-service call gets
+inserted *in front of* this command, so the values it receives become
+verified instead of merely assumed. Building that trust boundary
+backwards — having `AddSaleLineCommand` itself reach into Warehouse right
+now — would tangle a cross-service HTTP/gRPC call into a step that's
+supposed to be about POS's own domain shape only.
+
+**The same `IUnitOfWork` lesson from B2, recurring for the same reason.**
+`AddSaleLineCommand` inserts a new `SaleLine` *and* updates its parent
+`Sale.Total` — two writes that have to commit together, or the running
+total stops matching the sum of its lines, exactly the
+`StockLevel`/`StockTransaction` problem B2 solved for Warehouse.
+`POS.Infrastructure` repositories only ever stage changes; `IUnitOfWork`
+commits them. Identity never needed this (no Identity command touches
+more than one entity) — POS does, the same way Warehouse did, which is
+why this pattern keeps showing up in exactly the services whose commands
+have to keep two rows in sync and never in the services that don't.
+
+**Concepts introduced:**
+- **A richer, three-state lifecycle enforced entirely by handlers, not
+  by the entity.** `SaleStatus` (`InProgress` → `Completed`/`Cancelled`)
+  has real transition rules — lines can only be added/removed while
+  `InProgress`; only an `InProgress` sale can be checked out or
+  cancelled; checkout refuses an empty sale. Every one of those checks
+  lives in a command handler (`ConflictException`), not in `Sale` itself
+  — `Sale`/`SaleLine` stay exactly as anemic as `Item`/`StockLevel` did in
+  Warehouse. Consistency over introducing a richer domain-model style
+  just because POS's lifecycle happens to be a good fit for one.
+- **A deliberately narrow `Cancelled`.** It means "abandoned before
+  payment," nothing more. A *post-completion* return/refund is a
+  materially different feature — it needs a compensating stock increase
+  on Warehouse's side, not just a status flip in POS — and doesn't exist
+  yet. The enum's own comment says so explicitly, so a future "add
+  returns" step finds a clear, named gap instead of ambiguous room to
+  misuse `Cancelled` for something it was never designed to mean.
+
+**Verified with a focused runtime test (SQLite, deleted after — same
+approach as B1/B2), dispatched through actual MediatR, not calling
+handlers directly:** 16 checks, all passing. Among them: starting a sale
+and adding two lines gives the exact expected running `Total` (3.00, then
+8.00); removing a line brings `Total` back down correctly (5.00) and a
+second attempt to remove the *same* line is rejected as not found;
+checkout refuses an empty sale but succeeds on one with a line,
+correctly stamping `CompletedAt`; a completed sale rejects *both* another
+line being added to it and being checked out a second time; cancelling
+an in-progress sale works but cancelling an already-completed one is
+rejected; and `GetSaleByIdQuery` returns the right sale with the right
+remaining line, or `NotFoundException` for an unknown one.
