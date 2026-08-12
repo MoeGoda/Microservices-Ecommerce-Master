@@ -32,6 +32,15 @@ namespace POS.Application.Contracts.Infrastructure
         public int ItemId { get; set; }
         public string Sku { get; set; } = null!;
         public string ItemName { get; set; } = null!;
+
+        // Already the price to charge — if Warehouse has an active
+        // Promotion (C5) for this item, UnitPrice here is the DISCOUNTED
+        // price; OriginalUnitPrice/PromotionId are only set in that case,
+        // for AddSaleLineCommandHandler to snapshot onto the SaleLine for
+        // receipt transparency. POS never computes a discount itself —
+        // Warehouse is the one place that knows about promotions at all.
         public decimal UnitPrice { get; set; }
+        public decimal? OriginalUnitPrice { get; set; }
+        public int? PromotionId { get; set; }
     }
 }

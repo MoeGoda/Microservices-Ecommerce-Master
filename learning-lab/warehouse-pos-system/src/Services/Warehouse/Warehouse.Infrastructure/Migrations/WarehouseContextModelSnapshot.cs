@@ -158,6 +158,33 @@ namespace Warehouse.Infrastructure.Migrations
                     b.ToTable("ItemBarcodes");
                 });
 
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemPriceHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("NewPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("OldPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("ItemPriceHistories");
+                });
+
             modelBuilder.Entity("Warehouse.Domain.Entities.ItemUnit", b =>
                 {
                     b.Property<int>("Id")
@@ -260,6 +287,39 @@ namespace Warehouse.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProcessedSaleEvents");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.Promotion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("Promotions");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.StockLevel", b =>
@@ -439,6 +499,17 @@ namespace Warehouse.Infrastructure.Migrations
                     b.Navigation("Item");
                 });
 
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemPriceHistory", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
             modelBuilder.Entity("Warehouse.Domain.Entities.ItemUnit", b =>
                 {
                     b.HasOne("Warehouse.Domain.Entities.Item", "Item")
@@ -456,6 +527,17 @@ namespace Warehouse.Infrastructure.Migrations
                     b.Navigation("Item");
 
                     b.Navigation("UnitOfMeasure");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.Promotion", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.StockLevel", b =>

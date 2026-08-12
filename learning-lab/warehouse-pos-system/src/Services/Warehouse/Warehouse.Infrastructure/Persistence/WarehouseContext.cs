@@ -18,6 +18,8 @@ namespace Warehouse.Infrastructure.Persistence
         public DbSet<StockLevel> StockLevels => Set<StockLevel>();
         public DbSet<StockTransaction> StockTransactions => Set<StockTransaction>();
         public DbSet<ProcessedSaleEvent> ProcessedSaleEvents => Set<ProcessedSaleEvent>();
+        public DbSet<ItemPriceHistory> ItemPriceHistories => Set<ItemPriceHistory>();
+        public DbSet<Promotion> Promotions => Set<Promotion>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -161,6 +163,30 @@ namespace Warehouse.Infrastructure.Persistence
                 // SaleCompleted event is detectable as a duplicate rather
                 // than silently decrementing stock twice.
                 builder.HasIndex(p => p.SaleId).IsUnique();
+            });
+
+            modelBuilder.Entity<ItemPriceHistory>(builder =>
+            {
+                builder.Property(h => h.OldPrice).HasColumnType("decimal(18,2)");
+                builder.Property(h => h.NewPrice).HasColumnType("decimal(18,2)");
+
+                // Restrict, same reasoning as StockTransaction's own Item
+                // relationship — an audit trail has to survive the item it
+                // describes at least as long as anyone might want to read it.
+                builder.HasOne(h => h.Item)
+                       .WithMany()
+                       .HasForeignKey(h => h.ItemId)
+                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Promotion>(builder =>
+            {
+                builder.Property(p => p.DiscountValue).HasColumnType("decimal(18,2)");
+
+                builder.HasOne(p => p.Item)
+                       .WithMany()
+                       .HasForeignKey(p => p.ItemId)
+                       .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Categories, Locations, and Units of Measure are fixed

@@ -199,6 +199,76 @@
           </ul>
         }
 
+        <h3>Pricing</h3>
+        @if (item.activePromotionId) {
+          <p class="promo-active-note">
+            A promotion is active right now: <strong>{{ item.originalUnitPrice | number: '1.2-2' }}</strong> →
+            <strong>{{ item.unitPrice | number: '1.2-2' }}</strong>.
+          </p>
+        }
+
+        <form [formGroup]="priceForm" (ngSubmit)="submitUpdatePrice()" class="form-grid inline-form">
+          <mat-form-field appearance="outline">
+            <mat-label>List price</mat-label>
+            <input matInput type="number" step="0.01" formControlName="newPrice" />
+          </mat-form-field>
+          <button mat-stroked-button type="submit" [disabled]="updatingPrice()">Update price</button>
+        </form>
+
+        @if (priceHistory().length > 0) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Changed</th>
+                <th>Old price</th>
+                <th>New price</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (change of priceHistory(); track change.id) {
+                <tr>
+                  <td>{{ change.changedAtUtc | date: 'medium' }}</td>
+                  <td>{{ change.oldPrice | number: '1.2-2' }}</td>
+                  <td>{{ change.newPrice | number: '1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        <h4>Create a promotion</h4>
+        <!--
+          There's no list-existing-promotions endpoint yet (Warehouse only
+          exposes "what's active right now," via the effective-price
+          resolution above, not "every promotion ever created for this
+          item") — flagged here rather than built, the same "don't guess
+          at a shape until a second use needs it" discipline Promotion's
+          own single-item scope follows.
+        -->
+        <form [formGroup]="promotionForm" (ngSubmit)="submitCreatePromotion()" class="form-grid inline-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Discount type</mat-label>
+            <mat-select formControlName="discountType">
+              @for (type of discountTypes; track type) {
+                <mat-option [value]="type">{{ type }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>{{ promotionForm.controls.discountType.value === 'PercentageOff' ? 'Percent off' : 'Amount off' }}</mat-label>
+            <input matInput type="number" step="0.01" formControlName="discountValue" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Starts</mat-label>
+            <input matInput type="datetime-local" formControlName="startsAt" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Ends</mat-label>
+            <input matInput type="datetime-local" formControlName="endsAt" />
+          </mat-form-field>
+          <button mat-stroked-button type="submit" [disabled]="creatingPromotion()">Create promotion</button>
+        </form>
+
         <h3>Stock on hand</h3>
         <table class="data-table">
           <thead>

@@ -42,7 +42,7 @@ a distributed transaction.
 - [x] **C2 — Sync call to Warehouse (barcode + stock check)**
 - [x] **C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)**
 - [x] **C4 — Angular POS screen**
-- [ ] C5 — Selling price history + promotions (POS pricing rules)
+- [x] **C5 — Selling price history + promotions (POS pricing rules)**
 
 **Phase D — Reporting**
 - [ ] D1 — Event-driven read models
@@ -1287,3 +1287,125 @@ dotnet run --project ApiGateways/Gateway.Ocelot
 npm start
 # → http://localhost:4300, sign in as a Cashier (see AuthController.Register), then /pos
 ```
+
+## C5 — Selling price history + promotions
+
+**What it does:** two closely related pricing features on the Warehouse
+side — an audit trail of every real change to an item's list price
+(`ItemPriceHistory`), and time-boxed markdowns on a single item
+(`Promotion`, percentage or fixed-amount off) that automatically apply
+the moment a cashier scans that item at POS, with zero POS-side
+awareness that a discount exists at all.
+
+```
+UpdateItemPriceCommand (Warehouse)
+  1. NewPrice == Item.UnitPrice already? → no-op, nothing recorded
+  2. Otherwise: record ItemPriceHistory{OldPrice, NewPrice}, set
+     Item.UnitPrice = NewPrice, one SaveChanges for both
+
+EffectivePriceResolver.Resolve(item, nowUtc) (Warehouse)
+  1. Any Promotion for this item with StartsAtUtc <= now <= EndsAtUtc?
+     none → { UnitPrice = item.UnitPrice }  (no discount)
+  2. PercentageOff  → item.UnitPrice * (1 - value/100)
+     FixedAmountOff → item.UnitPrice - value
+  3. Floor at 0 either way, round to 2 decimals
+  4. → { UnitPrice (discounted), OriginalUnitPrice, PromotionId }
+
+ResolveBarcodeQueryHandler / GetItemByIdQueryHandler (Warehouse)
+  → call the resolver, hand the result into ItemDetailDto — the ONE
+    place a real sale's price comes from (AddSaleLineCommandHandler,
+    via IWarehouseCatalogClient) already goes through this
+
+AddSaleLineCommandHandler (POS, unchanged control flow)
+  → snapshots whatever UnitPrice/OriginalUnitPrice/PromotionId
+    Warehouse handed back onto the new SaleLine, same as
+    Sku/ItemName always have been (C1)
+```
+
+**Warehouse resolves the discount; POS never computes one.** The
+alternative — POS asking "is there a promotion for this item?" as a
+separate call, then doing the percentage/fixed-amount math itself —
+would duplicate pricing logic across two services and create exactly
+the kind of drift C2 already reasoned about for stock availability:
+POS has to trust Warehouse's answer for "what does this cost," not
+re-derive it. `IWarehouseCatalogClient.WarehouseItemLookup.UnitPrice`
+is already the price to charge; `OriginalUnitPrice`/`PromotionId` ride
+along purely so the receipt can show "was $15.00, now $7.50" without
+POS needing to know anything about *why*.
+
+**`UpdateItemPriceCommand` is the only sanctioned way to change
+`Item.UnitPrice`.** There's deliberately no generic "edit item" command
+that happens to let price through unnoticed — every price change goes
+through this one command specifically so an `ItemPriceHistory` row is
+guaranteed alongside it. Re-submitting the *same* price is treated as
+"nothing happened," not a change worth recording — an audit trail that
+logged every no-op price check would bury the changes that actually
+matter under noise.
+
+**`Promotion` is scoped to a single Item, not a Category or the whole
+store.** The smallest slice that's still genuinely useful — a real
+markdown on a real product — rather than guessing at a category-wide or
+storewide shape nothing has asked for yet. The same "extract on second
+use" discipline `StockAdjustmentStager`/`JwtTokenFactory` apply to code
+in this codebase applies here to scope: build the narrow thing, widen it
+the moment a second, different need actually shows up.
+
+**A promotion floors at zero rather than letting a sale line go
+negative.** `CreatePromotionCommand` has no way to check a
+`FixedAmountOff` value against the item's current price at creation
+time (nothing stops someone from lowering the price *after* the
+promotion exists), so `EffectivePriceResolver` treats "discount bigger
+than the price" as a data problem to contain, not something worth a
+500 over — `Math.Max(discounted, 0m)`.
+
+**Concepts introduced:**
+- **`ItemPriceHistory`** — an append-only log of actual changes, not a
+  running log of every price *check*; the "did it really change"
+  filter lives in `UpdateItemPriceCommandHandler`, not in the entity.
+- **`EffectivePriceResolver`** — the one place "an Item plus whatever
+  Promotion is active" turns into a single number to charge, the same
+  "one implementation of what a stock change is" reasoning
+  `StockAdjustmentStager` applies to inventory, just applied to price.
+- **A DTO field that means two different things depending on context.**
+  `ItemDetailDto.UnitPrice` is the base price everywhere EXCEPT
+  `ResolveBarcodeQuery`/`GetItemByIdQuery`'s results, where it's
+  whatever `EffectivePriceResolver` computed — deliberate, since every
+  consumer of "what does this cost" (a sale, a detail screen) wants the
+  charge-able price, not the raw column; `OriginalUnitPrice` is what
+  lets a caller reconstruct the raw price when it needs to (the admin
+  panel's price-edit form does exactly this, since editing the
+  *discounted* number would silently corrupt the real list price).
+
+**A real gap left open, flagged rather than fixed:** there is no
+"list every promotion for this item" query — only "what's active right
+now," reached indirectly through price resolution. An admin who creates
+a promotion can't later browse or cancel it through this UI; the same
+"don't guess at a shape until a second use needs it" reasoning that
+kept `Promotion` scoped to one item applies to not building a
+management screen nothing has asked for yet.
+
+**Verified with a runtime test against an in-memory SQLite database
+(Warehouse) and a second, separate one (POS), 16 checks, all passing:**
+a genuine price change records exactly one `ItemPriceHistory` row and
+updates `Item.UnitPrice`; re-submitting the identical price adds no
+second row; a second genuine change adds a second row, most-recent
+first. A `PercentageOff` promotion that's currently active correctly
+halves the resolved price while surfacing the original price and the
+promotion's id; a promotion that hasn't started yet, and one that
+already ended, both leave the price untouched; a `FixedAmountOff`
+promotion subtracts a flat amount; a fixed discount larger than the
+item's own price floors the result at zero rather than going negative.
+End to end — `AddSaleLineCommand` against a stub resolving to a
+discounted price snapshots the discounted `UnitPrice` AND the
+`OriginalUnitPrice`/`PromotionId` onto the persisted `SaleLine`, and
+`LineTotal` is computed off the discounted price, not the original.
+The frontend: `ng build` verified clean, then the dev server driven
+with Playwright, gateway routes mocked — the admin panel's new pricing
+section renders and pre-fills the list price from `OriginalUnitPrice`
+(not the possibly-discounted `UnitPrice`); submitting an updated price
+calls the backend and shows a success toast; the price-history table
+renders the change; creating a promotion calls the backend and the
+"promotion active" note appears showing both prices; on the POS
+register, both the cart and the completed receipt render the original
+price struck through next to the discounted one. No unexpected console
+errors.

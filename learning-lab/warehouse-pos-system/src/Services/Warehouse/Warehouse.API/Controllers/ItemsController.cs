@@ -5,8 +5,11 @@ using System.Net;
 using Warehouse.Application.Features.Items.Commands.AddItemBarcode;
 using Warehouse.Application.Features.Items.Commands.AddItemUnit;
 using Warehouse.Application.Features.Items.Commands.CreateItem;
+using Warehouse.Application.Features.Items.Commands.CreatePromotion;
+using Warehouse.Application.Features.Items.Commands.UpdateItemPrice;
 using Warehouse.Application.Features.Items.Queries.GetAllItems;
 using Warehouse.Application.Features.Items.Queries.GetItemById;
+using Warehouse.Application.Features.Items.Queries.GetItemPriceHistory;
 using Warehouse.Application.Features.Items.Queries.GetItemVariants;
 using Warehouse.Application.Features.Items.Queries.ResolveBarcode;
 using Warehouse.Application.Models;
@@ -91,6 +94,29 @@ namespace Warehouse.API.Controllers
         [HttpPost("{id:int}/units")]
         [ProducesResponseType(typeof(ItemUnitDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<ItemUnitDto>> AddUnit(int id, [FromBody] AddItemUnitCommand command)
+        {
+            command.ItemId = id;
+            return Ok(await _mediator.Send(command));
+        }
+
+        [HttpPut("{id:int}/price")]
+        [ProducesResponseType(typeof(ItemDetailDto), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<ItemDetailDto>> UpdatePrice(int id, [FromBody] UpdateItemPriceCommand command)
+        {
+            command.ItemId = id;
+            return Ok(await _mediator.Send(command));
+        }
+
+        [HttpGet("{id:int}/price-history")]
+        [ProducesResponseType(typeof(IEnumerable<ItemPriceHistoryDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<IEnumerable<ItemPriceHistoryDto>>> GetPriceHistory(int id)
+        {
+            return Ok(await _mediator.Send(new GetItemPriceHistoryQuery { ItemId = id }));
+        }
+
+        [HttpPost("{id:int}/promotions")]
+        [ProducesResponseType(typeof(PromotionDto), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PromotionDto>> CreatePromotion(int id, [FromBody] CreatePromotionCommand command)
         {
             command.ItemId = id;
             return Ok(await _mediator.Send(command));

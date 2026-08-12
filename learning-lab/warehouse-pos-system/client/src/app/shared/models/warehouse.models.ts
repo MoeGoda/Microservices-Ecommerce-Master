@@ -55,6 +55,29 @@ export interface ItemDetailDto extends ItemSummaryDto {
   barcodes: ItemBarcodeDto[];
   units: ItemUnitDto[];
   variants: ItemSummaryDto[];
+  // Both null unless a Promotion (C5) is active right now — unitPrice
+  // (inherited from ItemSummaryDto) is already the discounted price in
+  // that case; these two are purely for "was X, now Y" display.
+  originalUnitPrice: number | null;
+  activePromotionId: number | null;
+}
+
+// Mirrors ItemPriceHistoryDto — one row per actual price change.
+export interface ItemPriceHistoryDto {
+  id: number;
+  oldPrice: number;
+  newPrice: number;
+  changedAtUtc: string;
+}
+
+// Mirrors PromotionDto. discountType is 'PercentageOff' | 'FixedAmountOff'.
+export interface PromotionDto {
+  id: number;
+  itemId: number;
+  discountType: string;
+  discountValue: number;
+  startsAtUtc: string;
+  endsAtUtc: string;
 }
 
 export interface StockLevelDto {
@@ -115,3 +138,19 @@ export interface AdjustStockRequest {
 
 // Mirrors Warehouse.Domain.Entities.BarcodeType.
 export const BARCODE_TYPES = ['EAN13', 'EAN8', 'UPC', 'Code128', 'QRCode', 'Other'] as const;
+
+// Mirrors UpdateItemPriceCommand.
+export interface UpdateItemPriceRequest {
+  newPrice: number;
+}
+
+// Mirrors CreatePromotionCommand.
+export interface CreatePromotionRequest {
+  discountType: string;
+  discountValue: number;
+  startsAtUtc: string;
+  endsAtUtc: string;
+}
+
+// Mirrors Warehouse.Domain.Entities.DiscountType.
+export const DISCOUNT_TYPES = ['PercentageOff', 'FixedAmountOff'] as const;

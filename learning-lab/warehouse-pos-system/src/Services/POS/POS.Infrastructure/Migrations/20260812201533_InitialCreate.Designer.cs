@@ -12,7 +12,7 @@ using POS.Infrastructure.Persistence;
 namespace POS.Infrastructure.Migrations
 {
     [DbContext(typeof(PosContext))]
-    [Migration("20260812184601_InitialCreate")]
+    [Migration("20260812201533_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -121,6 +121,12 @@ namespace POS.Infrastructure.Migrations
 
                     b.Property<decimal>("LineTotal")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("OriginalUnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("PromotionId")
+                        .HasColumnType("int");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");

@@ -62,7 +62,12 @@
               <tr>
                 <td>{{ line.sku }}</td>
                 <td>{{ line.itemName }}</td>
-                <td>{{ line.unitPrice | number: '1.2-2' }}</td>
+                <td>
+                  @if (line.originalUnitPrice) {
+                    <span class="original-price">{{ line.originalUnitPrice | number: '1.2-2' }}</span>
+                  }
+                  {{ line.unitPrice | number: '1.2-2' }}
+                </td>
                 <td>{{ line.quantity }}</td>
                 <td>{{ line.lineTotal | number: '1.2-2' }}</td>
                 <td>
@@ -129,7 +134,12 @@
               <tr>
                 <td>{{ line.sku }}</td>
                 <td>{{ line.itemName }}</td>
-                <td>{{ line.unitPrice | number: '1.2-2' }}</td>
+                <td>
+                  @if (line.originalUnitPrice) {
+                    <span class="original-price">{{ line.originalUnitPrice | number: '1.2-2' }}</span>
+                  }
+                  {{ line.unitPrice | number: '1.2-2' }}
+                </td>
                 <td>{{ line.quantity }}</td>
                 <td>{{ line.lineTotal | number: '1.2-2' }}</td>
               </tr>

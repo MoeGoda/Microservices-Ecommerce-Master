@@ -64,3 +64,9 @@
   color: var(--mat-sys-error, #b00020);
   font-style: italic;
 }
+
+.original-price {
+  text-decoration: line-through;
+  color: #777;
+  margin-right: 6px;
+}

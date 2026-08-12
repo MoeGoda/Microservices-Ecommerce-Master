@@ -22,6 +22,14 @@ namespace POS.Domain.Entities
         public string ItemName { get; set; } = null!;
         public decimal UnitPrice { get; set; }
 
+        // Both null unless Warehouse had an active Promotion (C5) for this
+        // item at the moment this line was added — same snapshot
+        // reasoning as UnitPrice itself: what discount applied to THIS
+        // sale is part of its historical record, independent of whether
+        // the promotion is still running (or even still exists) later.
+        public decimal? OriginalUnitPrice { get; set; }
+        public int? PromotionId { get; set; }
+
         // Always in the item's Warehouse base unit — a barcode scan at the
         // register resolves to one unit of whatever Warehouse considers
         // "the base unit" for that item (see Warehouse's Item.BaseUnitOfMeasure,

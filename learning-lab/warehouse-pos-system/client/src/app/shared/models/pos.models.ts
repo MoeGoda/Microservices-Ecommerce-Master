@@ -9,6 +9,11 @@ export interface SaleLineDto {
   sku: string;
   itemName: string;
   unitPrice: number;
+  // Both null unless a Promotion (C5) was active in Warehouse the moment
+  // this line was added — unitPrice above is already the discounted
+  // price either way; these are purely "was X, now Y" receipt detail.
+  originalUnitPrice: number | null;
+  promotionId: number | null;
   quantity: number;
   lineTotal: number;
 }

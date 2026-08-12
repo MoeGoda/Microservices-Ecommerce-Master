@@ -11,15 +11,18 @@ namespace Warehouse.Application.Features.Items.Queries.GetItemById
         private readonly IItemRepository _itemRepository;
         private readonly IItemBarcodeRepository _itemBarcodeRepository;
         private readonly IItemUnitRepository _itemUnitRepository;
+        private readonly EffectivePriceResolver _effectivePriceResolver;
 
         public GetItemByIdQueryHandler(
             IItemRepository itemRepository,
             IItemBarcodeRepository itemBarcodeRepository,
-            IItemUnitRepository itemUnitRepository)
+            IItemUnitRepository itemUnitRepository,
+            EffectivePriceResolver effectivePriceResolver)
         {
             _itemRepository = itemRepository;
             _itemBarcodeRepository = itemBarcodeRepository;
             _itemUnitRepository = itemUnitRepository;
+            _effectivePriceResolver = effectivePriceResolver;
         }
 
         public async Task<ItemDetailDto> Handle(GetItemByIdQuery request, CancellationToken cancellationToken)
@@ -31,7 +34,13 @@ namespace Warehouse.Application.Features.Items.Queries.GetItemById
             var units = await _itemUnitRepository.GetByItem(item.Id);
             var variants = await _itemRepository.GetVariants(item.Id);
 
-            return ItemDetailDto.FromEntity(item, barcodes, units, variants);
+            // Same reasoning as ResolveBarcodeQueryHandler — a single-item
+            // detail view is one cheap lookup, unlike GetAllItemsQuery's
+            // list of many (see EffectivePriceResolver's own comment on
+            // why that one is deliberately left alone for now).
+            var effectivePrice = await _effectivePriceResolver.Resolve(item, DateTime.UtcNow);
+
+            return ItemDetailDto.FromEntity(item, barcodes, units, variants, effectivePrice);
         }
     }
 }

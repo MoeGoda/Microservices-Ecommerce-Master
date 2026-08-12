@@ -61,6 +61,8 @@ namespace POS.Infrastructure.Migrations
                     Sku = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     ItemName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     UnitPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    OriginalUnitPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    PromotionId = table.Column<int>(type: "int", nullable: true),
                     Quantity = table.Column<int>(type: "int", nullable: false),
                     LineTotal = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)

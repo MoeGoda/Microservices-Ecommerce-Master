@@ -8,14 +8,18 @@ import {
   AdjustStockRequest,
   CategoryDto,
   CreateItemRequest,
+  CreatePromotionRequest,
   ItemBarcodeDto,
   ItemDetailDto,
+  ItemPriceHistoryDto,
   ItemSummaryDto,
   ItemUnitDto,
   LocationDto,
+  PromotionDto,
   ReceiveStockRequest,
   StockLevelDto,
   UnitOfMeasureDto,
+  UpdateItemPriceRequest,
 } from '../../shared/models/warehouse.models';
 
 const BASE = `${environment.apiBaseUrl}/Warehouse`;
@@ -70,5 +74,17 @@ export class WarehouseService {
 
   getUnitsOfMeasure(): Observable<UnitOfMeasureDto[]> {
     return this.http.get<UnitOfMeasureDto[]>(`${BASE}/MasterData/units-of-measure`);
+  }
+
+  updatePrice(itemId: number, request: UpdateItemPriceRequest): Observable<ItemDetailDto> {
+    return this.http.put<ItemDetailDto>(`${BASE}/Items/${itemId}/price`, request);
+  }
+
+  getPriceHistory(itemId: number): Observable<ItemPriceHistoryDto[]> {
+    return this.http.get<ItemPriceHistoryDto[]>(`${BASE}/Items/${itemId}/price-history`);
+  }
+
+  createPromotion(itemId: number, request: CreatePromotionRequest): Observable<PromotionDto> {
+    return this.http.post<PromotionDto>(`${BASE}/Items/${itemId}/promotions`, request);
   }
 }

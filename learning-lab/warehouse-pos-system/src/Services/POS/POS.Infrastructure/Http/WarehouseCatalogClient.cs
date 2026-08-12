@@ -45,6 +45,8 @@ namespace POS.Infrastructure.Http
                 Sku = item.Sku,
                 ItemName = item.Name,
                 UnitPrice = item.UnitPrice,
+                OriginalUnitPrice = item.OriginalUnitPrice,
+                PromotionId = item.ActivePromotionId,
             };
         }
 
@@ -95,6 +97,8 @@ namespace POS.Infrastructure.Http
             public string Sku { get; set; } = null!;
             public string Name { get; set; } = null!;
             public decimal UnitPrice { get; set; }
+            public decimal? OriginalUnitPrice { get; set; }
+            public int? ActivePromotionId { get; set; }
         }
 
         // Just the fields this client actually reads from

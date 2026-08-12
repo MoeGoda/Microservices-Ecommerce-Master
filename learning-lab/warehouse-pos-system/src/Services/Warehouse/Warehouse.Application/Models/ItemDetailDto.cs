@@ -1,3 +1,4 @@
+using Warehouse.Application.Features.Items;
 using Warehouse.Domain.Entities;
 
 namespace Warehouse.Application.Models
@@ -21,15 +22,31 @@ namespace Warehouse.Application.Models
         public int BaseUnitOfMeasureId { get; set; }
         public string BaseUnitOfMeasureCode { get; set; } = null!;
         public int? ParentItemId { get; set; }
+
+        // Null unless a Promotion (C5) is active for this item right now.
+        // UnitPrice above is always the price to actually CHARGE — the
+        // discounted one, when a promotion applies — so a caller that only
+        // reads UnitPrice (every call site that existed before C5) keeps
+        // working unchanged; these two are purely for callers that want to
+        // show "was X, now Y" (the POS receipt, the admin item panel).
+        public decimal? OriginalUnitPrice { get; set; }
+        public int? ActivePromotionId { get; set; }
+
         public IReadOnlyList<ItemBarcodeDto> Barcodes { get; set; } = Array.Empty<ItemBarcodeDto>();
         public IReadOnlyList<ItemUnitDto> Units { get; set; } = Array.Empty<ItemUnitDto>();
         public IReadOnlyList<ItemSummaryDto> Variants { get; set; } = Array.Empty<ItemSummaryDto>();
 
+        // effectivePrice defaults to null — every call site that predates
+        // C5 (CreateItemCommandHandler, AddItemBarcode/AddItemUnit
+        // handlers) has no promotion to consider and just gets the item's
+        // raw UnitPrice, unchanged. Only ResolveBarcodeQueryHandler and
+        // GetItemByIdQueryHandler pass one in.
         public static ItemDetailDto FromEntity(
             Item item,
             IEnumerable<ItemBarcode> barcodes,
             IEnumerable<ItemUnit> units,
-            IEnumerable<Item> variants)
+            IEnumerable<Item> variants,
+            EffectivePrice? effectivePrice = null)
         {
             return new ItemDetailDto
             {
@@ -37,7 +54,9 @@ namespace Warehouse.Application.Models
                 Sku = item.Sku,
                 Name = item.Name,
                 Description = item.Description,
-                UnitPrice = item.UnitPrice,
+                UnitPrice = effectivePrice?.UnitPrice ?? item.UnitPrice,
+                OriginalUnitPrice = effectivePrice?.OriginalUnitPrice,
+                ActivePromotionId = effectivePrice?.PromotionId,
                 IsActive = item.IsActive,
                 CategoryId = item.CategoryId,
                 CategoryName = item.Category.Name,

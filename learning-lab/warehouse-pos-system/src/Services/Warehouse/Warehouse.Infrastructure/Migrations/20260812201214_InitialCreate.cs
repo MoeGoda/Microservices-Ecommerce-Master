@@ -134,6 +134,28 @@ namespace Warehouse.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ItemPriceHistories",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ItemId = table.Column<int>(type: "int", nullable: false),
+                    OldPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    NewPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ItemPriceHistories", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ItemPriceHistories_Items_ItemId",
+                        column: x => x.ItemId,
+                        principalTable: "Items",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ItemUnits",
                 columns: table => new
                 {
@@ -157,6 +179,30 @@ namespace Warehouse.Infrastructure.Migrations
                         name: "FK_ItemUnits_UnitsOfMeasure_UnitOfMeasureId",
                         column: x => x.UnitOfMeasureId,
                         principalTable: "UnitsOfMeasure",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Promotions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ItemId = table.Column<int>(type: "int", nullable: false),
+                    DiscountType = table.Column<int>(type: "int", nullable: false),
+                    DiscountValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    StartsAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    EndsAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Promotions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Promotions_Items_ItemId",
+                        column: x => x.ItemId,
+                        principalTable: "Items",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -279,6 +325,11 @@ namespace Warehouse.Infrastructure.Migrations
                 filter: "[IsPrimary] = 1");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ItemPriceHistories_ItemId",
+                table: "ItemPriceHistories",
+                column: "ItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Items_BaseUnitOfMeasureId",
                 table: "Items",
                 column: "BaseUnitOfMeasureId");
@@ -323,6 +374,11 @@ namespace Warehouse.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Promotions_ItemId",
+                table: "Promotions",
+                column: "ItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_StockLevels_ItemId_LocationId",
                 table: "StockLevels",
                 columns: new[] { "ItemId", "LocationId" },
@@ -362,10 +418,16 @@ namespace Warehouse.Infrastructure.Migrations
                 name: "ItemBarcodes");
 
             migrationBuilder.DropTable(
+                name: "ItemPriceHistories");
+
+            migrationBuilder.DropTable(
                 name: "ItemUnits");
 
             migrationBuilder.DropTable(
                 name: "ProcessedSaleEvents");
+
+            migrationBuilder.DropTable(
+                name: "Promotions");
 
             migrationBuilder.DropTable(
                 name: "StockLevels");

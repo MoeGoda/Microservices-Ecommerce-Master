@@ -37,6 +37,7 @@ namespace POS.Infrastructure.Persistence
                 builder.Property(l => l.Sku).HasMaxLength(50);
                 builder.Property(l => l.ItemName).HasMaxLength(200);
                 builder.Property(l => l.UnitPrice).HasColumnType("decimal(18,2)");
+                builder.Property(l => l.OriginalUnitPrice).HasColumnType("decimal(18,2)");
                 builder.Property(l => l.LineTotal).HasColumnType("decimal(18,2)");
 
                 // Cascade, not Restrict: a SaleLine has no meaning
