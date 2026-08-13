@@ -17,6 +17,12 @@ namespace Warehouse.Infrastructure.Persistence
         public DbSet<ItemUnit> ItemUnits => Set<ItemUnit>();
         public DbSet<StockLevel> StockLevels => Set<StockLevel>();
         public DbSet<StockTransaction> StockTransactions => Set<StockTransaction>();
+        public DbSet<ProcessedSaleEvent> ProcessedSaleEvents => Set<ProcessedSaleEvent>();
+        public DbSet<ProcessedSaleReturnEvent> ProcessedSaleReturnEvents => Set<ProcessedSaleReturnEvent>();
+        public DbSet<ItemPriceHistory> ItemPriceHistories => Set<ItemPriceHistory>();
+        public DbSet<Promotion> Promotions => Set<Promotion>();
+        public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+        public DbSet<OutboxDelivery> OutboxDeliveries => Set<OutboxDelivery>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -151,6 +157,66 @@ namespace Warehouse.Infrastructure.Persistence
                        .WithMany()
                        .HasForeignKey(t => t.LocationId)
                        .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ProcessedSaleEvent>(builder =>
+            {
+                // The whole point of this table — a SaleId can appear
+                // here at most once, so a retried delivery of the same
+                // SaleCompleted event is detectable as a duplicate rather
+                // than silently decrementing stock twice.
+                builder.HasIndex(p => p.SaleId).IsUnique();
+            });
+
+            modelBuilder.Entity<ProcessedSaleReturnEvent>(builder =>
+            {
+                // A separate table from ProcessedSaleEvent's own unique
+                // index — see ProcessedSaleReturnEvent's own comment for
+                // why a SaleId needs independent dedup tracking here.
+                builder.HasIndex(p => p.SaleId).IsUnique();
+            });
+
+            modelBuilder.Entity<ItemPriceHistory>(builder =>
+            {
+                builder.Property(h => h.OldPrice).HasColumnType("decimal(18,2)");
+                builder.Property(h => h.NewPrice).HasColumnType("decimal(18,2)");
+
+                // Restrict, same reasoning as StockTransaction's own Item
+                // relationship — an audit trail has to survive the item it
+                // describes at least as long as anyone might want to read it.
+                builder.HasOne(h => h.Item)
+                       .WithMany()
+                       .HasForeignKey(h => h.ItemId)
+                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Promotion>(builder =>
+            {
+                builder.Property(p => p.DiscountValue).HasColumnType("decimal(18,2)");
+
+                builder.HasOne(p => p.Item)
+                       .WithMany()
+                       .HasForeignKey(p => p.ItemId)
+                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<OutboxMessage>(builder =>
+            {
+                builder.Property(m => m.EventType).HasMaxLength(100);
+                builder.Property(m => m.PayloadJson).IsRequired();
+            });
+
+            modelBuilder.Entity<OutboxDelivery>(builder =>
+            {
+                builder.Property(d => d.ConsumerName).HasMaxLength(100);
+                builder.Property(d => d.LastError).HasMaxLength(1000);
+
+                builder.HasOne(d => d.OutboxMessage)
+                       .WithMany()
+                       .HasForeignKey(d => d.OutboxMessageId)
+                       .OnDelete(DeleteBehavior.Cascade);
+
+                builder.HasIndex(d => new { d.OutboxMessageId, d.ConsumerName }).IsUnique();
             });
 
             // Categories, Locations, and Units of Measure are fixed

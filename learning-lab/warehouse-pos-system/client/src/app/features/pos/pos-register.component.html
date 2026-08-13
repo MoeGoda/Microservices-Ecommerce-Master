@@ -1,0 +1,185 @@
+<div class="pos-register">
+  @if (!sale()) {
+    <mat-card class="start-card">
+      <mat-card-header>
+        <mat-card-title>Start a new sale</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="startForm" (ngSubmit)="submitStartSale()" class="form-row">
+          <mat-form-field appearance="outline" class="location-field">
+            <mat-label>Register location</mat-label>
+            <mat-select formControlName="locationId">
+              @for (location of locations(); track location.id) {
+                <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
+              }
+            </mat-select>
+            @if (startForm.controls.locationId.touched && startForm.controls.locationId.invalid) {
+              <mat-error>A location is required.</mat-error>
+            }
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" [disabled]="startingSale()">
+            @if (startingSale()) {
+              <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+            } @else {
+              Start sale
+            }
+          </button>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  } @else if (sale()!.status === 'InProgress') {
+    <mat-card class="register-card">
+      <mat-card-header>
+        <mat-card-title>Sale #{{ sale()!.id }}</mat-card-title>
+        <mat-card-subtitle>In progress</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="scanForm" (ngSubmit)="submitScan()" class="scan-row">
+          <mat-form-field appearance="outline" class="barcode-field">
+            <mat-label>Scan or type barcode</mat-label>
+            <input matInput #barcodeInput formControlName="barcode" autocomplete="off" (keyup.enter)="submitScan()" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="quantity-field">
+            <mat-label>Qty</mat-label>
+            <input matInput type="number" formControlName="quantity" min="1" />
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" [disabled]="addingLine()">Add</button>
+        </form>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Sku</th>
+              <th>Item</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th>Line total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of sale()!.lines; track line.id) {
+              <tr>
+                <td>{{ line.sku }}</td>
+                <td>{{ line.itemName }}</td>
+                <td>
+                  @if (line.originalUnitPrice) {
+                    <span class="original-price">{{ line.originalUnitPrice | number: '1.2-2' }}</span>
+                  }
+                  {{ line.unitPrice | number: '1.2-2' }}
+                </td>
+                <td>{{ line.quantity }}</td>
+                <td>{{ line.lineTotal | number: '1.2-2' }}</td>
+                <td>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="removeLine(line.id)"
+                    [disabled]="removingLineId() === line.id"
+                    aria-label="Remove line"
+                    title="Remove line"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty-row">Scan a barcode to add the first line.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <div class="totals-row">
+          <span class="total-label">Total</span>
+          <span class="total-value">{{ sale()!.total | number: '1.2-2' }}</span>
+        </div>
+
+        <div class="action-row">
+          <button mat-stroked-button type="button" (click)="cancelSale()" [disabled]="cancelling()">Cancel sale</button>
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            (click)="submitCheckout()"
+            [disabled]="checkingOut() || sale()!.lines.length === 0"
+          >
+            Checkout
+          </button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  } @else if (sale()!.status === 'Completed' || sale()!.status === 'Returned') {
+    <mat-card class="receipt-card">
+      <mat-card-header>
+        <mat-card-title>Receipt — Sale #{{ sale()!.id }}</mat-card-title>
+        <mat-card-subtitle>
+          @if (sale()!.status === 'Returned') {
+            Returned {{ sale()!.returnedAt | date: 'medium' }} (originally completed {{ sale()!.completedAt | date: 'medium' }})
+          } @else {
+            Completed {{ sale()!.completedAt | date: 'medium' }} · stock sync: {{ sale()!.stockSyncStatus }}
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Sku</th>
+              <th>Item</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th>Line total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of sale()!.lines; track line.id) {
+              <tr>
+                <td>{{ line.sku }}</td>
+                <td>{{ line.itemName }}</td>
+                <td>
+                  @if (line.originalUnitPrice) {
+                    <span class="original-price">{{ line.originalUnitPrice | number: '1.2-2' }}</span>
+                  }
+                  {{ line.unitPrice | number: '1.2-2' }}
+                </td>
+                <td>{{ line.quantity }}</td>
+                <td>{{ line.lineTotal | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <div class="totals-row">
+          <span class="total-label">Total</span>
+          <span class="total-value">{{ sale()!.total | number: '1.2-2' }}</span>
+        </div>
+
+        <!--
+          stockSyncStatus starts Pending the instant checkout returns — the
+          outbox dispatcher (C3) hasn't necessarily run yet, so a fresh
+          receipt legitimately shows Pending rather than Synced. This isn't
+          a bug to poll away; it's the whole point of decoupling checkout's
+          response from Warehouse's own confirmation.
+        -->
+        @if (sale()!.status === 'Completed' && sale()!.stockSyncStatus === 'Failed') {
+          <p class="sync-failed-note">
+            Stock sync failed after retries — flagged for reconciliation. The sale itself is still final.
+          </p>
+        }
+
+        @if (sale()!.status === 'Returned') {
+          <p class="returned-note">This sale was returned — stock has been restocked at its original location.</p>
+        }
+
+        <div class="action-row">
+          @if (sale()!.status === 'Completed') {
+            <button mat-stroked-button type="button" (click)="returnSale()" [disabled]="returningSale()">Return sale</button>
+          }
+          <button mat-flat-button color="primary" type="button" (click)="startNewSale()">New sale</button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

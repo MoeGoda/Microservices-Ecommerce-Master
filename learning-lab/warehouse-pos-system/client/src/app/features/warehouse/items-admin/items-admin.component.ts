@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,10 +14,14 @@ import { NotificationService } from '../../../core/notifications/notification.se
 import {
   BARCODE_TYPES,
   CategoryDto,
+  DISCOUNT_TYPES,
   ItemDetailDto,
+  ItemPriceHistoryDto,
   ItemSummaryDto,
   LocationDto,
+  PromotionDto,
   StockLevelDto,
+  TransferStockRequest,
   UnitOfMeasureDto,
 } from '../../../shared/models/warehouse.models';
 import { WarehouseService } from '../warehouse.service';
@@ -30,6 +34,7 @@ import { WarehouseService } from '../warehouse.service';
 @Component({
   selector: 'app-items-admin',
   imports: [
+    DatePipe,
     DecimalPipe,
     ReactiveFormsModule,
     MatButtonModule,
@@ -46,6 +51,7 @@ import { WarehouseService } from '../warehouse.service';
 })
 export class ItemsAdminComponent implements OnInit {
   readonly barcodeTypes = BARCODE_TYPES;
+  readonly discountTypes = DISCOUNT_TYPES;
 
   readonly categories = signal<CategoryDto[]>([]);
   readonly locations = signal<LocationDto[]>([]);
@@ -53,6 +59,8 @@ export class ItemsAdminComponent implements OnInit {
   readonly items = signal<ItemSummaryDto[]>([]);
   readonly selectedItem = signal<ItemDetailDto | null>(null);
   readonly stockLevels = signal<StockLevelDto[]>([]);
+  readonly priceHistory = signal<ItemPriceHistoryDto[]>([]);
+  readonly promotions = signal<PromotionDto[]>([]);
 
   readonly loadingItems = signal(false);
   readonly loadingDetail = signal(false);
@@ -60,6 +68,13 @@ export class ItemsAdminComponent implements OnInit {
   readonly addingBarcode = signal(false);
   readonly receivingStock = signal(false);
   readonly adjustingStock = signal(false);
+  readonly transferringStock = signal(false);
+  readonly updatingPrice = signal(false);
+  readonly creatingPromotion = signal(false);
+  // The one promotion currently being cancelled, if any — disables just
+  // that row's button rather than every button in the list while the
+  // request is in flight.
+  readonly cancellingPromotionId = signal<number | null>(null);
 
   readonly createForm = new FormGroup({
     sku: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -90,6 +105,29 @@ export class ItemsAdminComponent implements OnInit {
     locationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     quantityChange: new FormControl(0, { nonNullable: true, validators: [Validators.required] }),
     reference: new FormControl('', { nonNullable: true }),
+  });
+
+  readonly transferForm = new FormGroup({
+    fromLocationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    toLocationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    quantity: new FormControl(1, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    reference: new FormControl('', { nonNullable: true }),
+  });
+
+  readonly priceForm = new FormGroup({
+    newPrice: new FormControl(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+  });
+
+  // startsAt/endsAt are native datetime-local strings ("YYYY-MM-DDTHH:mm",
+  // in the BROWSER'S OWN timezone, not UTC) — converted to a UTC ISO
+  // string in submitCreatePromotion() before this ever reaches
+  // CreatePromotionRequest, which — like every other timestamp in this
+  // app — is UTC end to end.
+  readonly promotionForm = new FormGroup({
+    discountType: new FormControl<string>('PercentageOff', { nonNullable: true, validators: [Validators.required] }),
+    discountValue: new FormControl(0, { nonNullable: true, validators: [Validators.required, Validators.min(0.01)] }),
+    startsAt: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    endsAt: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
   });
 
   constructor(
@@ -134,9 +172,25 @@ export class ItemsAdminComponent implements OnInit {
           // selectable (see the template).
           this.receiveForm.reset({ locationId: null, unitOfMeasureId: detail.baseUnitOfMeasureId, quantity: 1, reference: '' });
           this.addBarcodeForm.reset({ barcode: '', barcodeType: 'EAN13', isPrimary: false });
+          // originalUnitPrice, not unitPrice — unitPrice on this DTO is
+          // already discounted when a promotion is active (C5), and
+          // editing that would silently overwrite the item's real list
+          // price with whatever the discount happened to compute to.
+          // originalUnitPrice falls back to null only when there's NO
+          // active promotion, in which case unitPrice IS the real price.
+          this.priceForm.reset({ newPrice: detail.originalUnitPrice ?? detail.unitPrice });
+          this.promotionForm.reset({ discountType: 'PercentageOff', discountValue: 0, startsAt: '', endsAt: '' });
           this.loadStockLevels(item.id);
+          this.loadPriceHistory(item.id);
+          this.loadPromotions(item.id);
         },
       });
+  }
+
+  private loadPromotions(itemId: number): void {
+    this.warehouseService.getPromotions(itemId).subscribe({
+      next: (promotions) => this.promotions.set(promotions),
+    });
   }
 
   private loadStockLevels(itemId: number): void {
@@ -146,6 +200,17 @@ export class ItemsAdminComponent implements OnInit {
         // Adjusting requires a StockLevel that already exists — default to
         // the first one on hand rather than leaving the picker empty.
         this.adjustForm.reset({ locationId: levels[0]?.locationId ?? null, quantityChange: 0, reference: '' });
+        // Transferring FROM also requires an existing balance; TO is any
+        // location at all (transferStock creates the destination row if
+        // it doesn't exist yet) — defaulting it to the second stocked
+        // location, if there is one, just avoids the obviously-wrong
+        // same-location default the picker would otherwise start on.
+        this.transferForm.reset({
+          fromLocationId: levels[0]?.locationId ?? null,
+          toLocationId: levels[1]?.locationId ?? this.locations().find((l) => l.id !== levels[0]?.locationId)?.id ?? null,
+          quantity: 1,
+          reference: '',
+        });
       },
     });
   }
@@ -250,6 +315,143 @@ export class ItemsAdminComponent implements OnInit {
         next: (level) => {
           this.notification.success(`Stock adjusted — now ${level.quantityOnHand} ${level.unitOfMeasureCode} at ${level.locationName}.`);
           this.loadStockLevels(item.id);
+        },
+      });
+  }
+
+  submitTransfer(): void {
+    const item = this.selectedItem();
+    if (!item || this.transferForm.invalid || this.transferringStock()) {
+      this.transferForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.transferForm.getRawValue();
+    if (value.fromLocationId === value.toLocationId) {
+      this.notification.error('From and to locations must be different.');
+      return;
+    }
+
+    const request: TransferStockRequest = {
+      itemId: item.id,
+      fromLocationId: value.fromLocationId!,
+      toLocationId: value.toLocationId!,
+      quantity: value.quantity,
+      reference: value.reference,
+    };
+
+    this.transferringStock.set(true);
+    this.warehouseService
+      .transferStock(request)
+      .pipe(finalize(() => this.transferringStock.set(false)))
+      .subscribe({
+        next: (result) => {
+          this.notification.success(
+            `Transferred ${value.quantity} ${result.from.unitOfMeasureCode} from ${result.from.locationName} to ${result.to.locationName}.`,
+          );
+          this.loadStockLevels(item.id);
+        },
+      });
+  }
+
+  private loadPriceHistory(itemId: number): void {
+    this.warehouseService.getPriceHistory(itemId).subscribe({
+      next: (history) => this.priceHistory.set(history),
+    });
+  }
+
+  submitUpdatePrice(): void {
+    const item = this.selectedItem();
+    if (!item || this.priceForm.invalid || this.updatingPrice()) {
+      this.priceForm.markAllAsTouched();
+      return;
+    }
+
+    const { newPrice } = this.priceForm.getRawValue();
+    this.updatingPrice.set(true);
+    this.warehouseService
+      .updatePrice(item.id, { newPrice })
+      .pipe(finalize(() => this.updatingPrice.set(false)))
+      .subscribe({
+        next: (updated) => {
+          this.notification.success(`Price updated to ${updated.originalUnitPrice ?? updated.unitPrice}.`);
+          this.selectItem(item);
+          this.loadItems();
+        },
+      });
+  }
+
+  submitCreatePromotion(): void {
+    const item = this.selectedItem();
+    if (!item || this.promotionForm.invalid || this.creatingPromotion()) {
+      this.promotionForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.promotionForm.getRawValue();
+    this.creatingPromotion.set(true);
+    this.warehouseService
+      .createPromotion(item.id, {
+        discountType: value.discountType,
+        discountValue: value.discountValue,
+        // datetime-local gives local-time strings with no timezone
+        // marker — new Date(...) interprets that as the BROWSER's local
+        // time, and toISOString() converts it to UTC, matching what
+        // CreatePromotionCommand expects (StartsAtUtc/EndsAtUtc).
+        startsAtUtc: new Date(value.startsAt).toISOString(),
+        endsAtUtc: new Date(value.endsAt).toISOString(),
+      })
+      .pipe(finalize(() => this.creatingPromotion.set(false)))
+      .subscribe({
+        next: () => {
+          this.notification.success('Promotion created.');
+          this.promotionForm.reset({ discountType: 'PercentageOff', discountValue: 0, startsAt: '', endsAt: '' });
+          // Re-fetching the item picks up the discounted price immediately
+          // if the new promotion is already active (StartsAtUtc <= now).
+          this.selectItem(item);
+        },
+      });
+  }
+
+  // Plain TS, not template date-string comparisons — comparing ISO
+  // strings lexicographically happens to work but is the wrong tool;
+  // parsing once here keeps the template a pure display layer.
+  promotionStatus(promotion: PromotionDto): 'Cancelled' | 'Expired' | 'Upcoming' | 'Active' {
+    if (promotion.isCancelled) {
+      return 'Cancelled';
+    }
+
+    const now = new Date();
+    if (new Date(promotion.endsAtUtc) < now) {
+      return 'Expired';
+    }
+    if (new Date(promotion.startsAtUtc) > now) {
+      return 'Upcoming';
+    }
+
+    return 'Active';
+  }
+
+  canCancelPromotion(promotion: PromotionDto): boolean {
+    return !promotion.isCancelled && new Date(promotion.endsAtUtc) >= new Date();
+  }
+
+  cancelPromotion(promotion: PromotionDto): void {
+    const item = this.selectedItem();
+    if (!item || this.cancellingPromotionId()) {
+      return;
+    }
+
+    this.cancellingPromotionId.set(promotion.id);
+    this.warehouseService
+      .cancelPromotion(item.id, promotion.id)
+      .pipe(finalize(() => this.cancellingPromotionId.set(null)))
+      .subscribe({
+        next: () => {
+          this.notification.success('Promotion cancelled.');
+          // Re-fetching the item picks up the base price immediately if
+          // the cancelled promotion was the one currently discounting it.
+          this.selectItem(item);
         },
       });
   }

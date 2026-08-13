@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Notifications.Application\Notifications.Application.csproj" />
+    <ProjectReference Include="..\Notifications.Infrastructure\Notifications.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.ExceptionHandling\Common.ExceptionHandling.csproj" />
+    <!--
+      Notifications.Infrastructure has no reason to know JWTs exist — it
+      only persists Notification rows; only this API layer needs
+      Common.Security, both to validate incoming service tokens (the
+      EventsController path) and — unlike every other service — to hand-roll
+      its own AddJwtBearer call (Program.cs) rather than call
+      Common.Security's shared AddJwtAuthentication extension, so the
+      SignalR hub's query-string token can be wired in without changing
+      that extension for every other service too.
+    -->
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
+  </ItemGroup>
+
+</Project>

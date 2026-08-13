@@ -14,10 +14,18 @@ namespace POS.Domain.Entities
         Completed,
 
         // Abandoned before payment — a customer changed their mind, a
-        // cashier started the wrong sale, etc. Deliberately distinct from
-        // a POST-completion return/refund, which needs a compensating
-        // stock increase and hasn't been designed yet; that's a real,
-        // separate feature this enum doesn't try to cover.
+        // cashier started the wrong sale, etc. Distinct from Returned
+        // below: a Cancelled sale never touched Warehouse's stock in the
+        // first place (see Sale.cs), so there's nothing to compensate.
         Cancelled,
+
+        // A completed sale, reversed after the fact — a customer brought
+        // the items back. Unlike Cancelled, this DOES need a compensating
+        // stock increase (ReturnSaleCommand's own SaleReturned event,
+        // mirroring SaleCompleted's decrement in reverse), because the
+        // original sale already decremented Warehouse's stock. Only a
+        // Completed sale can transition here; an InProgress or Cancelled
+        // sale never touched stock, so there's nothing to return.
+        Returned,
     }
 }

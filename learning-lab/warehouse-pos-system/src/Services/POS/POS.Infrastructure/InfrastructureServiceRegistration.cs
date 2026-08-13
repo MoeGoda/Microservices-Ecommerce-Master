@@ -20,13 +20,17 @@ namespace POS.Infrastructure
 
             services.AddScoped<ISaleRepository, SaleRepository>();
             services.AddScoped<ISaleLineRepository, SaleLineRepository>();
+            services.AddScoped<IOutboxRepository, OutboxRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             // Same JwtSettings section every service binds (Common.Security)
             // — ServiceAuthHandler needs Secret/Issuer/Audience to mint a
-            // token Warehouse.API's JwtBearer validation will accept.
+            // token Warehouse.API's/Reporting.API's JwtBearer validation
+            // will accept.
             services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
             services.Configure<WarehouseApiOptions>(configuration.GetSection("WarehouseApi"));
+            services.Configure<ReportingApiOptions>(configuration.GetSection("ReportingApi"));
+            services.Configure<NotificationsApiOptions>(configuration.GetSection("NotificationsApi"));
 
             services.AddTransient<ServiceAuthHandler>();
             services.AddHttpClient<IWarehouseCatalogClient, WarehouseCatalogClient>((provider, client) =>
@@ -35,6 +39,39 @@ namespace POS.Infrastructure
                 client.BaseAddress = new Uri(options.BaseUrl);
             })
             .AddHttpMessageHandler<ServiceAuthHandler>();
+
+            // Three IEventPublisher implementations now (D1, E1) — one per
+            // consumer a SaleCompleted event fans out to. Each is
+            // registered as itself via AddHttpClient<T>() (so it gets its
+            // own configured HttpClient) and then re-exposed under
+            // IEventPublisher by resolving that same instance, rather
+            // than registering the interface directly — AddHttpClient's
+            // typed-client sugar only works against a concrete type.
+            // OutboxDispatcher resolves IEnumerable<IEventPublisher> and
+            // picks the one whose ConsumerName matches a given delivery.
+            services.AddHttpClient<WarehouseEventPublisher>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<WarehouseApiOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl);
+            })
+            .AddHttpMessageHandler<ServiceAuthHandler>();
+            services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<WarehouseEventPublisher>());
+
+            services.AddHttpClient<ReportingEventPublisher>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<ReportingApiOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl);
+            })
+            .AddHttpMessageHandler<ServiceAuthHandler>();
+            services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<ReportingEventPublisher>());
+
+            services.AddHttpClient<NotificationsEventPublisher>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<NotificationsApiOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl);
+            })
+            .AddHttpMessageHandler<ServiceAuthHandler>();
+            services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<NotificationsEventPublisher>());
 
             return services;
         }

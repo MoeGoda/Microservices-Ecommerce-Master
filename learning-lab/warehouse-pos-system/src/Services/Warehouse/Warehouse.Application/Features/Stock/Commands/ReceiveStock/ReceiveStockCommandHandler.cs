@@ -1,6 +1,7 @@
 using Common.Exceptions;
 using MediatR;
 using Warehouse.Application.Contracts.Persistence;
+using Warehouse.Application.Features.Stock;
 using Warehouse.Application.Models;
 using Warehouse.Domain.Entities;
 
@@ -9,28 +10,22 @@ namespace Warehouse.Application.Features.Stock.Commands.ReceiveStock
     public class ReceiveStockCommandHandler : IRequestHandler<ReceiveStockCommand, StockLevelDto>
     {
         private readonly IItemRepository _itemRepository;
-        private readonly ILocationRepository _locationRepository;
         private readonly IItemUnitRepository _itemUnitRepository;
         private readonly IUnitOfMeasureRepository _unitOfMeasureRepository;
-        private readonly IStockLevelRepository _stockLevelRepository;
-        private readonly IStockTransactionRepository _stockTransactionRepository;
+        private readonly StockAdjustmentStager _stager;
         private readonly IUnitOfWork _unitOfWork;
 
         public ReceiveStockCommandHandler(
             IItemRepository itemRepository,
-            ILocationRepository locationRepository,
             IItemUnitRepository itemUnitRepository,
             IUnitOfMeasureRepository unitOfMeasureRepository,
-            IStockLevelRepository stockLevelRepository,
-            IStockTransactionRepository stockTransactionRepository,
+            StockAdjustmentStager stager,
             IUnitOfWork unitOfWork)
         {
             _itemRepository = itemRepository;
-            _locationRepository = locationRepository;
             _itemUnitRepository = itemUnitRepository;
             _unitOfMeasureRepository = unitOfMeasureRepository;
-            _stockLevelRepository = stockLevelRepository;
-            _stockTransactionRepository = stockTransactionRepository;
+            _stager = stager;
             _unitOfWork = unitOfWork;
         }
 
@@ -39,52 +34,30 @@ namespace Warehouse.Application.Features.Stock.Commands.ReceiveStock
             var item = await _itemRepository.GetById(request.ItemId)
                 ?? throw new NotFoundException(nameof(Item), request.ItemId);
 
-            var location = await _locationRepository.GetById(request.LocationId)
-                ?? throw new NotFoundException(nameof(Location), request.LocationId);
-
             var unitOfMeasure = await _unitOfMeasureRepository.GetById(request.UnitOfMeasureId)
                 ?? throw new NotFoundException(nameof(UnitOfMeasure), request.UnitOfMeasureId);
 
             var baseQuantity = await ConvertToBaseUnit(item, unitOfMeasure, request.Quantity);
 
-            var stockLevel = await _stockLevelRepository.GetByItemAndLocation(item.Id, location.Id);
-            if (stockLevel is null)
-            {
-                stockLevel = new StockLevel
-                {
-                    ItemId = item.Id,
-                    LocationId = location.Id,
-                    Location = location,
-                    QuantityOnHand = baseQuantity,
-                    ReorderThreshold = 0,
-                    UnitOfMeasureId = item.BaseUnitOfMeasureId,
-                    UnitOfMeasure = item.BaseUnitOfMeasure,
-                };
-                await _stockLevelRepository.AddAsync(stockLevel);
-            }
-            else
-            {
-                stockLevel.QuantityOnHand += baseQuantity;
-                await _stockLevelRepository.UpdateAsync(stockLevel);
-            }
+            // Routed through the SAME staging path AdjustStockCommand/
+            // ApplySaleCommand already use — createIfMissing: true is the
+            // one difference a purchase-order receipt actually needs (it
+            // can be the first stock this item has ever had at this
+            // location). This closes the gap D1/D2/E1 each flagged in
+            // turn: received stock now emits StockLevelChanged too, so
+            // Reporting's read model and Notifications both hear about a
+            // receipt, not just Warehouse's own StockLevel table.
+            var staged = await _stager.Stage(item.Id, request.LocationId, baseQuantity, StockTransactionReason.Received, request.Reference, createIfMissing: true);
 
-            var transaction = new StockTransaction
-            {
-                ItemId = item.Id,
-                LocationId = location.Id,
-                QuantityChange = baseQuantity,
-                Reason = StockTransactionReason.Received,
-                Reference = request.Reference,
-            };
-            await _stockTransactionRepository.AddAsync(transaction);
-
-            // The StockLevel change and the StockTransaction that explains
-            // it commit in the same call — B1's invariant (summing every
-            // StockTransaction for an item+location always equals its
-            // StockLevel) never has a window where it can be violated.
+            // The StockLevel/StockTransaction change and the outbox event
+            // Stage() staged all commit in the same call — B1's invariant
+            // (summing every StockTransaction for an item+location always
+            // equals its StockLevel) never has a window where it can be
+            // violated, and Reporting/Notifications never hear about a
+            // receipt that itself never actually committed.
             await _unitOfWork.SaveChangesAsync();
 
-            return StockLevelDto.FromEntity(stockLevel, item.BaseUnitOfMeasure.Code);
+            return StockLevelDto.FromEntity(staged.StockLevel, staged.Item.BaseUnitOfMeasure.Code);
         }
 
         // Resolves how many of the item's BASE unit `quantity` of

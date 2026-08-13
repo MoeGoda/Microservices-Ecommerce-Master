@@ -15,5 +15,11 @@ namespace Warehouse.Application.Contracts.Persistence
         Task<IEnumerable<Item>> GetVariants(int parentItemId);
 
         Task<Item> AddAsync(Item item);
+
+        // Stages only — see IUnitOfWork. So far only UpdateItemPriceCommand
+        // (C5) needs this; every earlier command that mutates an Item
+        // (AddItemBarcode/AddItemUnit) only touched a related entity, not
+        // the Item itself.
+        Task UpdateAsync(Item item);
     }
 }

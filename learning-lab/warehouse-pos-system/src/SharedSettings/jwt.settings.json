@@ -1,0 +1,8 @@
+{
+  "JwtSettings": {
+    "Secret": "CHANGE_ME_dev-only-secret-at-least-32-bytes-long!!",
+    "Issuer": "WarehousePos.Identity",
+    "Audience": "WarehousePos.Services",
+    "ExpiryMinutes": 60
+  }
+}

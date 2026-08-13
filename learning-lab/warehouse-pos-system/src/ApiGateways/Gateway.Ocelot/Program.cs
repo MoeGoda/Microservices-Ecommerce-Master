@@ -12,6 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 // takes effect without a restart.
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
 
+// The single shared JwtSettings source — see Identity.API's Program.cs
+// for the full reasoning. Editing SharedSettings/jwt.settings.json is now
+// the only place this value ever needs to change; AddJwtAuthentication
+// below still just reads IConfiguration's "JwtSettings" section.
+builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "SharedSettings", "jwt.settings.json"), optional: false, reloadOnChange: true);
+
 // Registers the SAME "Bearer" scheme (name matters — ocelot.json's routes
 // reference it by that exact string in AuthenticationOptions:AuthenticationProviderKey)
 // that Identity.API uses to validate tokens. This is the crux of A3: the

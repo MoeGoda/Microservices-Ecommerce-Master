@@ -40,17 +40,17 @@ a distributed transaction.
 **Phase C — POS using warehouse barcodes**
 - [x] **C1 — Domain/Application/Infrastructure (Sale, checkout)**
 - [x] **C2 — Sync call to Warehouse (barcode + stock check)**
-- [ ] C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)
-- [ ] C4 — Angular POS screen
-- [ ] C5 — Selling price history + promotions (POS pricing rules)
+- [x] **C3 — Async `SaleCompleted` event + saga (stock decrement, compensation)**
+- [x] **C4 — Angular POS screen**
+- [x] **C5 — Selling price history + promotions (POS pricing rules)**
 
 **Phase D — Reporting**
-- [ ] D1 — Event-driven read models
-- [ ] D2 — Reports + Angular dashboards
+- [x] **D1 — Event-driven read models**
+- [x] **D2 — Reports + Angular dashboards**
 
 **Phase E — Notifications / Mailing**
-- [ ] E1 — In-app notifications (SignalR)
-- [ ] E2 — Mailing system
+- [x] **E1 — In-app notifications (SignalR)**
+- [x] **E2 — Mailing system (SMTP/MailKit)**
 
 **Phase F — Hardening**
 - [ ] F1 — Performance (caching, pagination, health checks)
@@ -238,9 +238,22 @@ refactored to use this shared extension instead of its own inline copy.
 - **The JWT secret is now a genuinely shared secret.** Gateway.Ocelot's
   `appsettings.json` has to carry the exact same `JwtSettings:Secret`/`Issuer`/`Audience`
   as Identity.API's. There's no code sharing that enforces this — it's a
-  deployment/config discipline, and duplicating it by hand in two
-  `appsettings.json` files (as done here, for now) is a real gap Phase F2
-  will close with one shared secret source instead of copy-pasted values.
+  deployment/config discipline. This originally shipped as a literal
+  copy-pasted into every service's own `appsettings.json`, flagged here
+  as Phase F2's job to close — but as every later phase added one more
+  service repeating the same copy-paste, the gap only got wider, so it
+  was closed out of turn rather than left to compound further:
+  `src/SharedSettings/jwt.settings.json` is now the ONE physical file
+  that value lives in, loaded by every service's (and the gateway's own)
+  `Program.cs` via `builder.Configuration.AddJsonFile(...)` before
+  `AddJwtAuthentication` (or, for Notifications.API, its own hand-rolled
+  equivalent) ever reads the `JwtSettings` section — nothing about how
+  that section is READ changed, only where its values physically live.
+  A real production deployment would likely source this file's values
+  (or the whole file) from an actual secrets manager rather than a
+  committed JSON file with a `CHANGE_ME` placeholder — that hardening
+  step is still F2's to do; this fix only closes the "N copies that can
+  drift" problem, not the "committed secret" one.
 - **The Authorization header passes through untouched.** Ocelot forwards
   every request header to the downstream service by default — verified
   below by having the (stubbed) downstream echo the header back. That's
@@ -863,10 +876,15 @@ have to keep two rows in sync and never in the services that don't.
 - **A deliberately narrow `Cancelled`.** It means "abandoned before
   payment," nothing more. A *post-completion* return/refund is a
   materially different feature — it needs a compensating stock increase
-  on Warehouse's side, not just a status flip in POS — and doesn't exist
-  yet. The enum's own comment says so explicitly, so a future "add
-  returns" step finds a clear, named gap instead of ambiguous room to
-  misuse `Cancelled` for something it was never designed to mean.
+  on Warehouse's side, not just a status flip in POS — and the enum's own
+  comment said so explicitly, so a future "add returns" step would find a
+  clear, named gap instead of ambiguous room to misuse `Cancelled` for
+  something it was never designed to mean.
+
+  **Update:** that step has since landed — see the "Sale returns/refunds"
+  section near the end of this document for `ReturnSaleCommand`, the new
+  `Returned` status this bullet anticipated, and the compensating
+  Warehouse/Reporting/Notifications flow it triggers.
 
 **Verified with a focused runtime test (SQLite, deleted after — same
 approach as B1/B2), dispatched through actual MediatR, not calling
@@ -987,3 +1005,1166 @@ rather than erroring; a simulated network failure surfaces as
 `WarehouseUnavailableException`, not a raw `HttpRequestException`; and
 every captured outgoing request carried a validly-signed Bearer token
 identifying the caller as `pos-service`.
+
+## C3 — SaleCompleted event + saga
+
+**What it does:** decouples "the sale completed" from "Warehouse's stock
+is now correct" — C2's sync call happens *before* checkout, to stop an
+impossible sale from being rung up in the first place; this step is
+about what happens *after* checkout, when the actual stock decrement
+shouldn't block the cashier's request/response cycle or risk losing the
+sale-vs-stock relationship if Warehouse is briefly unreachable.
+
+```
+CheckoutCommandHandler (POS)
+  1. Sale is InProgress, has lines?             (C1, unchanged)
+  2. Sale.Status = Completed, StockSyncStatus = Pending
+  3. Write a SaleCompletedOutboxEntry (Pending) — SAME SaveChanges call as #2
+  4. Return — the cashier's screen doesn't wait for Warehouse at all
+
+SaleCompletedOutboxDispatcher (POS, polled every 10s)
+  1. Load all Pending outbox entries
+  2. POST to Warehouse.API /api/v1/StockEvents/sale-completed
+     success → entry.Status = Sent, Sale.StockSyncStatus = Synced
+     failure → entry.Attempts++; Attempts >= 5 → entry.Status = Failed,
+               Sale.StockSyncStatus = Failed  (the compensating signal)
+
+ApplySaleCommandHandler (Warehouse)
+  1. ProcessedSaleEvent already exists for this SaleId? → no-op, return
+     AlreadyProcessed = true   (idempotent receiver — safe against
+     at-least-once delivery/retries)
+  2. For every line: stage a stock decrement via StockAdjustmentStager
+     (same "fetch → check → mutate" the direct AdjustStock command uses)
+  3. Record a ProcessedSaleEvent, SaveChanges ONCE for the whole sale
+```
+
+**The outbox pattern, not a direct HTTP call from inside checkout.** A
+POST to Warehouse straight out of `CheckoutCommandHandler` would create a
+real failure window: if POS crashes (or Warehouse is down) between
+committing the sale and making that call, the sale is Completed and
+Warehouse never finds out — money taken, stock never adjusted, with no
+record anything went wrong. Writing `SaleCompletedOutboxEntry` in the
+*same* `SaveChangesAsync()` that completes the sale makes "sale
+completed" and "an event was queued" atomic by construction — either
+both happen or neither does, because they're one database transaction.
+Actually delivering that event is a separate concern, handled by
+`SaleCompletedOutboxDispatcher` on its own poll loop, so checkout's
+response time never depends on Warehouse's.
+
+**Idempotent receiver on Warehouse's side, because an outbox implies
+at-least-once, not exactly-once, delivery.** A dispatcher that crashes
+after POST-ing successfully but before marking the entry `Sent` will
+retry it — Warehouse has to be able to see the same `SaleId` twice and
+apply it exactly once. `ProcessedSaleEvent` (unique index on `SaleId`) is
+the inbox side of the same idea `ProcessedSaleEvent` sounds like it
+should have on the sending side: check-then-insert, `ApplySaleCommand`'s
+very first statement, before any stock is touched.
+
+**Atomicity across a multi-line sale doesn't need a hand-rolled
+compensating transaction — because every line lands in the same
+database.** A "saga" is machinery for coordinating a transaction that
+spans *multiple* databases/services, each with its own local commit,
+where a failure partway through means manually undoing whatever already
+committed elsewhere. That's not this. All of a sale's lines decrement
+stock in Warehouse's *one* database, so simply deferring
+`SaveChangesAsync()` until every line has been staged gets atomicity for
+free from the database's own transaction — if line 2 throws
+`InsufficientStockException`, line 1's in-memory stock mutation was never
+saved, so there's nothing to undo. Verified directly: a two-line sale
+where the second line is short-stock leaves the *first* line's item
+stock unchanged and records no `ProcessedSaleEvent`, so a retried
+delivery starts clean rather than double-applying half a sale.
+
+**The real compensating action only exists at the one boundary that's
+actually cross-service: the outbox dispatcher giving up.** After
+`MaxAttempts` (5) failed delivery attempts — Warehouse.API down for an
+extended stretch — `SaleCompletedOutboxDispatcher` does not try to
+un-complete the sale (the cashier already gave the customer a receipt;
+the money is already taken) or spin forever. It sets
+`Sale.StockSyncStatus = Failed` and dead-letters the outbox entry
+(`OutboxStatus.Failed`) — a durable, queryable flag meaning "this sale's
+effect on stock needs a human to reconcile," rather than an automatic
+reversal that could itself go wrong in a different way.
+
+**Concepts introduced:**
+- **Outbox pattern** (`SaleCompletedOutboxEntry`) — write the "event to
+  send" as an ordinary row in the same transaction as the state change
+  it describes, then deliver it out-of-band. Named specifically for one
+  event type rather than a generic `Type`/`Payload` envelope — the
+  natural next step is generalizing it the moment a *second* event type
+  shows up (D1's reporting events, E1's notifications), not before.
+- **Inbox / idempotent receiver** (`ProcessedSaleEvent`) — the
+  receiving-side counterpart to at-least-once delivery: a unique
+  constraint that turns "processed this exact event already" into a
+  cheap existence check instead of a re-derived side effect.
+- **`StockAdjustmentStager`** — extracted the moment `ApplySaleCommand`
+  needed the exact "fetch item/location/stock, validate, mutate,
+  record a StockTransaction, don't save yet" sequence `AdjustStockCommand`
+  (B2) already had; both commands now share one implementation of what
+  a stock change *is*, and only differ in who's asking and why
+  (`StockTransactionReason.Sale` vs. `.Adjustment`).
+- **A background dispatcher that exists without a host to run it.**
+  `SaleCompletedOutboxBackgroundService` is written and ready
+  (`AddHostedService` away from running for real) but deliberately not
+  registered anywhere — there's no `POS.API` yet, the same "built ahead
+  of the API that will use it" situation `WarehouseContextFactory` was
+  in during B1. This step's verification calls
+  `SaleCompletedOutboxDispatcher.DispatchPendingAsync()` directly instead
+  of through the background service, since exercising the poll loop
+  itself would need a real host and add nothing the direct call doesn't
+  already prove.
+
+**A real bug this step's own verification caught:** `CheckoutCommandHandler`
+originally serialized each outbox line as an anonymous type with
+lowercase property names (`new { itemId, quantity }`), while the
+dispatcher on the read side deserialized into `List<SaleCompletedLine>`
+(`ItemId`/`Quantity`, PascalCase) using default, case-sensitive
+`System.Text.Json` options. That mismatch doesn't throw — it silently
+produces `ItemId = 0, Quantity = 0` for every line, which then failed
+`ApplySaleCommandValidator`'s checks and surfaced as a generic "publish
+failed" with no obvious cause. Fixed by serializing the *same* shared
+`SaleCompletedLine` type on both the write and read sides, so the two
+ends of the round trip can't drift out of casing sync again — caught
+only because the verification asserted the actual resulting
+`QuantityOnHand`, not just "the dispatch call didn't throw."
+
+**Verified with a runtime test against two separate SQLite databases
+(one per service, deleted after), 16 checks, all passing:** on the
+Warehouse side alone — a first `ApplySaleCommand` for a `SaleId` applies
+and records the correct `StockTransactionReason.Sale`; a *repeated*
+delivery of that same `SaleId` returns `AlreadyProcessed = true` without
+touching stock again; a two-line sale with one line short on stock
+throws `InsufficientStockException` and leaves *both* lines' stock
+untouched, with no `ProcessedSaleEvent` recorded. End to end — a real
+`CheckoutCommand` against POS's database writes the outbox entry
+atomically with completing the sale; dispatching it routes into
+Warehouse's *actual* `ApplySaleCommandHandler` (via a publisher stub
+that calls Warehouse's own mediator in-process instead of over HTTP,
+each call through its own fresh DI scope so it mirrors the request-scoped
+`DbContext` lifetime a real HTTP-hosted request would get) and Warehouse's
+stock genuinely drops by the sold quantity; the outbox entry flips to
+`Sent` and the `Sale.StockSyncStatus` flips to `Synced`. And the
+compensating path — a publisher that always fails, dispatched 5 times,
+dead-letters the outbox entry, flips `Sale.StockSyncStatus` to `Failed`
+while `Sale.Status` stays `Completed`, and leaves Warehouse's stock
+completely untouched for that sale.
+
+## C4 — Angular POS screen
+
+**What it does:** the register a cashier actually uses — start a sale at
+a location, scan barcodes into a running cart, remove a mis-scanned line,
+checkout, and see the receipt. Everything C1–C3 built (checkout, the
+barcode/stock sync call, the outbox) had no UI in front of it yet; this
+step is the first time a person can run a sale end to end without going
+through `IMediator.Send` by hand.
+
+**POS.API didn't exist before this step, and had to be built first.**
+C1–C3 deliberately built POS.Domain/Application/Infrastructure ahead of
+any host — `SaleCompletedOutboxBackgroundService` (C3) was written and
+directly exercised by that step's own test, but had nowhere to actually
+run on a poll loop until something registered it. That's the exact
+situation `WarehouseContextFactory` was in before Warehouse.API showed up
+in B3, and the resolution is the same: stand up the API. `POS.API` is a
+line-for-line clone of Warehouse.API's own shape — same `Program.cs`
+structure (`AddApplicationServices`/`AddInfrastructureServices`/
+`AddCommonExceptionHandling`/`AddJwtAuthentication`, `Database.Migrate()`
+on startup, Swagger with a Bearer scheme, `public partial class Program`
+for testability) — with one addition Warehouse.API doesn't have:
+`builder.Services.AddHostedService<SaleCompletedOutboxBackgroundService>()`,
+finally giving C3's dispatcher a host to actually poll from.
+
+```
+SalesController (all actions [Authorize], no anonymous route — same as Warehouse.API)
+  POST   /api/v1/Sales                    → StartSaleCommand
+  GET    /api/v1/Sales/{id}                → GetSaleByIdQuery
+  POST   /api/v1/Sales/{id}/lines          → AddSaleLineCommand
+  DELETE /api/v1/Sales/{id}/lines/{lineId} → RemoveSaleLineCommand
+  POST   /api/v1/Sales/{id}/checkout       → CheckoutCommand
+  POST   /api/v1/Sales/{id}/cancel         → CancelSaleCommand
+```
+
+**`CashierUserId` is read from the caller's own JWT, not the request
+body.** `StartSaleCommand`'s own comment (C1) flagged `CashierUserId` as
+"trusted as given" input — nothing before this step ever closed that gap.
+`SalesController.Start` now does: `command.CashierUserId =
+int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!)`, overwriting
+whatever the body claims, the same "context is authoritative over the
+body" idiom `ItemsController.AddBarcode`/`AddUnit` (B3) established for
+route-supplied ids. A cashier can no longer open a sale claiming to be a
+different cashier just by editing the request payload — verified
+directly: a request body claiming `cashierUserId: 999` still produces a
+sale whose `CashierUserId` is the caller's real id from their token.
+`LocationId` still isn't validated against Warehouse's real location
+list; that's an open gap this step doesn't close either, same as before.
+
+**No new "receipt" concept — `SaleDto` already was one.** `Checkout` and
+`GetSaleById` both return the same `SaleDto` (with its `Lines`), so the
+Angular receipt view is just that DTO rendered once `Status` is
+`Completed` — there was never a reason to invent a second shape for what
+is, at the data level, the exact same sale before and after payment.
+
+**One Angular component drives all three states a sale moves through.**
+`PosRegisterComponent` (`no sale` → `InProgress` → `Completed`) is a
+single component with three template branches on `sale()`, the same
+single-screen-with-a-selection-panel reasoning `items-admin.component.ts`
+(B3) used rather than several routed sub-pages — a register's three
+states are sequential, not independently navigable, so routing between
+them would be fighting the domain rather than modeling it. It sits
+directly on the `/pos` route with no `AdminShellComponent`-style wrapper:
+that shell only exists because it was A4's own placeholder before B3's
+real content landed in it, and there's no equivalent placeholder history
+for POS to inherit.
+
+**The barcode field IS the scan target — there's no separate "scan"
+button.** A physical barcode scanner types the barcode's characters into
+whatever text input has focus, followed by an Enter keystroke, completely
+indistinguishable to the DOM from a cashier typing the digits by hand and
+pressing Enter themselves. Binding `(keyup.enter)` on the barcode
+`<input>` to the same `submitScan()` the Add button calls means the field
+is scanner-ready with zero scanner-specific code — and after every
+successful add, `focusBarcodeInput()` returns focus to it so the very
+next scan doesn't need a click first, the way a real register keeps the
+scanner "hot" between items.
+
+**A real timing bug the frontend's own Playwright verification caught:**
+the first call to `focusBarcodeInput()` — right after `StartSale`
+succeeds — used a bare `setTimeout(() => this.barcodeInput?.nativeElement.focus())`,
+reasoning that deferring to the next macrotask would give Angular's
+change detection enough time to render the newly-`InProgress` branch
+before the callback ran. On every *later* call (after adding a line) that
+held; on this *first* transition specifically, `this.barcodeInput` was
+still `undefined` when the macrotask fired — a bare `setTimeout` is not
+actually a guarantee that Angular has committed a signal-triggered DOM
+update, just a guess that it probably has by then. Fixed by switching to
+`afterNextRender(callback, { injector })` (Angular's own primitive for
+"run this once the pending render has actually happened"), which doesn't
+guess. Caught only because the verification checked which element
+actually had focus, rather than assuming a `setTimeout` had been enough
+time.
+
+**Concepts introduced:**
+- **`POS.API`** — the fourth ASP.NET Core host in this system, and the
+  reason `SaleCompletedOutboxBackgroundService` (C3) finally runs for
+  real rather than only under a test harness calling
+  `DispatchPendingAsync()` directly.
+- **Reading identity from the token instead of the request body** — the
+  first place in this codebase a controller pulls a *user* id
+  (`ClaimTypes.NameIdentifier`) out of the caller's own JWT to override
+  client-supplied input, rather than only doing this for route-path ids
+  (B3's `{id}`-overrides-body pattern). Same idiom, applied to "who is
+  this?" rather than "which resource?".
+- **`afterNextRender`** — Angular's guarantee for "run this after the
+  pending change-detection-triggered render has actually committed,"
+  distinct from `setTimeout`'s "run this on some later tick and hope."
+- **A scanner-ready input with no scanner-specific code** — `(keyup.enter)`
+  plus autofocus-after-every-add is the entire "barcode scanning" feature
+  from the frontend's point of view; the actual barcode *lookup* logic
+  already existed in `AddSaleLineCommandHandler` since C2.
+
+**Verified two ways.** Backend: a real ASP.NET Core pipeline (routing,
+JWT auth, MediatR, exception handling) hosted via `TestServer` against
+POS.API's own registration code — not `WebApplicationFactory<Program>`,
+which insists on finding a `.sln` next to whatever test project points at
+it and has none to find here — with `PosContext` swapped to SQLite and
+`IWarehouseCatalogClient`/`ISaleCompletedPublisher` swapped for stubs, 15
+checks, all passing: a request with no token (401), `CashierUserId`
+overridden from the JWT claim even when the body claims a different one,
+an unknown barcode (404) and over-stock quantity (409) both surfacing
+correctly through real HTTP rather than a 500, a line's `Sku`/`ItemName`/
+`UnitPrice` resolved from the (stubbed) Warehouse catalog rather than
+anything the request supplied, removing the only line dropping the total
+back to zero, checkout on an empty sale (409) and on an already-Completed
+sale (409) both rejected, the outbox entry existing immediately after
+checkout, and `GET /Sales/{id}` reflecting the same persisted total after
+the fact. Frontend: `ng build` verified clean, then the dev server driven
+with Playwright — a session token injected directly into `localStorage`
+(bypassing login, matching exactly what `AuthService` reads) with the
+gateway's `/Warehouse/MasterData/locations` and `/Pos/Sales...` routes
+mocked via request interception, walking the full screen through all
+three states: the start-sale card renders and lists the seeded location;
+starting a sale renders the register with the barcode field already
+focused; scanning an unknown barcode toasts an error without crashing;
+scanning a real one renders it in the cart with the correct running total
+and clears the field for the next scan; checkout renders the receipt with
+a matching total; "New sale" returns to the start card. No unexpected
+console errors in either run (an `HttpErrorResponse` logged after the
+unknown-barcode scan is RxJS's own default behavior for an unhandled
+observable error, not a bug — this component's `subscribe()` calls only
+supply a `next` handler, the same discipline `items-admin.component.ts`
+follows, on the reasoning that `errorInterceptor` already toasted it).
+
+**Try it locally** (needs SQL Server, which this sandbox doesn't have):
+```bash
+# From src/, in four terminals:
+dotnet run --project Services/Identity/Identity.API
+dotnet run --project Services/Warehouse/Warehouse.API
+dotnet run --project Services/POS/POS.API
+dotnet run --project ApiGateways/Gateway.Ocelot
+
+# From client/:
+npm start
+# → http://localhost:4300, sign in as a Cashier (see AuthController.Register), then /pos
+```
+
+## C5 — Selling price history + promotions
+
+**What it does:** two closely related pricing features on the Warehouse
+side — an audit trail of every real change to an item's list price
+(`ItemPriceHistory`), and time-boxed markdowns on a single item
+(`Promotion`, percentage or fixed-amount off) that automatically apply
+the moment a cashier scans that item at POS, with zero POS-side
+awareness that a discount exists at all.
+
+```
+UpdateItemPriceCommand (Warehouse)
+  1. NewPrice == Item.UnitPrice already? → no-op, nothing recorded
+  2. Otherwise: record ItemPriceHistory{OldPrice, NewPrice}, set
+     Item.UnitPrice = NewPrice, one SaveChanges for both
+
+EffectivePriceResolver.Resolve(item, nowUtc) (Warehouse)
+  1. Any Promotion for this item with StartsAtUtc <= now <= EndsAtUtc?
+     none → { UnitPrice = item.UnitPrice }  (no discount)
+  2. PercentageOff  → item.UnitPrice * (1 - value/100)
+     FixedAmountOff → item.UnitPrice - value
+  3. Floor at 0 either way, round to 2 decimals
+  4. → { UnitPrice (discounted), OriginalUnitPrice, PromotionId }
+
+ResolveBarcodeQueryHandler / GetItemByIdQueryHandler (Warehouse)
+  → call the resolver, hand the result into ItemDetailDto — the ONE
+    place a real sale's price comes from (AddSaleLineCommandHandler,
+    via IWarehouseCatalogClient) already goes through this
+
+AddSaleLineCommandHandler (POS, unchanged control flow)
+  → snapshots whatever UnitPrice/OriginalUnitPrice/PromotionId
+    Warehouse handed back onto the new SaleLine, same as
+    Sku/ItemName always have been (C1)
+```
+
+**Warehouse resolves the discount; POS never computes one.** The
+alternative — POS asking "is there a promotion for this item?" as a
+separate call, then doing the percentage/fixed-amount math itself —
+would duplicate pricing logic across two services and create exactly
+the kind of drift C2 already reasoned about for stock availability:
+POS has to trust Warehouse's answer for "what does this cost," not
+re-derive it. `IWarehouseCatalogClient.WarehouseItemLookup.UnitPrice`
+is already the price to charge; `OriginalUnitPrice`/`PromotionId` ride
+along purely so the receipt can show "was $15.00, now $7.50" without
+POS needing to know anything about *why*.
+
+**`UpdateItemPriceCommand` is the only sanctioned way to change
+`Item.UnitPrice`.** There's deliberately no generic "edit item" command
+that happens to let price through unnoticed — every price change goes
+through this one command specifically so an `ItemPriceHistory` row is
+guaranteed alongside it. Re-submitting the *same* price is treated as
+"nothing happened," not a change worth recording — an audit trail that
+logged every no-op price check would bury the changes that actually
+matter under noise.
+
+**`Promotion` is scoped to a single Item, not a Category or the whole
+store.** The smallest slice that's still genuinely useful — a real
+markdown on a real product — rather than guessing at a category-wide or
+storewide shape nothing has asked for yet. The same "extract on second
+use" discipline `StockAdjustmentStager`/`JwtTokenFactory` apply to code
+in this codebase applies here to scope: build the narrow thing, widen it
+the moment a second, different need actually shows up.
+
+**A promotion floors at zero rather than letting a sale line go
+negative.** `CreatePromotionCommand` has no way to check a
+`FixedAmountOff` value against the item's current price at creation
+time (nothing stops someone from lowering the price *after* the
+promotion exists), so `EffectivePriceResolver` treats "discount bigger
+than the price" as a data problem to contain, not something worth a
+500 over — `Math.Max(discounted, 0m)`.
+
+**Concepts introduced:**
+- **`ItemPriceHistory`** — an append-only log of actual changes, not a
+  running log of every price *check*; the "did it really change"
+  filter lives in `UpdateItemPriceCommandHandler`, not in the entity.
+- **`EffectivePriceResolver`** — the one place "an Item plus whatever
+  Promotion is active" turns into a single number to charge, the same
+  "one implementation of what a stock change is" reasoning
+  `StockAdjustmentStager` applies to inventory, just applied to price.
+- **A DTO field that means two different things depending on context.**
+  `ItemDetailDto.UnitPrice` is the base price everywhere EXCEPT
+  `ResolveBarcodeQuery`/`GetItemByIdQuery`'s results, where it's
+  whatever `EffectivePriceResolver` computed — deliberate, since every
+  consumer of "what does this cost" (a sale, a detail screen) wants the
+  charge-able price, not the raw column; `OriginalUnitPrice` is what
+  lets a caller reconstruct the raw price when it needs to (the admin
+  panel's price-edit form does exactly this, since editing the
+  *discounted* number would silently corrupt the real list price).
+
+**Update:** the gap this section originally flagged here — no
+"list every promotion for this item" query, only "what's active right
+now" via price resolution, so an admin who created a promotion couldn't
+later browse or cancel it — has since been closed. `GetPromotionsForItemQuery`
+(returns every promotion, active or not) and `CancelPromotionCommand`
+(adds a `Promotion.IsCancelled` flag; `GetActiveForItem` excludes
+cancelled rows, so a cancelled promotion stops discounting immediately —
+the original `StartsAtUtc`/`EndsAtUtc` window stays as historical
+record, same reasoning `SaleLine`'s own snapshot fields already follow)
+now back the Admin Panel's promotions table, with a Cancel button per
+still-live row. Verified with a 9-check runtime test (create two
+promotions, browse both, cancel the active one, confirm
+`EffectivePriceResolver` stops applying it, confirm cancelling twice or
+cancelling via the wrong item both throw) and an 8-check Playwright pass
+against the built Angular app.
+
+**Verified with a runtime test against an in-memory SQLite database
+(Warehouse) and a second, separate one (POS), 16 checks, all passing:**
+a genuine price change records exactly one `ItemPriceHistory` row and
+updates `Item.UnitPrice`; re-submitting the identical price adds no
+second row; a second genuine change adds a second row, most-recent
+first. A `PercentageOff` promotion that's currently active correctly
+halves the resolved price while surfacing the original price and the
+promotion's id; a promotion that hasn't started yet, and one that
+already ended, both leave the price untouched; a `FixedAmountOff`
+promotion subtracts a flat amount; a fixed discount larger than the
+item's own price floors the result at zero rather than going negative.
+End to end — `AddSaleLineCommand` against a stub resolving to a
+discounted price snapshots the discounted `UnitPrice` AND the
+`OriginalUnitPrice`/`PromotionId` onto the persisted `SaleLine`, and
+`LineTotal` is computed off the discounted price, not the original.
+The frontend: `ng build` verified clean, then the dev server driven
+with Playwright, gateway routes mocked — the admin panel's new pricing
+section renders and pre-fills the list price from `OriginalUnitPrice`
+(not the possibly-discounted `UnitPrice`); submitting an updated price
+calls the backend and shows a success toast; the price-history table
+renders the change; creating a promotion calls the backend and the
+"promotion active" note appears showing both prices; on the POS
+register, both the cart and the completed receipt render the original
+price struck through next to the discounted one. No unexpected console
+errors.
+
+## D1 — Event-driven read models
+
+**What it does:** a fourth service, Reporting, that builds its own
+denormalized copy of "what happened" — completed sales and current stock
+levels — by consuming events POS and Warehouse publish, rather than
+querying either service's database directly. Nothing in D1 aggregates or
+displays that data yet (no "sales by day," no dashboard) — that's D2's
+job, on top of the read models this step gets right.
+
+```
+POS Checkout                          Warehouse StockAdjustmentStager
+  → OutboxMessage(SaleCompleted)        → OutboxMessage(StockLevelChanged)
+  → OutboxDelivery(Warehouse)           → OutboxDelivery(Reporting)
+  → OutboxDelivery(Reporting)                    ↓
+         ↓                              Reporting.API /Events/stock-level-changed
+POS OutboxDispatcher                          ↓
+  → WarehouseEventPublisher (C3,      IngestStockLevelChangedCommand
+     unchanged) → Warehouse.API         → upsert StockLevelRecord(ItemId, LocationId)
+  → ReportingEventPublisher (new)
+     → Reporting.API /Events/sale-completed
+              ↓
+     IngestSaleCompletedCommand
+       → SaleRecord (once per SaleId)
+       → SaleLineRecord × N
+```
+
+**The outbox generalizes from "one event, one consumer" to "one event,
+many deliveries" — exactly the next step C3's own README named.** Before
+D1, `SaleCompletedOutboxEntry` was one row per sale, delivered to exactly
+one place (Warehouse). Reporting needing the SAME event broke that
+1:1 assumption, so POS's outbox split into `OutboxMessage` (the event
+itself — `EventType`/`PayloadJson`, written once) and `OutboxDelivery`
+(one row per `(message, consumer)` pair, each with its own
+Pending/Sent/Failed status and retry count). `CheckoutCommandHandler` now
+writes one message and fans it out to `["Warehouse", "Reporting"]` in the
+same transaction that completes the sale; `OutboxDispatcher` resolves
+each delivery's `IEventPublisher` by `ConsumerName` and retries each one
+independently. The payoff shows up directly in the one piece of legacy
+behavior that couldn't fully generalize: `Sale.StockSyncStatus` only
+means "did Warehouse confirm the stock decrement" — Reporting failing to
+ingest a sale (for whatever reason) leaves that status completely alone,
+because the two deliveries now genuinely don't share fate. Warehouse got
+the identical message/delivery shape for its own first-ever outbox
+(`StockLevelChanged`, one consumer today — Reporting) rather than
+inventing something simpler for a single consumer, on the same
+reasoning: the shape is already right the moment a second Warehouse-side
+consumer shows up (E1's notifications, most likely).
+
+**Warehouse making its first OUTBOUND service call ever is a bigger deal
+than it looks.** Every previous Warehouse interaction was inbound —
+`StockEventsController` (C3) receiving POS's calls, `ItemsController`
+(B3) receiving the admin panel's. `ReportingEventPublisher` is the first
+time Warehouse calls out to anything, which is why
+`Warehouse.Infrastructure` needed a `ServiceAuthHandler` and a
+`Common.Security` reference for the first time too — the exact
+dual-use POS.Infrastructure already had since C2 (mint a token to call
+someone else, validate tokens presented to you, two different jobs, same
+package). And because Warehouse.API already exists (unlike POS's own C3
+outbox, which had to wait for POS.API to exist before its background
+service could be hosted anywhere), `OutboxBackgroundService` gets
+registered via `AddHostedService` in the very same step that wrote it —
+no deferred wiring this time.
+
+**The event's payload is forwarded to Reporting verbatim, not
+re-serialized.** `ReportingEventPublisher` (both POS's and Warehouse's)
+posts `OutboxMessage.PayloadJson` as raw `StringContent`, because
+`SaleCompletedMessage`/`StockLevelChangedMessage`'s own property names
+already match `IngestSaleCompletedCommand`/`IngestStockLevelChangedCommand`
+exactly — there's no shape translation to do, unlike
+`WarehouseEventPublisher`, which DOES re-map (it only wants `ItemId`/
+`Quantity` per line, ignoring the richer fields Reporting needs). ASP.NET
+Core's default model binding is case-insensitive, which is what makes
+forwarding a raw PascalCase-serialized string straight into a controller
+action safe — but this step's own runtime test checks the ACTUAL
+resulting `SaleRecord`/`StockLevelRecord` values over real HTTP rather
+than assuming that, precisely because a casing mismatch across a JSON
+boundary silently produced wrong data once already (C3's own bug).
+
+**Two different idempotency strategies, because the two events are
+different shapes of fact.** `SaleRecord` is idempotent via a dedup
+check — `ExistsForSale(saleId)` before inserting, the same
+existence-check idiom `ApplySaleCommand`'s `ProcessedSaleEvent` (C3)
+used, because a sale is an immutable, one-time fact: applying it twice
+would double-count reporting totals. `StockLevelRecord` is idempotent
+via upsert instead — no dedup check at all, because a stock level is a
+continuously-changing current snapshot (like `StockLevel` itself,
+B1): applying the "same" `StockLevelChanged` event twice just writes the
+same `QuantityOnHand` twice, which is harmless by construction. Neither
+needed a generic inbox table the way a naive "idempotent receiver"
+pattern might suggest — the right dedup strategy depends on what kind of
+fact the event actually represents.
+
+**Concepts introduced:**
+- **Outbox message/delivery split** — one event, independently-tracked
+  deliveries per consumer. See above.
+- **`Reporting` service** — the fourth ASP.NET Core host, and the first
+  one whose entire job is projections built from other services' events
+  rather than owning any transactional data of its own.
+- **`ReadModelsController` named apart from a future `ReportsController`**
+  — `GET /Reporting/sales` and `/Reporting/stock-levels` are raw dumps of
+  what's been ingested, proving the read model is correct and queryable;
+  they are deliberately NOT the aggregated sales-by-day/top-selling/
+  low-stock reports D2 will build. Routed through the gateway (unlike
+  `EventsController`, which is service-to-service and isn't), since a
+  future Angular dashboard will eventually call something at this same
+  layer.
+- **Upsert-based idempotency** as a second, equally valid alternative to
+  dedup-based idempotency (C3) — see above.
+
+**Update:** the gap this section originally flagged here — `ReceiveStockCommand`
+didn't go through `StockAdjustmentStager` (it needs unit conversion
+first), so receiving stock via a purchase order never emitted a
+`StockLevelChanged` event, only `AdjustStockCommand`/`ApplySaleCommand`
+did — has since been closed. `Stage()` grew a `createIfMissing` parameter
+(a PO receipt can be the FIRST stock this item has ever had at this
+location, unlike an adjustment or sale, which both require a balance to
+already exist), and `ReceiveStockCommandHandler` now calls it after its
+own unit conversion. Received stock shows up in Reporting (and, once E1
+exists, Notifications) exactly like every other stock change.
+
+**Verified with a 19-check runtime test spanning three separate SQLite
+databases, one per service — Reporting hosted via a real ASP.NET Core
+pipeline (`TestServer`, the same approach C4 established for POS.API),
+Warehouse and POS as direct DI containers, all wired together with the
+ACTUAL production `IEventPublisher` implementations pointed at
+Reporting's real `HttpClient`, not stand-ins:** `AdjustStockCommand`
+stages exactly one Pending delivery for Reporting, dispatching it lands
+a real `StockLevelRecord` in Reporting's database with the correct
+post-adjustment quantity; a multi-line `ApplySaleCommand` where one line
+is short on stock stages NO outbox message at all (not even for the
+valid line) — the event is exactly as atomic as the stock change it
+describes; a successful multi-line sale emits one event per line, and
+dispatching it upserts the SAME `StockLevelRecord` row rather than
+creating a second one. End to end on the POS side — a real `Checkout`
+fans out to exactly two deliveries, dispatching both marks them Sent,
+`Sale.StockSyncStatus` reflects only the Warehouse delivery's outcome,
+and Reporting's real ingestion endpoint — reached over actual HTTP, not
+an in-process shortcut — produces a `SaleRecord`/`SaleLineRecord` with
+the real resolved Sku/quantity/line total. And a repeated delivery of the
+same sale (simulating a dispatcher retry after an already-successful
+delivery) inserts no second `SaleRecord`, confirming the dedup check
+actually works, not just the upsert.
+
+## D2 — Reports + Angular dashboards
+
+**What it does:** the real, aggregated reports D1 deliberately stopped
+short of — sales by day, top-selling items, and a low-stock list — built
+as genuine `GROUP BY` queries over D1's read models, exposed through a
+new `ReportsController`, and rendered on a new `/reports` Angular route
+with three visualizations. `ReadModelsController` (D1) still exists
+unchanged — `GET /Reporting/sales` and `/stock-levels` are raw dumps,
+`ReportsController` is the aggregated view built on top of them; the two
+were named apart from day one specifically so this step wouldn't need to
+rename anything.
+
+**`StockLevelChanged` gained the fields Reporting actually needed to
+build a human-readable report, not just a queryable one.** D1's version
+of the event carried only `ItemId`/`LocationId`/`QuantityOnHand` —
+enough to upsert a row, not enough to show anyone a low-stock table
+without a name. Reporting has no live reference back to Warehouse's
+catalog (that's the entire point of the read-model pattern — no
+cross-service joins), so `Sku`/`ItemName`/`LocationCode`/`LocationName`/
+`ReorderThreshold` are now snapshotted onto the event itself and
+re-snapshotted on every subsequent event for the same item — a Warehouse-
+side rename eventually catches up rather than freezing whatever the
+first-ever event happened to say. `StockAdjustmentStager` is the only
+place that changed on the Warehouse side; nothing about `StockLevel`
+itself, or how it's persisted, moved.
+
+**Two EF Core `GROUP BY` queries, and a portability gap the runtime test
+actually caught.** `GetSalesByDay()` groups `SaleRecord` by
+`CompletedAtUtc.Date`; `GetTopSellingItems(take)` groups `SaleLineRecord`
+by `ItemId`, using `MAX(Sku)`/`MAX(ItemName)` for the two dimension
+attributes rather than reaching for `g.First()` — a `GROUP BY` row has no
+inherent order to pick a "first" line from, and `MAX` over a string is a
+real, universally-translatable SQL aggregate every provider agrees on.
+The measures (`SUM(Total)`, `SUM(LineTotal)`) are where SQL Server and
+SQLite genuinely disagree: SQL Server sums a `decimal` column natively,
+but SQLite — which has no native decimal type — has no translation for
+`SUM(decimal)` at all, and the very first run of this step's own runtime
+test threw `NotSupportedException` proving it. Both queries now sum as
+`double` in SQL and cast back to `decimal` after materializing, a
+documented precision-for-portability tradeoff (ample for a reporting
+total, wrong for a ledger) rather than special-casing the SQLite
+substitute — the same query runs unmodified against the real SQL Server
+this project targets.
+
+**The Angular dashboard adds no charting library.** Consistent with this
+project's minimal-dependency habit (Ocelot instead of a heavier gateway,
+manual mapping instead of AutoMapper's runtime cost until B2 proved it
+justified), `/reports` is built from an inline SVG bar chart and a plain
+HTML/CSS bar list rather than pulling in a chart package for three fairly
+simple visualizations. The two chart forms were picked for what each
+axis actually is: sales-by-day is a chronological x-axis, where SVG's
+precise coordinate math earns its keep (bars are drawn as rounded-top
+paths, not a plain `rect` with `rx` — an SVG rect rounds all four
+corners, and the mark spec calls for square at the baseline, rounded only
+at the data-end); top-selling is a ranked list of named items, where
+ordinary HTML/CSS handles text truncation and layout far more simply than
+SVG `<text>` would. Both stay single-series (categorical slot 1 blue,
+`#2a78d6`) and skip a legend box on purpose — a legend restates what the
+card title already says for one series. Hover is part of the deliverable
+rather than an afterthought: each bar/row lifts (a brightness bump, never
+a border — an outline is ink that isn't data) and the sales-by-day chart
+shows a value+date tooltip, all reachable on keyboard focus the same as
+on hover, not hover-only.
+
+**Low stock's status color never carries meaning alone.** Every row
+`GetLowStock` returns is already at-or-below its own threshold by
+definition, so the table adds one more split on top: zero on hand
+(`critical`, red `#d03b3b`) versus merely below threshold (`warning`,
+amber). Both always ship with an icon *and* a text label ("Out of stock"
+/ "Low stock") next to the colored badge — never the color by itself —
+per the same status-palette rule the reference palette documents (three
+of its four status steps are sub-3:1 contrast on a light surface by
+design; the icon+label pairing is what makes that acceptable, not
+optional polish).
+
+**Concepts introduced:**
+- **Cross-service event enrichment for a consumer's own future need** —
+  `StockLevelChanged` grew fields Warehouse's own domain has no use for,
+  purely because Reporting (a different service, with no other way to
+  get them) needed them to render a report. See above.
+- **SQL provider portability for decimal aggregates** — `SUM` over
+  `decimal` has no SQLite translation; sum as `double`, cast back after
+  materializing. A tradeoff worth naming, not a workaround to hide.
+- **`MAX()` as the correct way to pick a stable dimension attribute out of
+  a `GROUP BY`** when there's no real "first" row to reach for.
+- **A hand-rolled chart built to a written methodology (mark specs, a
+  validated color assignment, a hover layer that's part of the
+  deliverable) instead of either an ad hoc div-with-a-width-percentage or
+  a new dependency.** The three visualizations here don't need a charting
+  library; they do need the same care one would bring to using one.
+
+**Update:** the gap this section originally flagged here — a purchase-
+order receipt keeping the low-stock table stale until an unrelated
+`AdjustStockCommand`/sale next touched the same `(ItemId, LocationId)`,
+because `ReceiveStockCommand` never emitted `StockLevelChanged` — has
+since been closed (see D1's own updated note for the fix itself). A
+receipt now updates the low-stock report the moment it happens, same as
+every other stock change.
+
+**Verified with an 11-check runtime test (three SQLite databases in one
+process — Warehouse and Reporting, same discipline as D1) plus a 9-check
+Playwright pass against the built Angular app:** the backend test proved
+the enriched event payload actually carries `Sku`/`ItemName`/
+`LocationCode`/`ReorderThreshold` (not just ids), that the low-stock
+report both enters *and exits* correctly across an upsert (not a second
+row), that `GetSalesByDay` groups two sales landing on two different
+calendar days into two rows rather than one, and that `GetTopSellingItems`
+sums quantity and revenue correctly across multiple sales of the same
+item, orders by revenue rather than quantity (a single 100.00 sale
+outranks five 4.00 units totaling 20.00), and respects `Take`. This is
+also the run where the SQLite `SUM(decimal)` gap above was caught, before
+it could reach the frontend. The Playwright pass (mocked gateway routes, a token seeded into
+`localStorage`, the built app served and driven in a real Chromium)
+confirmed the dashboard renders the right bar/row/table counts, orders
+top-selling by revenue, shows the critical/warning split correctly, lifts
+and tooltips a bar on hover, reloads top-selling when the take-selector
+changes, and raises no unexpected console errors.
+
+**Run it locally (requires the gateway + Identity/Warehouse/POS/Reporting
+APIs running, per D1):**
+```bash
+cd client
+npm start   # ng serve — http://localhost:4200
+# → sign in, then /reports
+```
+
+## E1 — In-app notifications (SignalR)
+
+**What it does:** a fifth service, Notifications, that consumes the same
+`SaleCompleted`/`StockLevelChanged` events Reporting already does (D1/D2)
+— fanned out from POS's and Warehouse's existing outbox, not a new event
+source — and turns qualifying ones into short, human-readable messages,
+pushed live to every connected browser over a SignalR hub and persisted
+so a bell dropdown has something to show on page load, before any push
+has happened yet.
+
+**Both outbox producers generalize to a third consumer with zero changes
+to the dispatcher itself — exactly the point of the message/delivery
+split D1 made.** POS's `CheckoutCommandHandler` already fanned
+`SaleCompleted` out over an array of consumer names (its own comment
+literally named this step as the anticipated third); adding
+`Notifications` there was a one-line change. Warehouse's
+`StockAdjustmentStager` had never needed more than one consumer for
+`StockLevelChanged`, so it staged a single hardcoded delivery — this
+step turns that into the same array-loop idiom POS already used, for
+Warehouse's second-ever consumer. `OutboxDispatcher` (both services)
+needed no changes at all: it already resolves `IEnumerable<IEventPublisher>`
+by `ConsumerName`, so a new `NotificationsEventPublisher` in each
+service's own Infrastructure project (same typed-HttpClient-plus-
+`ServiceAuthHandler` shape as their existing `ReportingEventPublisher`)
+was the only new code the producer side needed.
+
+**The ingestion commands bind only what a notification message actually
+needs, and let ASP.NET Core's model binding quietly ignore the rest.**
+`IngestSaleCompletedCommand` declares just `SaleId`/`Total` — POS's
+`NotificationsEventPublisher` still forwards the FULL `SaleCompletedMessage`
+JSON verbatim (the same "no shape translation, no re-serialization"
+idiom D1 established), and the extra fields (`Lines`, `CashierUserId`,
+...) are simply never bound. `IngestStockLevelChangedCommand` mirrors
+Reporting's own version field-for-field since a low-stock message needs
+the same denormalized `Sku`/`ItemName`/`LocationName`/`ReorderThreshold`
+D2 already added to that event.
+
+**Two different idempotency shapes, because the two events answer
+different questions.** `SaleCompleted` gets a real dedup key —
+`Notification.SourceSaleId`, unique-indexed, checked via `ExistsForSale`
+before inserting — the exact existence-check idiom D1's `SaleRecord`/C3's
+`ProcessedSaleEvent` already established for a one-time, immutable fact:
+"did we already tell someone about sale #123." `LowStock` answers a
+different question — "did this item just CROSS INTO low stock, or was
+it already there" — which existence-checking can't answer on its own,
+since the same item can legitimately re-cross that line many times.
+Notifications keeps its own tiny `StockLevelSnapshot` per `(ItemId, LocationId)`
+(the last-known `QuantityOnHand`/`ReorderThreshold` it saw), upserted on
+every event regardless of outcome, purely to compute "was it low
+BEFORE this event." A notification fires only when that comparison
+flips from not-low to low; a brand-new pair with no snapshot yet counts
+as "wasn't low," so an item that arrives already low on its very first
+event still notifies. This is deliberately NOT a second copy of
+Reporting's own `StockLevelRecord` (D1/D2) — it carries none of the
+denormalized display fields that table has, only the two numbers needed
+to answer one yes/no question.
+
+**The SignalR hub and its `INotificationPusher` implementation live in
+the API layer, not Infrastructure — a placement decision, not a broken
+rule.** Every other cross-service concern in this system (outbound HTTP
+via `IEventPublisher`, `ServiceAuthHandler`) sits in Infrastructure
+because it's genuinely persistence/outbound-call plumbing. A SignalR
+`Hub` is different: it's inseparable from THIS service's own ASP.NET
+Core request pipeline and hosting model — mapping it, authenticating
+its connections, and pushing through it are all things only the API
+layer's `Program.cs` can actually wire up. `Notifications.Application`
+still only knows about the transport-agnostic `INotificationPusher`
+interface; it has no idea SignalR exists.
+
+**A WebSocket handshake can't carry an `Authorization` header, so the
+token travels as a query-string parameter instead — and that couldn't be
+wired into the shared `AddJwtAuthentication` extension without affecting
+every other service's normal header-based validation too.**
+Notifications.API hand-rolls its own `AddJwtBearer` call (same
+`TokenValidationParameters` every service already uses) with one
+addition: `JwtBearerEvents.OnMessageReceived` pulls `?access_token=...`
+out of the query string, but ONLY for requests under `/hubs/notifications`
+— every controller's ordinary `Authorization: Bearer ...` header check is
+completely untouched, and `Common.Security` itself needed no changes.
+
+**The SignalR hub is the one thing in this whole system that does NOT go
+through the gateway — and that decision comes with its own new,
+previously-unneeded piece of infrastructure: CORS.** Ocelot's HTTP-
+forwarding model doesn't reliably proxy a WebSocket upgrade handshake,
+so rather than build and debug that against a reverse proxy with no
+live SQL Server or docker-compose stack to validate it against anyway,
+the Angular client connects to Notifications.API's own port directly for
+the hub connection only — `NotificationsController`'s plain REST
+endpoints (`GetRecent`, mark-as-read) still go through the gateway like
+every other feature. A direct browser-to-service connection is a
+cross-origin request the gateway never had to mediate, which is why this
+is also the first and only place in this project CORS gets configured at
+all: every other feature's browser traffic has only ever gone through
+Ocelot in a mocked-gateway Playwright run, never a real one, so whether
+the REST side would need CORS too has simply never been exercised. That
+gap is real and wider than this step — flagged here rather than solved,
+left for F4's actual docker-compose pass to be the first time anything
+in this system talks to a truly separate origin for real.
+
+**Concepts introduced:**
+- **A live-push transport as a third delivery mechanism**, alongside
+  "plain HTTP through the gateway" (every REST call so far) and
+  "service-to-service ingestion" (`EventsController`, D1) — with its own
+  auth wiring and its own gateway-bypass tradeoff, both named above.
+- **API-layer-owned real-time transport vs. Infrastructure-layer-owned
+  persistence** as a considered placement, not a violation of the
+  Domain→Application→Infrastructure→API layering every other service
+  follows — see `INotificationPusher`'s own split above.
+- **Crossing-edge detection via a purpose-built snapshot** as a third
+  idempotency shape alongside dedup-by-existence-check (D1) and
+  upsert-without-dedup (D1's own `StockLevelRecord`) — some questions
+  ("is this the same fact twice") existence-checking answers directly;
+  others ("did a value just cross a line") need the PREVIOUS value on
+  hand to answer at all, which is what `StockLevelSnapshot` exists for.
+- **`NotificationFeedService`, kept deliberately distinct from the
+  pre-existing `NotificationService`** (A4's MatSnackBar toast wrapper) —
+  one is stateless and transient, the other persists a feed and a live
+  connection; the new one calls the old one on every push, so a live
+  event is both remembered and immediately seen without either service
+  knowing much about the other.
+
+**Update:** two of the three gaps this section originally flagged have
+since been closed. `ReceiveStockCommand` now routes through
+`StockAdjustmentStager` (see D1's updated note) — a purchase-order
+receipt reaches Reporting AND Notifications the moment it happens, the
+same as every other stock change. And LowStock notifications no longer
+fire on every qualifying event: `Notifications` now keeps its own tiny
+`StockLevelSnapshot` per `(ItemId, LocationId)` — exactly the "second
+copy of Reporting's read model, purely to suppress its own noise" this
+section originally said it would need to build — and only notifies on
+the actual transition into low stock (a brand-new item/location with no
+prior snapshot that arrives already low still notifies; leaving low
+stock never does; crossing into low stock a second time notifies again,
+so suppression is per-transition, not permanent). The CORS-everywhere
+question above is the one gap that remains open here — still F4's to
+actually confront with a real docker-compose stack.
+
+**Verified with a 19-check runtime test — three SQLite databases, one
+per service, Notifications hosted via a real ASP.NET Core pipeline
+(`TestServer`, the same approach D1 established for Reporting) with a
+REAL `Microsoft.AspNetCore.SignalR.Client` connection, not a stand-in —
+plus a 9-check Playwright pass against the built Angular app:** the
+backend test proves Warehouse's `AdjustStockCommand` now stages
+deliveries for exactly `{Reporting, Notifications}` and POS's
+`CheckoutCommand` for exactly `{Warehouse, Reporting, Notifications}`;
+that an unauthenticated SignalR connection attempt is actually rejected
+(`[Authorize]` on `NotificationsHub` isn't a no-op); that a real,
+token-bearing connection receives a REAL push — not a mocked one — the
+instant `EventsController` ingests a qualifying event, with the right
+message text; that a repeated delivery of the same sale produces no
+second push; that the identical low-stock event redelivered DOES push
+again (the named gap, proven real); that a normal, non-low stock change
+pushes nothing; and that mark-one/mark-all-as-read both work and are
+reflected in a subsequent `GetRecent`. The Playwright pass mocks every
+gateway REST route as usual but — because the hub bypasses the gateway —
+runs a REAL throwaway `Notifications.API` host on its real port for the
+hub connection alone: a real login token, a real WebSocket, and a real
+server-side `IHubContext` push land in a real Chromium browser, updating
+the bell's unread badge and firing a toast with no page reload, which is
+the one thing a fully mocked gateway could never have actually proven.
+
+**Run it locally (a sixth terminal, alongside
+Identity/Warehouse/POS/Reporting/Gateway):**
+```bash
+cd src/Services/Notifications/Notifications.API
+dotnet run   # http://localhost:5298
+
+cd client
+npm start   # ng serve — http://localhost:4200
+# → sign in; the bell icon in the toolbar shows the live notification feed
+```
+
+## E2 — Mailing system (SMTP/MailKit)
+
+**What it does:** a second delivery channel for the exact same LowStock
+crossing-edge decision E1 already computes — alongside the in-app
+SignalR toast, `IngestStockLevelChangedCommandHandler` now also emails a
+fixed list of configured alert recipients through a real SMTP relay
+(MailKit's `SmtpClient`), the moment an item/location pair crosses INTO
+low stock. No new event, no new ingestion endpoint, no new command:
+this is entirely a second consumer of a decision E1 already made.
+
+**`IEmailSender` mirrors `INotificationPusher`'s own split exactly — a
+transport-agnostic Application-layer interface, a concrete Infrastructure-
+layer implementation — for the same reason.** Neither interface takes a
+"who" parameter: just as `SignalRNotificationPusher` broadcasts to every
+connected client because there's no per-user targeting concept anywhere
+in this system yet, `IEmailSender.SendAsync(subject, body, ct)` sends to
+a FIXED recipient list (`SmtpSettings.Recipients`, bound from
+configuration) rather than an address the caller picks. Splitting by role
+or letting a user opt in/out of alert emails is the same kind of
+"natural F-phase follow-up, not solved here" gap E1's own
+`SignalRNotificationPusher` comment already named for its own broadcast
+model — this step inherits it rather than re-solving it differently for
+one channel and not the other.
+
+**Unlike `INotificationPusher`, `IEmailSender`'s real implementation lives
+in Infrastructure, not the API layer — and that's not an inconsistency,
+it's the same placement rule correctly applied.** `SignalRNotificationPusher`
+had to live in `Notifications.API` because it's inseparable from THIS
+host's own ASP.NET Core pipeline (`IHubContext`, hub mapping). MailKit's
+`SmtpClient` has no such dependency — it's generic outbound-network
+plumbing, exactly like every `IEventPublisher` HTTP client already
+registered in every other service's own Infrastructure project. Two
+different transports, two different correct answers to "which layer owns
+this," from the same one rule.
+
+**Sending is deliberately best-effort, with no retry queue — a NAMED
+tradeoff, not an oversight.** Every inter-SERVICE event in this system
+(`SaleCompleted`, `StockLevelChanged`, …) goes through the outbox pattern
+specifically because losing one silently would be wrong — C3/D1 built
+real retry/redelivery machinery for that reason. An alert EMAIL is
+different: the notification itself (the DB row, the SignalR push) already
+happened and already succeeded independently of whether the SMTP relay
+answers. `IngestStockLevelChangedCommandHandler` wraps the `SendAsync`
+call in its own `try`/`catch`, logs a warning on failure, and returns the
+same success response either way — an unreachable mail relay degrades
+this ONE channel, not the ingestion pipeline underneath it. Building a
+second outbox just for email would be solving a problem this system
+doesn't have: nothing downstream is waiting on the email to have been
+sent, the way Warehouse's stock decrement genuinely can't be skipped.
+
+**Concepts introduced:**
+- **Two consumers of one decision, reusing the exact same crossing-edge
+  computation.** E1's `StockLevelSnapshot`-based "was it low before this
+  event" logic didn't change at all; this step only adds a second `await`
+  after the existing SignalR push, inside the same `if` branch.
+- **Best-effort vs. reliable delivery as a considered choice per
+  channel**, not a system-wide policy. The outbox pattern is for facts
+  another SERVICE needs to eventually know; a plain try/catch is for a
+  supplementary notification channel whose failure doesn't strand any
+  other state.
+- **No per-call "to" address, mirrored from `INotificationPusher` into a
+  brand-new interface** — proof the "audience is a deployment concern,
+  not a domain decision" idiom generalizes across transports, not just
+  something SignalR needed.
+
+**Verified with a 13-check runtime test — no live SQL Server needed
+(SQLite, same as every other Application-layer test in this project), but
+a REAL fake SMTP server this time (`netDumbster`, a scratchpad-only test
+dependency, never added to the actual project) instead of a mocked
+`IEmailSender` for the wire-format half:** the first half proves the
+HANDLER's own decision — a brand-new item/location pair that arrives
+already low emails once; staying low sends nothing further; leaving low
+stock sends nothing; crossing into low stock a SECOND time emails again
+(per-transition, not permanently suppressed, the same behavior E1's own
+SignalR test already proved for the push side); and a normal,
+never-low pair never emails at all. The second half proves
+`SmtpEmailSender` ITSELF — not a fake standing in for it — actually
+connects to a real SMTP listener and sends a correctly-addressed message:
+the fake server receives exactly one email, with the right `From`
+address, the right `Subject`, BOTH configured recipients on the envelope,
+and the low-stock message text in the body; and that an unconfigured
+recipient list logs a warning and returns cleanly rather than throwing or
+silently attempting to connect anywhere.
+
+**Run it locally (a local SMTP catcher instead of a real mail server —
+smtp4dev, MailHog, or any SMTP-accepting relay on the configured host/port
+works, since `Smtp:Host`/`Smtp:Port` in `appsettings.json` point at
+`localhost:2525` by default):**
+```bash
+# any local SMTP catcher that listens on 2525, e.g.:
+docker run --rm -it -p 2525:25 -p 5080:80 rnwood/smtp4dev
+
+cd src/Services/Notifications/Notifications.API
+dotnet run   # http://localhost:5298
+# → trigger a LowStock event (Admin Panel: adjust an item's stock below
+#   its reorder threshold) and check the catcher's inbox for the alert
+```
+
+## Business gap — Sale returns/refunds
+
+**What it does:** closes the gap C1's own `SaleStatus` comment named
+explicitly — a completed sale could never be reversed. A new `Returned`
+status and `ReturnSaleCommand` let a cashier return a `Completed` sale;
+POS fans a `SaleReturned` event out to the same three consumers
+`SaleCompleted` already reaches (Warehouse, Reporting, Notifications),
+each applying the reversal in its own way: Warehouse restocks the
+quantity, Reporting stops counting the sale toward revenue, Notifications
+pushes a second, independent "returned" toast.
+
+**`SaleReturned` reuses `SaleCompletedMessage`'s exact shape — only the
+`EventType` string and the downstream URL path change.** A return moves
+the same `{ SaleId, LocationId, Lines[...] }` data as a completion; the
+only thing that differs is which direction each consumer applies it, and
+that's a routing decision each `IEventPublisher` already had to make
+per-event-type anyway. Every producer-side publisher
+(`WarehouseEventPublisher`, `ReportingEventPublisher`,
+`NotificationsEventPublisher`, all in `POS.Infrastructure`) went from a
+single hardcoded `if` guard to an `if`/`else if` on `eventType`, picking a
+different downstream path — no new message class, no new outbox
+machinery, and `OutboxDispatcher` itself needed zero changes: it already
+resolves publishers by `ConsumerName`, not by event type.
+
+**Warehouse's restock is `ApplySaleCommand`'s mirror image, sharing its
+`StockAdjustmentStager` — but with its own idempotency table, not a
+reused one.** `ApplySaleReturnCommand` stages a positive
+`StockAdjustmentStager.Stage(...)` per line (`StockTransactionReason.Return`,
+a new value distinct from `Adjustment` so the audit trail stays
+filterable by reason) instead of `ApplySaleCommand`'s negative one, and
+commits once at the end — the same all-or-nothing atomicity
+`ApplySaleCommand` already relies on. The idempotency check is a
+**separate** table, `ProcessedSaleReturnEvent`, not a second column
+tacked onto the existing `ProcessedSaleEvent`: a given `SaleId`
+legitimately appears in both tables at once — once when the original sale
+decremented stock, once when its return restocked it — and a single
+table keyed by `SaleId` couldn't dedupe those two distinct facts
+independently. Notifications' `Notification.SourceSaleReturnId` (kept
+separate from `SourceSaleId` for the identical reason) and the two
+tables' own unique indexes are the same pattern, twice.
+
+**Reporting doesn't get a second table either — a return is a mutation of
+the existing `SaleRecord`, not a new fact alongside it.**
+`IngestSaleReturnedCommand` finds the `SaleRecord` by `SaleId` and stamps
+`ReturnedAtUtc`, rather than inserting a new row the way `SaleCompleted`
+ingestion does — there's already exactly one row per sale to hold that
+flag on. `GetSalesByDay` and `GetTopSellingItems` both now filter it out;
+the second one has no `SaleLineRecord → SaleRecord` navigation property to
+`Include` through (see that entity's own comment on why lines are split
+out), so the exclusion is a plain subquery against `SaleRecords.SaleId`
+instead.
+
+**If `SaleReturned` is delivered before `SaleCompleted` has been ingested
+yet, `IngestSaleReturnedCommandHandler` throws `NotFoundException` — and
+that's the self-healing path, not a bug.** At-least-once delivery across
+two *separate* outbox messages gives no ordering guarantee between them;
+a `NotFoundException` becomes a failed HTTP response, which POS's
+`OutboxDispatcher` already treats as retryable (`MaxAttempts = 5`) for
+every other consumer. No new retry mechanism was needed — just reusing
+the one that already existed correctly.
+
+**Concepts introduced:**
+- **Reusing one message shape for two semantically opposite events.**
+  `EventType` alone (`SaleCompleted` vs `SaleReturned`) carries the
+  distinction; the payload shape staying identical is what let every
+  consumer's routing collapse to a single `if`/`else if` rather than a
+  parallel set of return-flavored DTOs.
+- **Independent dedup keys for facts that share a natural key.** The same
+  `SaleId` needs to be "have I applied this sale" and "have I reversed
+  this sale" *at the same time*, in the same row's neighborhood
+  (`ProcessedSaleEvent`/`ProcessedSaleReturnEvent`,
+  `SourceSaleId`/`SourceSaleReturnId`) — one column or table per question,
+  never one shared between two.
+- **A mutation-in-place read model vs. an append-only one**, in the same
+  service. `SaleRecord` gets a nullable `ReturnedAtUtc` mutated after the
+  fact (there's only ever one row per sale); Warehouse's `StockTransaction`
+  ledger, by contrast, never mutates a past row for a return — it appends
+  a new one with `Reason = Return`. Which shape fits depends on whether
+  the entity already models "the current state of one thing" or "an
+  immutable history of events."
+
+**Verified with a 30-check runtime test — four SQLite databases, one per
+service, dispatched through actual MediatR pipelines (validators and all),
+not calling handlers directly — plus a Playwright pass against the built
+Angular app:** the backend test proves `ApplySaleCommand` then
+`ApplySaleReturnCommand` round-trips a stock level back to its original
+quantity, with a real `StockTransaction` row stamped `Reason = Return` and
+`Reference = "Return of Sale {id}"`; that redelivering either command a
+second time is a no-op (`AlreadyProcessed = true`) with no double
+decrement/restock; that `ProcessedSaleEvent` and `ProcessedSaleReturnEvent`
+both hold exactly one row for the *same* `SaleId` at the same time, proving
+the separate-table decision actually avoids the collision a shared one
+would hit; that `GetSalesByDay`/`GetTopSellingItems` include a sale's
+revenue before its return and exclude it after; that an unknown `SaleId`
+delivered to `IngestSaleReturnedCommand` throws `NotFoundException`
+rather than silently no-op'ing; that the same `SaleId` produces two
+independently-dedup'd Notifications (`SaleCompleted` and `SaleReturned`);
+and that `ReturnSaleCommand` transitions a `Completed` sale to `Returned`,
+fans exactly 3 pending `OutboxDelivery` rows out
+(Warehouse/Reporting/Notifications), and rejects returning a sale that's
+already `Returned` or still `InProgress`. The Playwright pass mocks the
+gateway's REST routes as usual, drives the register component straight to
+its `Completed` receipt state, clicks "Return sale," and confirms the
+button disappears, a "this sale was returned" note appears, and the real
+`POST .../return` call actually fired.
+
+**Run it:** no new terminal — `ReturnSaleCommand` is a new endpoint on the
+existing POS.API (`POST /api/v1/Sales/{id}/return`, gatewayed as
+`POST /Pos/Sales/{id}/return`); the register screen's receipt card shows a
+"Return sale" button once a sale is `Completed`.
+
+## Business gap — Location-to-location stock transfer
+
+**What it does:** closes the second gap the returns/refunds work above
+surfaced while grepping for it — `StockTransactionReason.TransferIn` and
+`TransferOut` had been declared since B1 but no command anywhere ever
+constructed a `StockTransaction` with either value. `TransferStockCommand`
+is their first (and only) caller: move a quantity of one item from one
+Warehouse location to another, in one atomic operation, through a new
+Admin Panel form.
+
+**One command, two calls to the exact same `StockAdjustmentStager.Stage(...)`
+every other stock command already uses — a negative one at the source,
+a positive one at the destination — committed once.** No new staging
+logic was needed: `AdjustStockCommand` already proved `Stage(...)` handles
+the negative-balance guard, the `StockTransaction` audit row, and the
+`StockLevelChanged` outbox event for a single location; a transfer is
+just that, called twice with `TransferOut`/`TransferIn` instead of
+`Adjustment`, before one shared `SaveChangesAsync()`. The destination call
+passes `createIfMissing: true` (the same flag `ReceiveStockCommandHandler`
+already needed) — a transfer can legitimately be the first stock an item
+has ever had at that location.
+
+**Atomicity here is free, not hand-rolled — the same reasoning
+`ApplySaleCommand`'s own comment already gives for a multi-line sale.**
+`Stage()` only ever stages; it never calls `SaveChangesAsync` itself. The
+source is staged FIRST: if it doesn't have enough stock,
+`InsufficientStockException` throws right there, before the destination
+is ever touched, and nothing has been saved yet — there is no
+half-transfer state where stock vanished from the source without landing
+at the destination, and no compensating rollback needed to prevent one.
+An unknown source `(item, location)` pair throws `NotFoundException` the
+same way `AdjustStockCommand` already does, for the same reason: a
+transfer's source, unlike a transfer's destination, has to already have a
+balance to move.
+
+**A same-location "transfer" is rejected by validation, not left to net
+out to a no-op.** `FromLocationId == ToLocationId` would still stage a
+`-Q` and a `+Q` `StockTransaction` at the same `(item, location)` pair —
+netting to zero real stock change but writing two meaningless audit rows
+— so `TransferStockCommandValidator` rejects it outright with a
+`ValidationException`, the same "reject malformed input before the
+handler ever runs" job every other command's validator already does.
+
+**Concepts introduced:**
+- **A years-old dead enum value finally getting its first real caller.**
+  `TransferIn`/`TransferOut` are proof that a domain model can carry
+  intent ahead of the feature that uses it without that being a design
+  smell — the enum's own comment (added alongside this step) now says so
+  explicitly, the same "name the gap so a future step finds it named"
+  discipline C1's `SaleStatus` comment already modeled for returns/refunds.
+- **Free atomicity from deferred `SaveChangesAsync`, applied to a
+  TWO-location operation** rather than the multi-LINE operation
+  `ApplySaleCommand` originally demonstrated it for — same mechanism,
+  a different shape of "more than one thing has to succeed together."
+
+**Verified with a 14-check runtime test, extending the same SQLite
+Warehouse database and MediatR pipeline the returns/refunds test above
+already set up — plus a Playwright pass against the built Angular app:**
+the backend test proves a normal transfer decrements the source to the
+expected quantity, creates the destination `StockLevel` row with the
+transferred quantity, and records a `TransferOut`/`TransferIn` pair of
+`StockTransaction` rows with the right signs; that two `StockLevelChanged`
+events are staged (one per location) and each fans out to both Reporting
+and Notifications (4 deliveries total); that a same-location transfer is
+rejected by validation before touching the database; that transferring an
+item with no stock at all at the source throws `NotFoundException` and
+leaves NO destination row behind (proving the "source fails first, before
+the destination is touched" ordering actually holds); and that
+transferring MORE than the source has throws `InsufficientStockException`
+and leaves both locations' quantities completely unchanged. The Playwright
+pass mocks the gateway's REST routes, opens the Admin Panel, selects an
+item with existing stock, submits the new "Transfer stock" form, and
+confirms the real `POST .../Stock/transfer` call fired with the right
+body and that the stock-on-hand table refreshes to show both the
+destination's new row and the source's reduced quantity.
+
+**Run it:** no new terminal — `TransferStockCommand` is a new endpoint on
+the existing Warehouse.API (`POST /api/v1/Stock/transfer`, gatewayed as
+`POST /Warehouse/Stock/transfer`); the Admin Panel's item detail view
+shows a "Transfer stock" form alongside the existing "Receive stock"/
+"Adjust stock" ones once an item with at least one stock level is
+selected.

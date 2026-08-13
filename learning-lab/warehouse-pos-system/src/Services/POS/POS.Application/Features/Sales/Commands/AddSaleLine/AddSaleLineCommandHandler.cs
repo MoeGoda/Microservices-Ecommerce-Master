@@ -64,6 +64,12 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
                 Sku = item.Sku,
                 ItemName = item.ItemName,
                 UnitPrice = item.UnitPrice,
+                // Both null unless Warehouse resolved an active Promotion
+                // for this item (C5) — item.UnitPrice above is already the
+                // discounted price either way, so LineTotal below is
+                // correct regardless of whether a promotion applied.
+                OriginalUnitPrice = item.OriginalUnitPrice,
+                PromotionId = item.PromotionId,
                 Quantity = request.Quantity,
                 LineTotal = lineTotal,
             };

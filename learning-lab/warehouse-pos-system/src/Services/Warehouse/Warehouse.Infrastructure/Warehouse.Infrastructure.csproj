@@ -2,6 +2,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Warehouse.Application\Warehouse.Application.csproj" />
+    <!--
+      Warehouse never needed to call OUT to another service before D1 —
+      StockEventsController (C3) only ever received calls. ReportingEventPublisher
+      is the first outbound call this service makes, needing
+      ServiceAuthHandler/JwtTokenFactory to mint a "warehouse-service"
+      token the same way POS.Infrastructure already does for its own
+      outbound calls (C2/C3).
+    -->
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -10,6 +19,9 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <!-- For BackgroundService (OutboxBackgroundService) -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
   </ItemGroup>
 
   <PropertyGroup>

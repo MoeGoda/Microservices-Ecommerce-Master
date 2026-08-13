@@ -62,5 +62,11 @@ namespace Warehouse.Infrastructure.Repositories
             await _context.Items.AddAsync(item);
             return item;
         }
+
+        public Task UpdateAsync(Item item)
+        {
+            _context.Items.Update(item);
+            return Task.CompletedTask;
+        }
     }
 }

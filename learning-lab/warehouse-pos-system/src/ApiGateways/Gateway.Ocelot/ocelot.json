@@ -78,6 +78,39 @@
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     },
     {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/price",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/price",
+      "UpstreamHttpMethod": [ "PUT" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/price-history",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/price-history",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "GET added alongside the existing POST (CreatePromotion) — the browse/history view a real gap note asked for.",
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/promotions",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/promotions",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/promotions/{promotionId}/cancel",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/promotions/{promotionId}/cancel",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
       "DownstreamPathTemplate": "/api/v1/Stock/{itemId}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
@@ -98,6 +131,14 @@
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
       "UpstreamPathTemplate": "/Warehouse/Stock/adjust",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Stock/transfer",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Stock/transfer",
       "UpstreamHttpMethod": [ "POST" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     },
@@ -123,6 +164,130 @@
       "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
       "UpstreamPathTemplate": "/Warehouse/MasterData/units-of-measure",
       "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "Same rule as /Warehouse below it: no anonymous route under /Pos either — a cashier is always signed in before they can touch a register. POS.API's own service-to-service call OUT to Warehouse (StockEventsController, C3) never goes through this gateway at all; only these browser-facing routes do.",
+      "DownstreamPathTemplate": "/api/v1/Sales",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/lines",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/lines",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/lines/{lineId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/lines/{lineId}",
+      "UpstreamHttpMethod": [ "DELETE" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/checkout",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/checkout",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/cancel",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/cancel",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/return",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/return",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "ReadModelsController only — EventsController (Reporting.API's ingestion endpoints) is service-to-service, called directly by POS/Warehouse's own outbox dispatchers, and deliberately has no gateway route at all, the same reasoning Warehouse's own StockEventsController (C3) was never routed either.",
+      "DownstreamPathTemplate": "/api/v1/ReadModels/sales",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/sales",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/ReadModels/stock-levels",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/stock-levels",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "ReportsController (D2) — the real, aggregated reports the Angular dashboard renders, as opposed to ReadModelsController's raw dumps above.",
+      "DownstreamPathTemplate": "/api/v1/Reports/sales-by-day",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/sales-by-day",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Reports/top-selling-items",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/top-selling-items",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Reports/low-stock",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/low-stock",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "NotificationsController only (E1) — EventsController (Notifications.API's own ingestion endpoints) is service-to-service, same reasoning as Reporting's EventsController above, and has no gateway route either. The SignalR hub (/hubs/notifications) ALSO has no gateway route, for a different reason: it's a live WebSocket connection, and Ocelot's HTTP-forwarding model doesn't proxy the upgrade handshake reliably (see the README's own gap note) — the Angular client connects to Notifications.API's port directly for the hub only, with its own CORS policy standing in for what the gateway would otherwise mediate.",
+      "DownstreamPathTemplate": "/api/v1/Notifications",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5298 }],
+      "UpstreamPathTemplate": "/Notifications",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Notifications/{id}/read",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5298 }],
+      "UpstreamPathTemplate": "/Notifications/{id}/read",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Notifications/read-all",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5298 }],
+      "UpstreamPathTemplate": "/Notifications/read-all",
+      "UpstreamHttpMethod": [ "POST" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     }
   ],

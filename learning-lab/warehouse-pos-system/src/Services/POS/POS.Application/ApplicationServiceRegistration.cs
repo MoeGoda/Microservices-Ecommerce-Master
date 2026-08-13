@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using POS.Application.Behaviours;
+using POS.Application.Features.Outbox;
 
 namespace POS.Application
 {
@@ -14,6 +15,10 @@ namespace POS.Application
 
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehaviour<,>));
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehaviour<,>));
+
+            // Not a MediatR handler — nothing sends it a request. Driven
+            // by a poll loop (OutboxBackgroundService, POS.Infrastructure).
+            services.AddScoped<OutboxDispatcher>();
 
             return services;
         }

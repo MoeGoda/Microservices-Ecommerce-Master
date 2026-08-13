@@ -158,6 +158,33 @@ namespace Warehouse.Infrastructure.Migrations
                     b.ToTable("ItemBarcodes");
                 });
 
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemPriceHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("NewPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("OldPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("ItemPriceHistories");
+                });
+
             modelBuilder.Entity("Warehouse.Domain.Entities.ItemUnit", b =>
                 {
                     b.Property<int>("Id")
@@ -238,6 +265,151 @@ namespace Warehouse.Infrastructure.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Name = "Aisle B, Shelf 1"
                         });
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.OutboxDelivery", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ConsumerName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("OutboxMessageId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OutboxMessageId", "ConsumerName")
+                        .IsUnique();
+
+                    b.ToTable("OutboxDeliveries");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.OutboxMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("OutboxMessages");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ProcessedSaleEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId")
+                        .IsUnique();
+
+                    b.ToTable("ProcessedSaleEvents");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ProcessedSaleReturnEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId")
+                        .IsUnique();
+
+                    b.ToTable("ProcessedSaleReturnEvents");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.Promotion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("Promotions");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.StockLevel", b =>
@@ -417,6 +589,17 @@ namespace Warehouse.Infrastructure.Migrations
                     b.Navigation("Item");
                 });
 
+            modelBuilder.Entity("Warehouse.Domain.Entities.ItemPriceHistory", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
             modelBuilder.Entity("Warehouse.Domain.Entities.ItemUnit", b =>
                 {
                     b.HasOne("Warehouse.Domain.Entities.Item", "Item")
@@ -434,6 +617,28 @@ namespace Warehouse.Infrastructure.Migrations
                     b.Navigation("Item");
 
                     b.Navigation("UnitOfMeasure");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.OutboxDelivery", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.OutboxMessage", "OutboxMessage")
+                        .WithMany()
+                        .HasForeignKey("OutboxMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OutboxMessage");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.Promotion", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.StockLevel", b =>

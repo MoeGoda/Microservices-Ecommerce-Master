@@ -2,6 +2,9 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Warehouse.Application.Behaviours;
+using Warehouse.Application.Features.Items;
+using Warehouse.Application.Features.Outbox;
+using Warehouse.Application.Features.Stock;
 
 namespace Warehouse.Application
 {
@@ -17,6 +20,18 @@ namespace Warehouse.Application
 
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehaviour<,>));
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehaviour<,>));
+
+            // A plain Application-layer helper, not an Infrastructure
+            // concern — it only depends on already-abstracted repository
+            // interfaces (Contracts/Persistence), so it's registered here
+            // rather than needing Warehouse.Infrastructure to know it exists.
+            services.AddScoped<StockAdjustmentStager>();
+            services.AddScoped<EffectivePriceResolver>();
+
+            // Not a MediatR handler — driven by a poll loop
+            // (OutboxBackgroundService, Warehouse.Infrastructure), the
+            // same shape as POS's own OutboxDispatcher (C3/D1).
+            services.AddScoped<OutboxDispatcher>();
 
             return services;
         }
