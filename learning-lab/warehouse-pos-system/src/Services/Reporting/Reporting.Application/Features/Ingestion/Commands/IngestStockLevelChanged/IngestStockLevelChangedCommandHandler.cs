@@ -29,15 +29,30 @@ namespace Reporting.Application.Features.Ingestion.Commands.IngestStockLevelChan
                 record = new StockLevelRecord
                 {
                     ItemId = request.ItemId,
+                    Sku = request.Sku,
+                    ItemName = request.ItemName,
                     LocationId = request.LocationId,
+                    LocationCode = request.LocationCode,
+                    LocationName = request.LocationName,
                     QuantityOnHand = request.QuantityOnHand,
+                    ReorderThreshold = request.ReorderThreshold,
                     AsOfUtc = DateTime.UtcNow,
                 };
                 await _stockLevelRecordRepository.AddAsync(record);
             }
             else
             {
+                // Sku/ItemName/LocationCode/LocationName rarely change,
+                // but re-snapshotting them on every event costs nothing
+                // and means a rename in Warehouse eventually catches up
+                // here too, rather than freezing whatever the FIRST event
+                // happened to say forever.
+                record.Sku = request.Sku;
+                record.ItemName = request.ItemName;
+                record.LocationCode = request.LocationCode;
+                record.LocationName = request.LocationName;
                 record.QuantityOnHand = request.QuantityOnHand;
+                record.ReorderThreshold = request.ReorderThreshold;
                 record.AsOfUtc = DateTime.UtcNow;
                 await _stockLevelRecordRepository.UpdateAsync(record);
             }

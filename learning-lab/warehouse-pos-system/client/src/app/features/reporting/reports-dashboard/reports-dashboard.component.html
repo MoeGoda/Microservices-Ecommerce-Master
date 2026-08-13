@@ -1,0 +1,138 @@
+<div class="reports-dashboard">
+  <h2>Reports</h2>
+
+  @if (loading()) {
+    <mat-spinner diameter="32"></mat-spinner>
+  }
+
+  <div class="cards-grid">
+    <mat-card class="chart-card">
+      <mat-card-header>
+        <mat-card-title>Sales by day</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (salesByDay().length === 0) {
+          <p class="empty-state">No completed sales yet.</p>
+        } @else {
+          <div class="chart-wrap" (mouseleave)="hoveredSalesIndex.set(null)">
+            <svg
+              [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
+              preserveAspectRatio="xMidYMid meet"
+              class="sales-chart"
+              role="img"
+              aria-label="Bar chart of total sales revenue per day"
+            >
+              @for (grid of salesChart()!.gridLines; track grid.value) {
+                <line class="gridline" [attr.x1]="leftPad" [attr.x2]="chartWidth - rightPad" [attr.y1]="grid.y" [attr.y2]="grid.y" />
+                <text class="grid-label" [attr.x]="leftPad - 6" [attr.y]="grid.y + 4" text-anchor="end">{{ grid.value | number: '1.0-0' }}</text>
+              }
+              <line class="baseline" [attr.x1]="leftPad" [attr.x2]="chartWidth - rightPad" [attr.y1]="salesChart()!.baselineY" [attr.y2]="salesChart()!.baselineY" />
+
+              @for (bar of salesChart()!.bars; track bar.fullDate; let i = $index) {
+                <g
+                  class="bar-group"
+                  [class.hovered]="hoveredSalesIndex() === i"
+                  tabindex="0"
+                  role="img"
+                  [attr.aria-label]="bar.fullDate + ': ' + (bar.value | number: '1.2-2')"
+                  (mouseenter)="hoveredSalesIndex.set(i)"
+                  (focus)="hoveredSalesIndex.set(i)"
+                  (blur)="hoveredSalesIndex.set(null)"
+                >
+                  <path class="bar" [attr.d]="bar.path" />
+                  @if (bar.showValueLabel) {
+                    <text class="bar-label" [attr.x]="bar.labelX" [attr.y]="bar.labelY" text-anchor="middle">{{ bar.value | number: '1.0-2' }}</text>
+                  }
+                  <text class="axis-label" [attr.x]="bar.axisLabelX" [attr.y]="salesChart()!.baselineY + 18" text-anchor="middle">{{ bar.dateLabel }}</text>
+                </g>
+              }
+            </svg>
+
+            @if (hoveredSalesBar(); as hovered) {
+              <div class="tooltip" [style.left.%]="(hovered.labelX / chartWidth) * 100" [style.top.%]="(hovered.labelY / chartHeight) * 100">
+                <strong>{{ hovered.value | number: '1.2-2' }}</strong>
+                <span>{{ hovered.fullDate }}</span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="chart-card">
+      <mat-card-header>
+        <mat-card-title>Top-selling items</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="take-field">
+          <mat-label>Show</mat-label>
+          <mat-select [formControl]="takeControl">
+            <mat-option [value]="5">Top 5</mat-option>
+            <mat-option [value]="10">Top 10</mat-option>
+            <mat-option [value]="20">Top 20</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        @if (topSelling().length === 0) {
+          <p class="empty-state">No completed sales yet.</p>
+        } @else {
+          <div class="top-selling-list">
+            @for (row of topSelling(); track row.itemId) {
+              <div class="top-selling-row" [title]="row.sku + ' — ' + row.totalQuantity + ' sold'" tabindex="0">
+                <span class="item-name">{{ row.itemName }}</span>
+                <div class="bar-track">
+                  <div class="bar-fill" [style.width.%]="topSellingMax() > 0 ? (row.totalRevenue / topSellingMax()) * 100 : 0"></div>
+                </div>
+                <span class="bar-value">{{ row.totalRevenue | number: '1.2-2' }}</span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="chart-card full-width">
+      <mat-card-header>
+        <mat-card-title>Low stock</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (lowStock().length === 0) {
+          <p class="empty-state good">
+            <mat-icon aria-hidden="true">check_circle</mat-icon>
+            Nothing is at or below its reorder threshold.
+          </p>
+        } @else {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Sku</th>
+                <th>Item</th>
+                <th>Location</th>
+                <th>On hand</th>
+                <th>Reorder threshold</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of lowStock(); track row.itemId + '-' + row.locationId) {
+                <tr>
+                  <td>
+                    <span class="status-badge" [class]="stockSeverity(row)">
+                      <mat-icon aria-hidden="true">{{ stockSeverity(row) === 'critical' ? 'error' : 'warning' }}</mat-icon>
+                      {{ stockSeverity(row) === 'critical' ? 'Out of stock' : 'Low stock' }}
+                    </span>
+                  </td>
+                  <td>{{ row.sku }}</td>
+                  <td>{{ row.itemName }}</td>
+                  <td>{{ row.locationName }} ({{ row.locationCode }})</td>
+                  <td>{{ row.quantityOnHand }}</td>
+                  <td>{{ row.reorderThreshold }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>

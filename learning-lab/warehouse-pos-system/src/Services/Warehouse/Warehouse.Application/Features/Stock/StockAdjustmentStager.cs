@@ -96,14 +96,24 @@ namespace Warehouse.Application.Features.Stock
             // for an EARLIER line is discarded right along with its
             // StockLevel/StockTransaction — Reporting never hears about a
             // stock change that itself never actually committed.
+            // Sku/ItemName/LocationCode/LocationName/ReorderThreshold are
+            // denormalized onto the event (D2) — Reporting has no other
+            // way to know an item's name or a location's code; it only
+            // ever hears about either through an event. Item/Location are
+            // already loaded here, so this costs nothing extra to include.
             var outboxMessage = await _outboxRepository.AddMessageAsync(new OutboxMessage
             {
                 EventType = OutboxEventTypes.StockLevelChanged,
                 PayloadJson = JsonSerializer.Serialize(new StockLevelChangedMessage
                 {
                     ItemId = item.Id,
+                    Sku = item.Sku,
+                    ItemName = item.Name,
                     LocationId = location.Id,
+                    LocationCode = location.Code,
+                    LocationName = location.Name,
                     QuantityOnHand = stockLevel.QuantityOnHand,
+                    ReorderThreshold = stockLevel.ReorderThreshold,
                 }),
             });
             await _outboxRepository.AddDeliveryAsync(new OutboxDelivery

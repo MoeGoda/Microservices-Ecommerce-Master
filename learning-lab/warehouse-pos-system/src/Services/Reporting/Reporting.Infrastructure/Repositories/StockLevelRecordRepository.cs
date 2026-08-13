@@ -38,5 +38,14 @@ namespace Reporting.Infrastructure.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<StockLevelRecord>> GetLowStock()
+        {
+            return await _context.StockLevelRecords
+                .AsNoTracking()
+                .Where(r => r.QuantityOnHand <= r.ReorderThreshold)
+                .OrderBy(r => r.QuantityOnHand)
+                .ToListAsync();
+        }
     }
 }

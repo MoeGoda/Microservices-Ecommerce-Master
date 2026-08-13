@@ -214,6 +214,31 @@
       "UpstreamPathTemplate": "/Reporting/stock-levels",
       "UpstreamHttpMethod": [ "GET" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "ReportsController (D2) — the real, aggregated reports the Angular dashboard renders, as opposed to ReadModelsController's raw dumps above.",
+      "DownstreamPathTemplate": "/api/v1/Reports/sales-by-day",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/sales-by-day",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Reports/top-selling-items",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/top-selling-items",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Reports/low-stock",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/low-stock",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     }
   ],
   "GlobalConfiguration": {

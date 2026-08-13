@@ -45,6 +45,10 @@ namespace Reporting.Infrastructure.Persistence
                 // IngestStockLevelChangedCommandHandler upserts against
                 // this, never inserts a second row for the same pair.
                 builder.HasIndex(r => new { r.ItemId, r.LocationId }).IsUnique();
+                builder.Property(r => r.Sku).HasMaxLength(50);
+                builder.Property(r => r.ItemName).HasMaxLength(200);
+                builder.Property(r => r.LocationCode).HasMaxLength(20);
+                builder.Property(r => r.LocationName).HasMaxLength(100);
             });
         }
     }

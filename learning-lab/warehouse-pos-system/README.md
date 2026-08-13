@@ -46,7 +46,7 @@ a distributed transaction.
 
 **Phase D — Reporting**
 - [x] **D1 — Event-driven read models**
-- [ ] D2 — Reports + Angular dashboards
+- [x] **D2 — Reports + Angular dashboards**
 
 **Phase E — Notifications / Mailing**
 - [ ] E1 — In-app notifications (SignalR)
@@ -1549,3 +1549,135 @@ the real resolved Sku/quantity/line total. And a repeated delivery of the
 same sale (simulating a dispatcher retry after an already-successful
 delivery) inserts no second `SaleRecord`, confirming the dedup check
 actually works, not just the upsert.
+
+## D2 — Reports + Angular dashboards
+
+**What it does:** the real, aggregated reports D1 deliberately stopped
+short of — sales by day, top-selling items, and a low-stock list — built
+as genuine `GROUP BY` queries over D1's read models, exposed through a
+new `ReportsController`, and rendered on a new `/reports` Angular route
+with three visualizations. `ReadModelsController` (D1) still exists
+unchanged — `GET /Reporting/sales` and `/stock-levels` are raw dumps,
+`ReportsController` is the aggregated view built on top of them; the two
+were named apart from day one specifically so this step wouldn't need to
+rename anything.
+
+**`StockLevelChanged` gained the fields Reporting actually needed to
+build a human-readable report, not just a queryable one.** D1's version
+of the event carried only `ItemId`/`LocationId`/`QuantityOnHand` —
+enough to upsert a row, not enough to show anyone a low-stock table
+without a name. Reporting has no live reference back to Warehouse's
+catalog (that's the entire point of the read-model pattern — no
+cross-service joins), so `Sku`/`ItemName`/`LocationCode`/`LocationName`/
+`ReorderThreshold` are now snapshotted onto the event itself and
+re-snapshotted on every subsequent event for the same item — a Warehouse-
+side rename eventually catches up rather than freezing whatever the
+first-ever event happened to say. `StockAdjustmentStager` is the only
+place that changed on the Warehouse side; nothing about `StockLevel`
+itself, or how it's persisted, moved.
+
+**Two EF Core `GROUP BY` queries, and a portability gap the runtime test
+actually caught.** `GetSalesByDay()` groups `SaleRecord` by
+`CompletedAtUtc.Date`; `GetTopSellingItems(take)` groups `SaleLineRecord`
+by `ItemId`, using `MAX(Sku)`/`MAX(ItemName)` for the two dimension
+attributes rather than reaching for `g.First()` — a `GROUP BY` row has no
+inherent order to pick a "first" line from, and `MAX` over a string is a
+real, universally-translatable SQL aggregate every provider agrees on.
+The measures (`SUM(Total)`, `SUM(LineTotal)`) are where SQL Server and
+SQLite genuinely disagree: SQL Server sums a `decimal` column natively,
+but SQLite — which has no native decimal type — has no translation for
+`SUM(decimal)` at all, and the very first run of this step's own runtime
+test threw `NotSupportedException` proving it. Both queries now sum as
+`double` in SQL and cast back to `decimal` after materializing, a
+documented precision-for-portability tradeoff (ample for a reporting
+total, wrong for a ledger) rather than special-casing the SQLite
+substitute — the same query runs unmodified against the real SQL Server
+this project targets.
+
+**The Angular dashboard adds no charting library.** Consistent with this
+project's minimal-dependency habit (Ocelot instead of a heavier gateway,
+manual mapping instead of AutoMapper's runtime cost until B2 proved it
+justified), `/reports` is built from an inline SVG bar chart and a plain
+HTML/CSS bar list rather than pulling in a chart package for three fairly
+simple visualizations. The two chart forms were picked for what each
+axis actually is: sales-by-day is a chronological x-axis, where SVG's
+precise coordinate math earns its keep (bars are drawn as rounded-top
+paths, not a plain `rect` with `rx` — an SVG rect rounds all four
+corners, and the mark spec calls for square at the baseline, rounded only
+at the data-end); top-selling is a ranked list of named items, where
+ordinary HTML/CSS handles text truncation and layout far more simply than
+SVG `<text>` would. Both stay single-series (categorical slot 1 blue,
+`#2a78d6`) and skip a legend box on purpose — a legend restates what the
+card title already says for one series. Hover is part of the deliverable
+rather than an afterthought: each bar/row lifts (a brightness bump, never
+a border — an outline is ink that isn't data) and the sales-by-day chart
+shows a value+date tooltip, all reachable on keyboard focus the same as
+on hover, not hover-only.
+
+**Low stock's status color never carries meaning alone.** Every row
+`GetLowStock` returns is already at-or-below its own threshold by
+definition, so the table adds one more split on top: zero on hand
+(`critical`, red `#d03b3b`) versus merely below threshold (`warning`,
+amber). Both always ship with an icon *and* a text label ("Out of stock"
+/ "Low stock") next to the colored badge — never the color by itself —
+per the same status-palette rule the reference palette documents (three
+of its four status steps are sub-3:1 contrast on a light surface by
+design; the icon+label pairing is what makes that acceptable, not
+optional polish).
+
+**Concepts introduced:**
+- **Cross-service event enrichment for a consumer's own future need** —
+  `StockLevelChanged` grew fields Warehouse's own domain has no use for,
+  purely because Reporting (a different service, with no other way to
+  get them) needed them to render a report. See above.
+- **SQL provider portability for decimal aggregates** — `SUM` over
+  `decimal` has no SQLite translation; sum as `double`, cast back after
+  materializing. A tradeoff worth naming, not a workaround to hide.
+- **`MAX()` as the correct way to pick a stable dimension attribute out of
+  a `GROUP BY`** when there's no real "first" row to reach for.
+- **A hand-rolled chart built to a written methodology (mark specs, a
+  validated color assignment, a hover layer that's part of the
+  deliverable) instead of either an ad hoc div-with-a-width-percentage or
+  a new dependency.** The three visualizations here don't need a charting
+  library; they do need the same care one would bring to using one.
+
+**A real gap flagged, carried over and now user-visible:** D1 already
+named that `ReceiveStockCommand` doesn't go through `StockAdjustmentStager`
+and so never emits `StockLevelChanged` — at the time that only meant
+Reporting's read model could go briefly stale. In D2 it's no longer just
+an internal staleness detail: an item received via purchase order will
+keep showing up in the low-stock table (or keep reporting a wrong
+`QuantityOnHand`) until an `AdjustStockCommand` or a sale next touches
+that same `(ItemId, LocationId)`, because nothing tells Reporting the
+receipt happened. The fix is the same one D1 already named — route stock
+receiving through the same event path stock adjustment uses — and it's
+still not done here; naming it again, now against a report a real user
+would actually look at, is more honest than letting it quietly disappear
+between steps.
+
+**Verified with an 11-check runtime test (three SQLite databases in one
+process — Warehouse and Reporting, same discipline as D1) plus a 9-check
+Playwright pass against the built Angular app:** the backend test proved
+the enriched event payload actually carries `Sku`/`ItemName`/
+`LocationCode`/`ReorderThreshold` (not just ids), that the low-stock
+report both enters *and exits* correctly across an upsert (not a second
+row), that `GetSalesByDay` groups two sales landing on two different
+calendar days into two rows rather than one, and that `GetTopSellingItems`
+sums quantity and revenue correctly across multiple sales of the same
+item, orders by revenue rather than quantity (a single 100.00 sale
+outranks five 4.00 units totaling 20.00), and respects `Take`. This is
+also the run where the SQLite `SUM(decimal)` gap above was caught, before
+it could reach the frontend. The Playwright pass (mocked gateway routes, a token seeded into
+`localStorage`, the built app served and driven in a real Chromium)
+confirmed the dashboard renders the right bar/row/table counts, orders
+top-selling by revenue, shows the critical/warning split correctly, lifts
+and tooltips a bar on hover, reloads top-selling when the take-selector
+changes, and raises no unexpected console errors.
+
+**Run it locally (requires the gateway + Identity/Warehouse/POS/Reporting
+APIs running, per D1):**
+```bash
+cd client
+npm start   # ng serve — http://localhost:4200
+# → sign in, then /reports
+```

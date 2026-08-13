@@ -15,8 +15,19 @@ namespace Reporting.Domain.Entities
     public class StockLevelRecord : EntityBase
     {
         public int ItemId { get; set; }
+        public string Sku { get; set; } = null!;
+        public string ItemName { get; set; } = null!;
         public int LocationId { get; set; }
+        public string LocationCode { get; set; } = null!;
+        public string LocationName { get; set; } = null!;
         public int QuantityOnHand { get; set; }
+
+        // Denormalized from Warehouse's own StockLevel.ReorderThreshold at
+        // the moment of the LATEST event — D2's low-stock report filters
+        // on this directly rather than asking Warehouse "is this below
+        // threshold," since Reporting is meant to answer that from its
+        // own read model alone.
+        public int ReorderThreshold { get; set; }
         public DateTime AsOfUtc { get; set; }
     }
 }
