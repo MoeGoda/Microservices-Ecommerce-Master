@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Warehouse.Application;
 using Warehouse.Infrastructure;
+using Warehouse.Infrastructure.BackgroundServices;
 using Warehouse.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,11 +15,18 @@ builder.Services.AddCommonExceptionHandling();
 
 // Same shared extension Identity.API and Gateway.Ocelot call, with the
 // same JwtSettings:Secret/Issuer/Audience — a token minted by Identity and
-// accepted at the gateway is accepted here identically. Warehouse never
-// issues tokens, only validates them, which is why Warehouse.Infrastructure
-// (unlike Identity.Infrastructure) has no reference to Common.Security at
-// all — only this API layer needs it.
+// accepted at the gateway is accepted here identically. Warehouse still
+// never ISSUES tokens to end users, only validates them — but D1 gave
+// Warehouse.Infrastructure its own reason to reference Common.Security
+// too now (ServiceAuthHandler, minting a "warehouse-service" token to
+// call Reporting.API), the same dual-use POS.Infrastructure already had
+// since C2/C3.
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// The outbox dispatcher (C3's pattern, generalized in D1) gets its host
+// the moment this class exists — unlike POS's own C3 outbox, which had
+// to wait for POS.API to exist at all, Warehouse.API is already here.
+builder.Services.AddHostedService<OutboxBackgroundService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

@@ -1,6 +1,9 @@
+using System.Text.Json;
 using Common.Exceptions;
+using Warehouse.Application.Contracts.Infrastructure;
 using Warehouse.Application.Contracts.Persistence;
 using Warehouse.Application.Exceptions;
+using Warehouse.Application.Features.Outbox;
 using Warehouse.Domain.Entities;
 
 namespace Warehouse.Application.Features.Stock
@@ -19,23 +22,36 @@ namespace Warehouse.Application.Features.Stock
     // saved. No hand-rolled compensating rollback needed for that case —
     // it's one database, so a normal transaction boundary (deferring
     // SaveChanges) does the job a saga would otherwise have to do by hand.
+    //
+    // D1 adds a StockLevelChanged outbox event here too, which means both
+    // of this method's callers (AdjustStockCommand, ApplySaleCommand) now
+    // emit it automatically — but ReceiveStockCommandHandler does NOT,
+    // since it never calls Stage() (it needs unit conversion first,
+    // ConvertToBaseUnit, that Stage() doesn't do). A real deployment would
+    // want stock received via a PO to show up in Reporting too; that gap
+    // is flagged here rather than closed, the same "narrow the fix to
+    // what's actually wired up, name what isn't" discipline this codebase
+    // has followed elsewhere.
     public class StockAdjustmentStager
     {
         private readonly IItemRepository _itemRepository;
         private readonly ILocationRepository _locationRepository;
         private readonly IStockLevelRepository _stockLevelRepository;
         private readonly IStockTransactionRepository _stockTransactionRepository;
+        private readonly IOutboxRepository _outboxRepository;
 
         public StockAdjustmentStager(
             IItemRepository itemRepository,
             ILocationRepository locationRepository,
             IStockLevelRepository stockLevelRepository,
-            IStockTransactionRepository stockTransactionRepository)
+            IStockTransactionRepository stockTransactionRepository,
+            IOutboxRepository outboxRepository)
         {
             _itemRepository = itemRepository;
             _locationRepository = locationRepository;
             _stockLevelRepository = stockLevelRepository;
             _stockTransactionRepository = stockTransactionRepository;
+            _outboxRepository = outboxRepository;
         }
 
         public async Task<StagedAdjustment> Stage(int itemId, int locationId, int quantityChange, StockTransactionReason reason, string? reference)
@@ -67,6 +83,34 @@ namespace Warehouse.Application.Features.Stock
                 Reference = reference,
             };
             await _stockTransactionRepository.AddAsync(transaction);
+
+            // Staged in the SAME unsaved unit of work as the StockLevel/
+            // StockTransaction change above (D1) — every caller of Stage()
+            // gets this for free, the whole point of extracting it here
+            // rather than duplicating it in AdjustStockCommandHandler and
+            // ApplySaleCommandHandler separately. It also means the same
+            // atomicity guarantee this method's own comment already
+            // describes covers the event too: if a LATER line in a
+            // multi-line ApplySaleCommand fails and the caller never
+            // reaches SaveChangesAsync, this staged (but unsaved) event
+            // for an EARLIER line is discarded right along with its
+            // StockLevel/StockTransaction — Reporting never hears about a
+            // stock change that itself never actually committed.
+            var outboxMessage = await _outboxRepository.AddMessageAsync(new OutboxMessage
+            {
+                EventType = OutboxEventTypes.StockLevelChanged,
+                PayloadJson = JsonSerializer.Serialize(new StockLevelChangedMessage
+                {
+                    ItemId = item.Id,
+                    LocationId = location.Id,
+                    QuantityOnHand = stockLevel.QuantityOnHand,
+                }),
+            });
+            await _outboxRepository.AddDeliveryAsync(new OutboxDelivery
+            {
+                OutboxMessage = outboxMessage,
+                ConsumerName = OutboxConsumers.Reporting,
+            });
 
             return new StagedAdjustment { StockLevel = stockLevel, Item = item };
         }

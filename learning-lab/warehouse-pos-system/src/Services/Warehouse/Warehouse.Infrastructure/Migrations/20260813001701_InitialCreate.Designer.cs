@@ -12,7 +12,7 @@ using Warehouse.Infrastructure.Persistence;
 namespace Warehouse.Infrastructure.Migrations
 {
     [DbContext(typeof(WarehouseContext))]
-    [Migration("20260812201214_InitialCreate")]
+    [Migration("20260813001701_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -268,6 +268,71 @@ namespace Warehouse.Infrastructure.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Name = "Aisle B, Shelf 1"
                         });
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.OutboxDelivery", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ConsumerName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("OutboxMessageId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OutboxMessageId", "ConsumerName")
+                        .IsUnique();
+
+                    b.ToTable("OutboxDeliveries");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.OutboxMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("OutboxMessages");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.ProcessedSaleEvent", b =>
@@ -530,6 +595,17 @@ namespace Warehouse.Infrastructure.Migrations
                     b.Navigation("Item");
 
                     b.Navigation("UnitOfMeasure");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.OutboxDelivery", b =>
+                {
+                    b.HasOne("Warehouse.Domain.Entities.OutboxMessage", "OutboxMessage")
+                        .WithMany()
+                        .HasForeignKey("OutboxMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OutboxMessage");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.Promotion", b =>

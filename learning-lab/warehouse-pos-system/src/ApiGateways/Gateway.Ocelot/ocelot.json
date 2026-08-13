@@ -197,6 +197,23 @@
       "UpstreamPathTemplate": "/Pos/Sales/{id}/cancel",
       "UpstreamHttpMethod": [ "POST" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "ReadModelsController only — EventsController (Reporting.API's ingestion endpoints) is service-to-service, called directly by POS/Warehouse's own outbox dispatchers, and deliberately has no gateway route at all, the same reasoning Warehouse's own StockEventsController (C3) was never routed either.",
+      "DownstreamPathTemplate": "/api/v1/ReadModels/sales",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/sales",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/ReadModels/stock-levels",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/stock-levels",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     }
   ],
   "GlobalConfiguration": {

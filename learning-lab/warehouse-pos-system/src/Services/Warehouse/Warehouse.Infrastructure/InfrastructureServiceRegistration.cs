@@ -1,7 +1,11 @@
+using Common.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Warehouse.Application.Contracts.Infrastructure;
 using Warehouse.Application.Contracts.Persistence;
+using Warehouse.Infrastructure.Http;
 using Warehouse.Infrastructure.Persistence;
 using Warehouse.Infrastructure.Repositories;
 
@@ -25,7 +29,24 @@ namespace Warehouse.Infrastructure
             services.AddScoped<IProcessedSaleEventRepository, ProcessedSaleEventRepository>();
             services.AddScoped<IItemPriceHistoryRepository, ItemPriceHistoryRepository>();
             services.AddScoped<IPromotionRepository, PromotionRepository>();
+            services.AddScoped<IOutboxRepository, OutboxRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // Warehouse's first outbound service-to-service call (D1) —
+            // same JwtSettings section every service binds, same
+            // ServiceAuthHandler idiom POS.Infrastructure already uses
+            // for its own outbound calls (C2/C3).
+            services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
+            services.Configure<ReportingApiOptions>(configuration.GetSection("ReportingApi"));
+
+            services.AddTransient<ServiceAuthHandler>();
+            services.AddHttpClient<ReportingEventPublisher>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<ReportingApiOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl);
+            })
+            .AddHttpMessageHandler<ServiceAuthHandler>();
+            services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<ReportingEventPublisher>());
 
             return services;
         }

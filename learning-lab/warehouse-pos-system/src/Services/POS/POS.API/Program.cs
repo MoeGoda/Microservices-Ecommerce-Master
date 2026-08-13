@@ -20,12 +20,12 @@ builder.Services.AddCommonExceptionHandling();
 // Warehouse.API.
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
-// The actual payoff of POS.API existing at all: SaleCompletedOutboxDispatcher
-// (C3) was written and exercised directly by that step's own runtime test,
-// but had nowhere to run on its own poll loop until there was a host to
-// register it in — WarehouseContextFactory (B1) sat in the exact same spot
-// before Warehouse.API showed up.
-builder.Services.AddHostedService<SaleCompletedOutboxBackgroundService>();
+// The actual payoff of POS.API existing at all: OutboxDispatcher (C3,
+// generalized in D1) was written and exercised directly by C3's own
+// runtime test, but had nowhere to run on its own poll loop until there
+// was a host to register it in — WarehouseContextFactory (B1) sat in the
+// exact same spot before Warehouse.API showed up.
+builder.Services.AddHostedService<OutboxBackgroundService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

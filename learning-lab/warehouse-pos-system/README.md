@@ -45,7 +45,7 @@ a distributed transaction.
 - [x] **C5 — Selling price history + promotions (POS pricing rules)**
 
 **Phase D — Reporting**
-- [ ] D1 — Event-driven read models
+- [x] **D1 — Event-driven read models**
 - [ ] D2 — Reports + Angular dashboards
 
 **Phase E — Notifications / Mailing**
@@ -1409,3 +1409,143 @@ renders the change; creating a promotion calls the backend and the
 register, both the cart and the completed receipt render the original
 price struck through next to the discounted one. No unexpected console
 errors.
+
+## D1 — Event-driven read models
+
+**What it does:** a fourth service, Reporting, that builds its own
+denormalized copy of "what happened" — completed sales and current stock
+levels — by consuming events POS and Warehouse publish, rather than
+querying either service's database directly. Nothing in D1 aggregates or
+displays that data yet (no "sales by day," no dashboard) — that's D2's
+job, on top of the read models this step gets right.
+
+```
+POS Checkout                          Warehouse StockAdjustmentStager
+  → OutboxMessage(SaleCompleted)        → OutboxMessage(StockLevelChanged)
+  → OutboxDelivery(Warehouse)           → OutboxDelivery(Reporting)
+  → OutboxDelivery(Reporting)                    ↓
+         ↓                              Reporting.API /Events/stock-level-changed
+POS OutboxDispatcher                          ↓
+  → WarehouseEventPublisher (C3,      IngestStockLevelChangedCommand
+     unchanged) → Warehouse.API         → upsert StockLevelRecord(ItemId, LocationId)
+  → ReportingEventPublisher (new)
+     → Reporting.API /Events/sale-completed
+              ↓
+     IngestSaleCompletedCommand
+       → SaleRecord (once per SaleId)
+       → SaleLineRecord × N
+```
+
+**The outbox generalizes from "one event, one consumer" to "one event,
+many deliveries" — exactly the next step C3's own README named.** Before
+D1, `SaleCompletedOutboxEntry` was one row per sale, delivered to exactly
+one place (Warehouse). Reporting needing the SAME event broke that
+1:1 assumption, so POS's outbox split into `OutboxMessage` (the event
+itself — `EventType`/`PayloadJson`, written once) and `OutboxDelivery`
+(one row per `(message, consumer)` pair, each with its own
+Pending/Sent/Failed status and retry count). `CheckoutCommandHandler` now
+writes one message and fans it out to `["Warehouse", "Reporting"]` in the
+same transaction that completes the sale; `OutboxDispatcher` resolves
+each delivery's `IEventPublisher` by `ConsumerName` and retries each one
+independently. The payoff shows up directly in the one piece of legacy
+behavior that couldn't fully generalize: `Sale.StockSyncStatus` only
+means "did Warehouse confirm the stock decrement" — Reporting failing to
+ingest a sale (for whatever reason) leaves that status completely alone,
+because the two deliveries now genuinely don't share fate. Warehouse got
+the identical message/delivery shape for its own first-ever outbox
+(`StockLevelChanged`, one consumer today — Reporting) rather than
+inventing something simpler for a single consumer, on the same
+reasoning: the shape is already right the moment a second Warehouse-side
+consumer shows up (E1's notifications, most likely).
+
+**Warehouse making its first OUTBOUND service call ever is a bigger deal
+than it looks.** Every previous Warehouse interaction was inbound —
+`StockEventsController` (C3) receiving POS's calls, `ItemsController`
+(B3) receiving the admin panel's. `ReportingEventPublisher` is the first
+time Warehouse calls out to anything, which is why
+`Warehouse.Infrastructure` needed a `ServiceAuthHandler` and a
+`Common.Security` reference for the first time too — the exact
+dual-use POS.Infrastructure already had since C2 (mint a token to call
+someone else, validate tokens presented to you, two different jobs, same
+package). And because Warehouse.API already exists (unlike POS's own C3
+outbox, which had to wait for POS.API to exist before its background
+service could be hosted anywhere), `OutboxBackgroundService` gets
+registered via `AddHostedService` in the very same step that wrote it —
+no deferred wiring this time.
+
+**The event's payload is forwarded to Reporting verbatim, not
+re-serialized.** `ReportingEventPublisher` (both POS's and Warehouse's)
+posts `OutboxMessage.PayloadJson` as raw `StringContent`, because
+`SaleCompletedMessage`/`StockLevelChangedMessage`'s own property names
+already match `IngestSaleCompletedCommand`/`IngestStockLevelChangedCommand`
+exactly — there's no shape translation to do, unlike
+`WarehouseEventPublisher`, which DOES re-map (it only wants `ItemId`/
+`Quantity` per line, ignoring the richer fields Reporting needs). ASP.NET
+Core's default model binding is case-insensitive, which is what makes
+forwarding a raw PascalCase-serialized string straight into a controller
+action safe — but this step's own runtime test checks the ACTUAL
+resulting `SaleRecord`/`StockLevelRecord` values over real HTTP rather
+than assuming that, precisely because a casing mismatch across a JSON
+boundary silently produced wrong data once already (C3's own bug).
+
+**Two different idempotency strategies, because the two events are
+different shapes of fact.** `SaleRecord` is idempotent via a dedup
+check — `ExistsForSale(saleId)` before inserting, the same
+existence-check idiom `ApplySaleCommand`'s `ProcessedSaleEvent` (C3)
+used, because a sale is an immutable, one-time fact: applying it twice
+would double-count reporting totals. `StockLevelRecord` is idempotent
+via upsert instead — no dedup check at all, because a stock level is a
+continuously-changing current snapshot (like `StockLevel` itself,
+B1): applying the "same" `StockLevelChanged` event twice just writes the
+same `QuantityOnHand` twice, which is harmless by construction. Neither
+needed a generic inbox table the way a naive "idempotent receiver"
+pattern might suggest — the right dedup strategy depends on what kind of
+fact the event actually represents.
+
+**Concepts introduced:**
+- **Outbox message/delivery split** — one event, independently-tracked
+  deliveries per consumer. See above.
+- **`Reporting` service** — the fourth ASP.NET Core host, and the first
+  one whose entire job is projections built from other services' events
+  rather than owning any transactional data of its own.
+- **`ReadModelsController` named apart from a future `ReportsController`**
+  — `GET /Reporting/sales` and `/Reporting/stock-levels` are raw dumps of
+  what's been ingested, proving the read model is correct and queryable;
+  they are deliberately NOT the aggregated sales-by-day/top-selling/
+  low-stock reports D2 will build. Routed through the gateway (unlike
+  `EventsController`, which is service-to-service and isn't), since a
+  future Angular dashboard will eventually call something at this same
+  layer.
+- **Upsert-based idempotency** as a second, equally valid alternative to
+  dedup-based idempotency (C3) — see above.
+
+**A real gap flagged rather than closed:** `ReceiveStockCommand` doesn't
+go through `StockAdjustmentStager` (it needs unit conversion first), so
+receiving stock via a purchase order does NOT emit a `StockLevelChanged`
+event yet — only `AdjustStockCommand` and `ApplySaleCommand` do. A real
+deployment would want received stock to show up in Reporting too;
+narrowing the fix to what's actually wired up and naming what isn't
+follows the same discipline as C5's own "no promotion-listing query yet."
+
+**Verified with a 19-check runtime test spanning three separate SQLite
+databases, one per service — Reporting hosted via a real ASP.NET Core
+pipeline (`TestServer`, the same approach C4 established for POS.API),
+Warehouse and POS as direct DI containers, all wired together with the
+ACTUAL production `IEventPublisher` implementations pointed at
+Reporting's real `HttpClient`, not stand-ins:** `AdjustStockCommand`
+stages exactly one Pending delivery for Reporting, dispatching it lands
+a real `StockLevelRecord` in Reporting's database with the correct
+post-adjustment quantity; a multi-line `ApplySaleCommand` where one line
+is short on stock stages NO outbox message at all (not even for the
+valid line) — the event is exactly as atomic as the stock change it
+describes; a successful multi-line sale emits one event per line, and
+dispatching it upserts the SAME `StockLevelRecord` row rather than
+creating a second one. End to end on the POS side — a real `Checkout`
+fans out to exactly two deliveries, dispatching both marks them Sent,
+`Sale.StockSyncStatus` reflects only the Warehouse delivery's outcome,
+and Reporting's real ingestion endpoint — reached over actual HTTP, not
+an in-process shortcut — produces a `SaleRecord`/`SaleLineRecord` with
+the real resolved Sku/quantity/line total. And a repeated delivery of the
+same sale (simulating a dispatcher retry after an already-successful
+delivery) inserts no second `SaleRecord`, confirming the dedup check
+actually works, not just the upsert.

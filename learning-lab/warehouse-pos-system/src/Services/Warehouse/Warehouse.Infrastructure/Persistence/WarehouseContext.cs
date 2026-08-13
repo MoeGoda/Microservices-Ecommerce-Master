@@ -20,6 +20,8 @@ namespace Warehouse.Infrastructure.Persistence
         public DbSet<ProcessedSaleEvent> ProcessedSaleEvents => Set<ProcessedSaleEvent>();
         public DbSet<ItemPriceHistory> ItemPriceHistories => Set<ItemPriceHistory>();
         public DbSet<Promotion> Promotions => Set<Promotion>();
+        public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+        public DbSet<OutboxDelivery> OutboxDeliveries => Set<OutboxDelivery>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -187,6 +189,25 @@ namespace Warehouse.Infrastructure.Persistence
                        .WithMany()
                        .HasForeignKey(p => p.ItemId)
                        .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<OutboxMessage>(builder =>
+            {
+                builder.Property(m => m.EventType).HasMaxLength(100);
+                builder.Property(m => m.PayloadJson).IsRequired();
+            });
+
+            modelBuilder.Entity<OutboxDelivery>(builder =>
+            {
+                builder.Property(d => d.ConsumerName).HasMaxLength(100);
+                builder.Property(d => d.LastError).HasMaxLength(1000);
+
+                builder.HasOne(d => d.OutboxMessage)
+                       .WithMany()
+                       .HasForeignKey(d => d.OutboxMessageId)
+                       .OnDelete(DeleteBehavior.Cascade);
+
+                builder.HasIndex(d => new { d.OutboxMessageId, d.ConsumerName }).IsUnique();
             });
 
             // Categories, Locations, and Units of Measure are fixed

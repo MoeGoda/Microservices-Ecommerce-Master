@@ -43,6 +43,21 @@ namespace Warehouse.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "OutboxMessages",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    EventType = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    PayloadJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OutboxMessages", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ProcessedSaleEvents",
                 columns: table => new
                 {
@@ -69,6 +84,31 @@ namespace Warehouse.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_UnitsOfMeasure", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OutboxDeliveries",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    OutboxMessageId = table.Column<int>(type: "int", nullable: false),
+                    ConsumerName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    Attempts = table.Column<int>(type: "int", nullable: false),
+                    LastError = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    ProcessedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OutboxDeliveries", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OutboxDeliveries_OutboxMessages_OutboxMessageId",
+                        column: x => x.OutboxMessageId,
+                        principalTable: "OutboxMessages",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -368,6 +408,12 @@ namespace Warehouse.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_OutboxDeliveries_OutboxMessageId_ConsumerName",
+                table: "OutboxDeliveries",
+                columns: new[] { "OutboxMessageId", "ConsumerName" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ProcessedSaleEvents_SaleId",
                 table: "ProcessedSaleEvents",
                 column: "SaleId",
@@ -424,6 +470,9 @@ namespace Warehouse.Infrastructure.Migrations
                 name: "ItemUnits");
 
             migrationBuilder.DropTable(
+                name: "OutboxDeliveries");
+
+            migrationBuilder.DropTable(
                 name: "ProcessedSaleEvents");
 
             migrationBuilder.DropTable(
@@ -434,6 +483,9 @@ namespace Warehouse.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "StockTransactions");
+
+            migrationBuilder.DropTable(
+                name: "OutboxMessages");
 
             migrationBuilder.DropTable(
                 name: "Items");

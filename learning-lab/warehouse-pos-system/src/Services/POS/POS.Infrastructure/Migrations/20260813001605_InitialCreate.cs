@@ -12,23 +12,18 @@ namespace POS.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "SaleCompletedOutboxEntries",
+                name: "OutboxMessages",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    SaleId = table.Column<int>(type: "int", nullable: false),
-                    LocationId = table.Column<int>(type: "int", nullable: false),
-                    LinesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    Attempts = table.Column<int>(type: "int", nullable: false),
-                    LastError = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
-                    ProcessedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    EventType = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    PayloadJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_SaleCompletedOutboxEntries", x => x.Id);
+                    table.PrimaryKey("PK_OutboxMessages", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -48,6 +43,31 @@ namespace POS.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Sales", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OutboxDeliveries",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    OutboxMessageId = table.Column<int>(type: "int", nullable: false),
+                    ConsumerName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    Attempts = table.Column<int>(type: "int", nullable: false),
+                    LastError = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    ProcessedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OutboxDeliveries", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OutboxDeliveries_OutboxMessages_OutboxMessageId",
+                        column: x => x.OutboxMessageId,
+                        principalTable: "OutboxMessages",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -79,9 +99,10 @@ namespace POS.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_SaleCompletedOutboxEntries_SaleId",
-                table: "SaleCompletedOutboxEntries",
-                column: "SaleId");
+                name: "IX_OutboxDeliveries_OutboxMessageId_ConsumerName",
+                table: "OutboxDeliveries",
+                columns: new[] { "OutboxMessageId", "ConsumerName" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_SaleLines_SaleId",
@@ -93,10 +114,13 @@ namespace POS.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "SaleCompletedOutboxEntries");
+                name: "OutboxDeliveries");
 
             migrationBuilder.DropTable(
                 name: "SaleLines");
+
+            migrationBuilder.DropTable(
+                name: "OutboxMessages");
 
             migrationBuilder.DropTable(
                 name: "Sales");
