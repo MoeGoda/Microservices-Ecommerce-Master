@@ -8,6 +8,7 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { AuthService } from './core/auth/auth.service';
 import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
 import { NotificationDto } from './shared/models/notification.models';
+import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES } from './shared/models/roles';
 
 @Component({
   selector: 'app-root',
@@ -36,6 +37,26 @@ export class App {
         this.notificationFeed.disconnect();
       }
     });
+  }
+
+  // Mirrors roleGuard's own check — the toolbar shouldn't even offer a
+  // link the user's role can't actually use, same "don't show a door
+  // that leads to a 403" reasoning as the route guard itself.
+  canSeeAdmin(): boolean {
+    return this.hasAnyRole(ADMIN_ROLES);
+  }
+
+  canSeePos(): boolean {
+    return this.hasAnyRole(POS_ROLES);
+  }
+
+  canSeeReports(): boolean {
+    return this.hasAnyRole(REPORTS_ROLES);
+  }
+
+  private hasAnyRole(roles: readonly string[]): boolean {
+    const user = this.authService.currentUser();
+    return !!user && roles.includes(user.role);
   }
 
   logout(): void {

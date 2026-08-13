@@ -1,9 +1,15 @@
 <mat-toolbar color="primary">
   <span>Warehouse &amp; POS</span>
   @if (authService.currentUser()) {
-    <a mat-button routerLink="/admin" routerLinkActive="active-nav-link">Admin</a>
-    <a mat-button routerLink="/pos" routerLinkActive="active-nav-link">POS</a>
-    <a mat-button routerLink="/reports" routerLinkActive="active-nav-link">Reports</a>
+    @if (canSeeAdmin()) {
+      <a mat-button routerLink="/admin" routerLinkActive="active-nav-link">Admin</a>
+    }
+    @if (canSeePos()) {
+      <a mat-button routerLink="/pos" routerLinkActive="active-nav-link">POS</a>
+    }
+    @if (canSeeReports()) {
+      <a mat-button routerLink="/reports" routerLinkActive="active-nav-link">Reports</a>
+    }
   }
   <span class="spacer"></span>
   @if (authService.currentUser(); as user) {

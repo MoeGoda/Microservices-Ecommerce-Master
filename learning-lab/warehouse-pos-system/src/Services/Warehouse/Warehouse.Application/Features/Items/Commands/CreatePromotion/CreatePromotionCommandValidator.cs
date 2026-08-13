@@ -19,6 +19,20 @@ namespace Warehouse.Application.Features.Items.Commands.CreatePromotion
                 .When(c => c.DiscountType == DiscountType.PercentageOff)
                 .WithMessage("A percentage discount can't exceed 100%.");
 
+            // F2 — FixedAmountOff had no upper bound at all: a flat
+            // discount bigger than any real item's price is already
+            // harmless in practice (EffectivePriceResolver floors the
+            // discounted price at zero rather than letting a sale line go
+            // negative), but this validator can't see the item's actual
+            // price to reject it more precisely — it has no DB access,
+            // and shouldn't. This cap rejects an obvious data-entry
+            // mistake (or overflow-style input) at the door instead of
+            // relying solely on the apply-time floor to make it harmless.
+            RuleFor(c => c.DiscountValue)
+                .LessThanOrEqualTo(1_000_000)
+                .When(c => c.DiscountType == DiscountType.FixedAmountOff)
+                .WithMessage("A fixed discount amount is unreasonably large.");
+
             RuleFor(c => c.EndsAtUtc).GreaterThan(c => c.StartsAtUtc);
         }
     }

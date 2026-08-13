@@ -56,25 +56,45 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Le
 // client understood it needed to send that header at all. A global
 // ASP.NET Core RateLimiter, partitioned by the caller's IP, is the correct
 // mechanism here — an attacker can't opt out of having an IP address.
+//
+// F2 — the same throttle now also covers /register: it's the ONLY other
+// anonymous, abuse-prone POST route in the system (every non-anonymous
+// route requires a token an attacker doesn't have yet), and it was
+// completely unthrottled before this — an attacker could otherwise mass-
+// create accounts as fast as the network allowed. Partitioned by
+// "route:ip", not just "ip", so hammering /login doesn't also burn an
+// attacker's (or a legitimate user's) separate /register budget — the two
+// anonymous endpoints are rate-limited independently of each other.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
     {
-        var isLoginRoute = HttpMethods.IsPost(httpContext.Request.Method)
-            && httpContext.Request.Path.Equals("/Identity/Auth/login", StringComparison.OrdinalIgnoreCase);
+        string? anonymousAuthRoute = null;
+        if (HttpMethods.IsPost(httpContext.Request.Method))
+        {
+            if (httpContext.Request.Path.Equals("/Identity/Auth/login", StringComparison.OrdinalIgnoreCase))
+            {
+                anonymousAuthRoute = "login";
+            }
+            else if (httpContext.Request.Path.Equals("/Identity/Auth/register", StringComparison.OrdinalIgnoreCase))
+            {
+                anonymousAuthRoute = "register";
+            }
+        }
 
         // Every other route gets an effectively-unlimited partition — this
-        // limiter exists for the login route specifically, not as a
-        // general-purpose throttle on the whole gateway.
-        if (!isLoginRoute)
+        // limiter exists for these two anonymous routes specifically, not
+        // as a general-purpose throttle on the whole gateway.
+        if (anonymousAuthRoute is null)
         {
             return RateLimitPartition.GetNoLimiter("unrestricted");
         }
 
         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        var partitionKey = $"{anonymousAuthRoute}:{ip}";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = 5,
             Window = TimeSpan.FromSeconds(30)
@@ -92,6 +112,31 @@ var app = builder.Build();
 // anything downstream (including Ocelot's own proxied response) writes to
 // it, or there's nothing left for it to compress by the time it runs.
 app.UseResponseCompression();
+
+// F2 — three cheap, always-safe response headers, set once here rather
+// than in five separate downstream Program.cs files, for the identical
+// "one gateway, every browser-facing response passes through it" reason
+// F1's compression lives here. OnStarting (not a plain header assignment)
+// because Ocelot's own proxied response can start writing before this
+// middleware's own code after `await next()` would otherwise run;
+// OnStarting's callback fires right before the FIRST byte goes out,
+// whichever layer is about to write it. No HSTS/CSP here — HSTS needs
+// HTTPS actually enforced first (not true for local `dotnet run`), and a
+// meaningful CSP needs to know every script/style/connect source the
+// Angular app legitimately uses, which is a real per-app policy decision
+// this project hasn't made yet, not a safe default like the three below.
+app.Use((context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        return Task.CompletedTask;
+    });
+
+    return next();
+});
 
 app.UseCommonExceptionHandling();
 

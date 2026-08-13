@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using Common.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,10 +17,15 @@ namespace POS.API.Controllers
 {
     // Same idiom as Warehouse.API's controllers: every action needs a
     // caller who already holds a token, so [Authorize] sits once at the
-    // controller level.
+    // controller level. F2 adds a Roles restriction at the SAME level —
+    // safe here, unlike Warehouse's ItemsController/StockController,
+    // because nothing calls INTO SalesController service-to-service; POS
+    // only ever calls OUT (to Warehouse/Reporting/Notifications). Every
+    // action, including the read-only GetById, requires one of these
+    // roles — WarehouseStaff has no business running a register.
     [ApiController]
     [Route("api/v1/[controller]")]
-    [Authorize]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.Manager},{RoleNames.Cashier}")]
     public class SalesController : ControllerBase
     {
         private readonly IMediator _mediator;

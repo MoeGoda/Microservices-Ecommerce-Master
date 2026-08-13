@@ -54,7 +54,7 @@ a distributed transaction.
 
 **Phase F — Hardening**
 - [x] **F1 — Performance (Redis caching, pagination, compression, health checks)**
-- [ ] F2 — Security hardening (role policies, rate limiting)
+- [x] **F2 — Security hardening (role-based policies, gateway rate limiting, input validation review)**
 - [ ] F3 — Localization (English/Arabic, RTL)
 - [ ] F4 — Full docker-compose stack + end-to-end walkthrough
 
@@ -2343,4 +2343,199 @@ curl -sD - -o /dev/null -H "Accept-Encoding: gzip" http://localhost:5058/Warehou
 # either paged endpoint directly:
 curl http://localhost:5058/Warehouse/Items?page=2&pageSize=10
 curl http://localhost:5278/Reporting/ReadModels/sales?page=1&pageSize=20
+```
+
+## F2 — Security hardening (role-based policies, gateway rate limiting, input validation review)
+
+**What it does:** closes a real, self-flagged privilege-escalation hole in
+registration; adds role-based `[Authorize(Roles = ...)]` restrictions to
+every mutation endpoint (Warehouse catalog/stock, POS sales) and every
+report endpoint, without touching a single service-to-service call path;
+extends the gateway's existing rate limiter to the one other anonymous,
+abuse-prone route; adds three safe-default security response headers; and
+fixes a handful of concrete input-validation gaps a targeted review turned
+up.
+
+**The standout finding: anyone, with no token at all, could register as
+Admin.** `RegisterCommand`'s own comment (A1) already named
+this explicitly — "Only an existing Admin should be able to create
+Admin/Manager/WarehouseStaff accounts — that authorization rule is
+enforced at the controller (F2), not here" — and until this step, nothing
+actually enforced it. `AuthController.Register` now overwrites
+`command.Role` to `Cashier` unconditionally, no matter what the request
+body claims, the identical "context is authoritative over the body" idiom
+`SalesController.Start` already uses for `CashierUserId`. The other half
+of the fix is a NEW endpoint, `POST /Auth/create-user`
+(`[Authorize(Roles = Admin)]`), which reuses `RegisterCommand` as-is and
+trusts its submitted `Role` — safe specifically because only a caller who
+already holds a verified Admin token can reach it at all. No Angular UI
+was built for it (the client never had a public registration screen to
+begin with — A4 built login only); the backend capability exists and is
+verified end-to-end, calling it a curl/Swagger operation for now is a
+named, deliberate scope cut, not an oversight.
+
+**Every OTHER `[Authorize(Roles = ...)]` addition had to answer one
+question first: does anything call this endpoint service-to-service?**
+Warehouse's `ServiceAuthHandler`/POS's own copy each mint a token with
+exactly ONE claim — `ClaimTypes.Name` — and nothing else. No `Role` claim
+at all. `[Authorize(Roles = "...")]` on an endpoint POS's own
+`WarehouseCatalogClient` (C2) or Warehouse's `StockAdjustmentStager`
+outbox events call would 403 every checkout in the system, silently,
+the moment this shipped. So the actual work here was mapping every
+controller action in Warehouse.API/POS.API/Reporting.API against "is this
+ever reached by anything other than a human's browser request through
+the gateway" BEFORE deciding where a Roles restriction is even safe to
+add:
+- **Warehouse's `ItemsController`/`StockController`** keep their
+  class-level bare `[Authorize]` and get a SECOND, per-action
+  `[Authorize(Roles = "Admin,Manager,WarehouseStaff")]` layer added only
+  to the mutation actions (`Create`, `AddBarcode`, `AddUnit`,
+  `UpdatePrice`, `CreatePromotion`, `CancelPromotion`, `Receive`,
+  `Adjust`, `Transfer`) — both `[Authorize]` attributes on the same
+  target combine (a request must satisfy ALL of them), so these actions
+  now require "signed in" AND "one of these roles." Every read action —
+  including `ResolveBarcode` and `GetByItem` (Stock), the two endpoints
+  POS's own service-to-service catalog client actually calls — is left
+  completely untouched.
+- **POS's `SalesController`** gets its Roles restriction at the
+  CONTROLLER level instead (`Admin,Manager,Cashier`, covering even the
+  read-only `GetById`) — safe here specifically because nothing calls
+  INTO `SalesController` service-to-service; POS only ever calls OUT.
+- **Reporting's `ReportsController`/`ReadModelsController`** get the same
+  controller-level treatment (`Admin,Manager`) for the identical reason —
+  `EventsController` is a SEPARATE, still-bare controller that POS's/
+  Warehouse's own outbox dispatchers actually push events to, and was
+  never touched.
+- **Notifications** gets no role restriction at all — a low-stock or
+  sale alert is for everyone regardless of role, the same "broadcast to
+  all, no per-user targeting" model E1 already established.
+
+**A new `Common.Security.RoleNames`, alongside Identity.Domain's own
+copy — not a violation of "no shared domain assemblies," a second
+instance of the exact tradeoff `Common.Pagination` already made.**
+`[Authorize(Roles = ...)]` arguments must be compile-time constants, and
+Warehouse/POS/Reporting have no reference to Identity.Domain at all (by
+design) — so a shared `const string` set living in Common.Security (which
+every service already references for `AddJwtAuthentication`) is the
+typo-proof alternative to hand-copying the literal strings `"Admin"`,
+`"Manager"`, etc. into a dozen attribute arguments across three services.
+Identity's OWN copy in `Identity.Domain.Entities.RoleNames` stays the real
+source of truth for the seeded `Role` table rows; the two are duplicated
+on purpose, the same way `EntityBase` is duplicated per service, for the
+same underlying reason.
+
+**Angular gets a second guard, mirroring the backend's role matrix
+one-for-one — a UX guard, not a security boundary, same as `authGuard`
+already was.** `roleGuard(allowedRoles)` sits alongside `authGuard` on
+`/admin`, `/pos`, and `/reports`; without it, a signed-in Cashier clicking
+"Admin" in the toolbar would land on a real page that immediately fails
+every API call with 403, instead of being redirected before that ever
+renders. The toolbar's own three nav links are now conditionally rendered
+by the identical role check (`canSeeAdmin()`/`canSeePos()`/`canSeeReports()`
+in `app.ts`) — a Cashier never even sees a door that leads to a 403.
+
+**Gateway rate limiting: the login-only limiter now also covers
+`/register`, partitioned independently.** It was the only other
+anonymous, abuse-prone POST route in the system — every other route
+needs a token an attacker doesn't have yet — and it had zero throttling
+before this. The partition key became `"route:ip"` instead of just `"ip"`,
+so hammering `/login` doesn't also burn a legitimate user's separate
+`/register` budget; the two anonymous endpoints are throttled
+independently of each other, same `PermitLimit = 5` / `Window = 30s` as
+before. Every other route stays exactly as unlimited as the rate
+limiter's own comment already said it was designed to be — this still
+isn't a general-purpose throttle.
+
+**Three response headers, set once at the gateway via `Response.OnStarting`
+— the same "one point, every browser-facing response passes through it"
+reasoning F1's compression already used.** `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` — all three are
+safe, context-free defaults. Deliberately NOT included: HSTS (meaningless
+until HTTPS is actually enforced, which local `dotnet run` doesn't do) and
+a CSP (a real one needs to know every script/style/connect-src the Angular
+app legitimately uses, which is a genuine per-app policy decision this
+project hasn't made yet — a wrong CSP is worse than none, so this is a
+named gap, not a safe default to just add).
+
+**Input validation: a handful of concrete gaps a targeted review
+surfaced, not a blanket rewrite.** `LoginCommandValidator` had no
+`MaximumLength` on `UserName`/`Password` at all (added, matching
+`RegisterCommandValidator`'s existing `UserName` cap) — this isn't
+re-checking password complexity (that's `RegisterCommandValidator`'s job,
+once, at account creation), it's rejecting an oversized request body
+before it reaches PBKDF2 hashing. `RegisterCommandValidator` gained an
+`Email` length cap and a `Password` upper bound for the same reason.
+`AddItemUnitCommandValidator.ConversionFactor` and
+`CreatePromotionCommandValidator.DiscountValue` (the `FixedAmountOff`
+case) both had a lower bound but no upper one — neither is an actual
+security hole (`EffectivePriceResolver` already floors a discounted price
+at zero, so an absurd flat discount was already harmless in practice),
+but both now reject an obvious data-entry mistake or overflow-style input
+at the validator instead of relying solely on that apply-time floor.
+
+**What's still a named gap, not solved here:** the JWT secret
+(`SharedSettings/jwt.settings.json`) and every service's SQL Server
+credentials remain plaintext strings in checked-in `appsettings.json`
+files — real secrets-manager integration (user-secrets locally, Key Vault
+or equivalent in a real deployment) is a disproportionate detour for a
+single-tenant local learning-lab and stays exactly the "F2's to actually
+confront" pattern this project already flagged for itself, still
+unconfronted. A meaningful Content-Security-Policy is the other
+deliberately-skipped item, for the reason given above.
+
+**Verified with a 20-check runtime test — four real ASP.NET Core hosts
+(Identity/Warehouse/POS/Reporting), each with REAL JWT authentication
+wired up (`AddJwtAuthentication` against an in-memory `JwtSettings`,
+tokens minted by the same `JwtTokenFactory` every service already uses)
+and REAL controllers (`AddApplicationPart`), not MediatR calls that would
+skip the ASP.NET Core authorization pipeline entirely — plus a 16-check
+Playwright pass on the Angular guard/nav-visibility changes:** the
+backend test proves a Cashier token gets a genuine 403 on Warehouse's
+`POST /Stock/adjust` and `POST /Items` while a WarehouseStaff token
+succeeds (and the stock adjustment actually applies); a WarehouseStaff
+token gets 403 on POS's `POST /Sales` while a Cashier token succeeds; a
+Cashier token gets 403 on Reporting's `GET /Reports/sales-by-day` while
+an Admin token succeeds; and — the check that matters most — a
+service-to-service token with NO Role claim at all still succeeds on
+Warehouse's `GET /Stock/{itemId}` and `GET /Items/barcodes/{barcode}` and
+on Reporting's `POST /Events/sale-completed`, proving none of this broke
+the actual inter-service call paths the whole system depends on. The
+Identity test proves an anonymous `/register` submitting `role: "Admin"`
+comes back as `Cashier` regardless, that `/create-user` rejects both no
+token (401) and a non-Admin token (403), and that a real Admin token
+succeeds and the created account gets the role it actually asked for. The
+Playwright pass confirms a Cashier only ever sees the POS nav link and is
+redirected away from `/admin`/`/reports` on direct navigation, a
+WarehouseStaff sees the mirror image, and an Admin sees and can reach all
+three. Rate limiting and security headers were verified directly against
+a running gateway process: 6 rapid `POST /register` calls → the first 5
+proxy through (502, no live Identity.API in this sandbox — expected) and
+the 6th returns `429`; an immediately-following `/login` attempt still
+proxies through unblocked, proving the two anonymous routes have
+independent budgets; and `curl`'s response headers show
+`X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy` present on
+every response.
+
+**Run it locally:**
+```bash
+# Sign in as the seeded admin (Admin@12345) to get a token, then:
+
+# The fix — role in the body is ignored for public signup:
+curl -X POST http://localhost:5058/Identity/Auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"userName":"newuser","email":"newuser@example.com","password":"Password123","role":"Admin"}'
+# → response.role is "Cashier" regardless
+
+# The Admin-only counterpart — creates a Manager/WarehouseStaff/Admin account:
+curl -X POST http://localhost:5058/Identity/Auth/create-user \
+  -H "Authorization: Bearer <admin token>" -H "Content-Type: application/json" \
+  -d '{"userName":"newmanager","email":"newmanager@example.com","password":"Password123","role":"Manager"}'
+
+# Rate limiting + security headers, against the gateway directly:
+for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:5058/Identity/Auth/register -d '{}'; done
+curl -sD - -o /dev/null http://localhost:5058/hc   # X-Content-Type-Options / X-Frame-Options / Referrer-Policy
+
+# Role enforcement, in the Angular app: sign in as a Cashier-role account
+# and note the Admin/Reports nav links are simply gone; try navigating to
+# /admin directly and you're bounced back to /login.
 ```
