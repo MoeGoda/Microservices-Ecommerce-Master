@@ -59,7 +59,7 @@
           <mat-label>Parent item (optional)</mat-label>
           <mat-select formControlName="parentItemId">
             <mat-option [value]="null">None — standalone item</mat-option>
-            @for (parentCandidate of items(); track parentCandidate.id) {
+            @for (parentCandidate of parentCandidates(); track parentCandidate.id) {
               <mat-option [value]="parentCandidate.id">{{ parentCandidate.sku }} — {{ parentCandidate.name }}</mat-option>
             }
           </mat-select>
@@ -113,7 +113,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (item of items(); track item.id) {
+            @for (item of pagedItems().items; track item.id) {
               <tr [class.selected]="selectedItem()?.id === item.id">
                 <td>{{ item.sku }}</td>
                 <td>{{ item.name }}</td>
@@ -131,6 +131,14 @@
             }
           </tbody>
         </table>
+
+        <mat-paginator
+          [length]="pagedItems().totalCount"
+          [pageSize]="pagedItems().pageSize"
+          [pageIndex]="pagedItems().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onItemsPageChange($event)"
+        ></mat-paginator>
       }
     </mat-card-content>
   </mat-card>

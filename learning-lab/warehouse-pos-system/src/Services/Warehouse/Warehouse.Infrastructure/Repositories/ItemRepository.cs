@@ -35,13 +35,21 @@ namespace Warehouse.Infrastructure.Repositories
             return await _context.Items.AnyAsync(i => i.Sku == sku);
         }
 
-        public async Task<IEnumerable<Item>> GetAll()
+        public async Task<(IEnumerable<Item> Items, int TotalCount)> GetPaged(int page, int pageSize)
         {
-            return await _context.Items
+            var query = _context.Items
                 .Include(i => i.Category)
                 .Include(i => i.BaseUnitOfMeasure)
-                .OrderBy(i => i.Name)
-                .ToListAsync();
+                .OrderBy(i => i.Name);
+
+            // Two round trips (count, then page) rather than one clever
+            // query that returns both — EF Core has no built-in way to
+            // project "the page" and "the total" out of a single
+            // SELECT without materializing every row first, which would
+            // defeat the whole point of paging.
+            var totalCount = await query.CountAsync();
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            return (items, totalCount);
         }
 
         public async Task<IEnumerable<Item>> GetVariants(int parentItemId)

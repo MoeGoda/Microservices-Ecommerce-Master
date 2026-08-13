@@ -53,7 +53,7 @@ a distributed transaction.
 - [x] **E2 — Mailing system (SMTP/MailKit)**
 
 **Phase F — Hardening**
-- [ ] F1 — Performance (caching, pagination, health checks)
+- [x] **F1 — Performance (Redis caching, pagination, compression, health checks)**
 - [ ] F2 — Security hardening (role policies, rate limiting)
 - [ ] F3 — Localization (English/Arabic, RTL)
 - [ ] F4 — Full docker-compose stack + end-to-end walkthrough
@@ -2168,3 +2168,179 @@ the existing Warehouse.API (`POST /api/v1/Stock/transfer`, gatewayed as
 shows a "Transfer stock" form alongside the existing "Receive stock"/
 "Adjust stock" ones once an item with at least one stock level is
 selected.
+
+## F1 — Performance (Redis caching, pagination, compression, health checks)
+
+**What it does:** four independent performance concerns, each solved once
+at its own natural, highest-leverage point rather than mechanically
+everywhere it could theoretically apply — real dependency health checks
+on every service, response compression at the one place ALL browser
+traffic passes through, real pagination on the two rawest unbounded list
+endpoints, and a Redis-backed cache for Warehouse's read-heavy,
+effectively-immutable master data.
+
+**Health checks: a real DB-connectivity probe on all 5 services, not just
+the gateway's existing bare liveness check.** A3 already gave the
+gateway a `/hc` endpoint, but a deliberately bare one — no downstream
+service had one of its own at all, and the gateway's own check never
+verified anything past "the process is running." Every service now calls
+`AddHealthChecks().AddDbContextCheck<TContext>()` + `MapHealthChecks("/hc")`
+in its own `Program.cs` — the exact same two-line idiom five times, so
+each service's own `/hc` genuinely answers "can this service reach its
+database," not just "is Kestrel listening." None of these are routed
+through Ocelot — same "service-to-service/infra tooling, not a
+browser-facing feature" reasoning `EventsController`/`StockEventsController`
+already established: a real deployment's orchestrator (docker-compose's
+own `healthcheck:` directive, F4) hits each container's `/hc` directly,
+the same way it would never ask the gateway "is Identity healthy?" on
+Identity's behalf. The gateway's own `/hc` stays a bare liveness check on
+purpose — aggregating five downstream health checks INTO the gateway
+would make the gateway's own health depend on every service it fronts,
+which is exactly backwards for a reverse proxy that should stay reporting
+healthy even while one backend is degraded.
+
+**Compression: one `AddResponseCompression` call in the gateway covers
+every browser-facing response in the system.** Every REST call Angular
+makes goes through Ocelot's upstream routes — the one carve-out
+(Notifications' SignalR hub, E1) connects directly and was never
+gatewayed at all, so it was never in scope here either. Rather than add
+compression middleware to five separate downstream `Program.cs` files,
+one `AddResponseCompression`/`UseResponseCompression` pair in
+`Gateway.Ocelot`, placed as the FIRST middleware (before `UseOcelot()`
+wraps the response stream itself), compresses every proxied JSON payload
+on its way out. Brotli first, gzip as the fallback for clients that don't
+advertise it — negotiated automatically via the request's own
+`Accept-Encoding` header, exactly like a browser already does without
+Angular needing to know compression exists at all.
+
+**Pagination: a new shared `Common.Pagination` building block, and real
+paging on the two rawest, most obviously-unbounded list endpoints.**
+`PagedResult<T>` lives in `BuildingBlocks/Common.Pagination` — shared
+across services the same way `Common.Exceptions` already is, and for the
+identical reason: it's not domain data (no service's own `EntityBase`/
+`DbContext` lives there, so the "no shared domain assemblies" rule this
+project otherwise follows everywhere else stays intact), it's a generic
+wire-format envelope, the same category as `Common.ExceptionHandling`'s
+`ProblemDetails` shape. `GetAllItemsQuery` (Warehouse's item catalog) and
+`GetSalesQuery` (Reporting's raw sale-record dump) both moved from an
+unbounded `IEnumerable<T>` to `PagedResult<T>`, each repository gaining a
+`GetPaged(page, pageSize)` that returns the total row count alongside the
+page (one `CountAsync()` plus one `Skip().Take()`, not one clever query
+trying to do both at once — EF Core has no way to project "the page" and
+"the total" out of a single `SELECT` without materializing every row
+first). `GetTopSellingItemsQuery`/`GetRecentNotificationsQuery` keep
+their existing flat "top N" shape rather than being converted too — a
+ranked top-N list and a raw table dump answer different questions, and
+the former was never the unbounded-growth problem this step exists to
+solve.
+
+**The Angular "parent item" picker exposed the real tension in paginating
+a list that's ALSO used as a lookup — solved by giving it its own,
+separate, unpaged-ish request rather than reusing the paged one.**
+`items-admin.component.ts`'s create-item form offers every existing item
+as a possible parent via the same `items` signal the browsable list
+below used to populate from — once that signal only holds one page,
+reusing it would mean the picker only ever offers whichever items happen
+to be on the CURRENTLY VIEWED page. The fix is a second signal,
+`parentCandidates`, populated by its own call to the identical
+`GetAllItemsQuery` endpoint with `pageSize=100` (the max
+`GetAllItemsQueryValidator` allows) — a real, named limitation for a
+catalog bigger than 100 items (the picker would then miss some), left as
+a future "replace with a searchable autocomplete" improvement rather than
+solved here, the same "name the gap explicitly" discipline this project
+uses throughout rather than silently capping something and moving on.
+
+**Redis caching: `MasterDataCache`, a cache-aside helper extracted the
+moment a THIRD caller needed the identical shape — same reasoning
+`StockAdjustmentStager` was extracted for a SECOND.** Categories,
+Locations, and UnitsOfMeasure are all seeded reference data with no
+mutating command anywhere in this system (confirmed by grepping for one
+before writing a single line of caching code) — read on nearly every
+Admin Panel and POS screen load, changed never. `MasterDataCache` wraps
+`IDistributedCache` (a framework ABSTRACTION from
+`Microsoft.Extensions.Caching.Abstractions`, not a concrete Infrastructure
+detail — the same category `ILogger<T>` already falls into, which
+Application-layer handlers elsewhere in this project, like Notifications'
+`IngestStockLevelChangedCommandHandler`, already inject directly) behind
+a `GetOrSetAsync<T>(key, factory, ct)` cache-aside shape: check Redis,
+deserialize on a hit, fall through to the real repository and repopulate
+on a miss. The three `GetCategories`/`GetLocations`/`GetUnitsOfMeasure`
+query handlers each shrink to a five-line cache-key-plus-factory call. The
+concrete Redis implementation
+(`AddStackExchangeRedisCache`, bound from a plain `ConnectionStrings:Redis`
+value — no dedicated options class needed since there's nothing else to
+configure) is registered in `Warehouse.Infrastructure`, same as every
+other concrete Infrastructure detail; `MasterDataCache` itself, like
+`StockAdjustmentStager`, has no idea Redis exists. The 10-minute TTL
+exists purely as a safety net, not because this data is expected to
+change — if a future step ever adds the first command that mutates a
+Category/Location/UnitOfMeasure, THAT step will need to add cache
+invalidation here too; until then, a page that's up to 10 minutes stale
+is indistinguishable from a fresh one, because the underlying data never
+actually moves.
+
+**Concepts introduced:**
+- **A shared BuildingBlocks project for a wire-format shape, not domain
+  data.** `Common.Pagination` joins `Common.Exceptions`/
+  `Common.Security`/`Common.ExceptionHandling` as the fourth building
+  block every service is allowed to reference directly — the dividing
+  line was never "nothing shared," it was always "nothing DOMAIN shared,"
+  and a generic paged-response envelope was always on the allowed side of
+  that line, same as `ProblemDetails` already was.
+- **Extracting a cache-aside helper the moment a THIRD caller needs the
+  identical shape** — the same "extract on the Nth real need, not
+  preemptively" discipline `StockAdjustmentStager`/`EffectivePriceResolver`
+  already modeled, applied to a caching concern instead of a stock or
+  pricing one.
+- **A TTL as a pure safety net, with no invalidation logic, justified by
+  an actual grep proving no mutation path exists** — not "cache
+  everything and hope," a specific, checked precondition (`Category`/
+  `Location`/`UnitOfMeasure` are genuinely immutable at runtime today)
+  that the next person to violate it (by adding a mutating command) is
+  now on notice to also revisit.
+- **Two independent scoped-vs-unpaged-view needs on the same underlying
+  list**, solved with two separate signals/requests rather than
+  contorting one paged response to serve both — the same "don't force one
+  shape to answer two different questions" instinct that produced
+  `ProcessedSaleEvent`/`ProcessedSaleReturnEvent` as separate tables
+  earlier in this project.
+
+**Verified with a 24-check runtime test — real infrastructure throughout,
+not mocks: a real Kestrel HTTP listener for the health-check mechanism (a
+genuinely-reachable SQLite connection proving `/hc` returns 200 Healthy,
+and a genuinely-unreachable one proving it returns 503 Unhealthy), real
+MediatR-dispatched pagination proving page boundaries/counts/ordering are
+correct and out-of-range `Page`/`PageSize` values are rejected by
+validation, and a real local `redis-server` instance (not a mocked
+`IDistributedCache`) proving a cache miss reaches the repository exactly
+once, a cache hit does NOT reach it again, and an evicted/expired entry
+transparently falls back and repopulates — plus a Playwright pass
+confirming the Admin Panel's item list actually paginates (a second page
+of results, no row overlap with the first) and that the "parent item"
+picker keeps offering every item regardless of which page the browsable
+list is currently showing.** Response compression was verified directly
+against a running gateway process with `curl -H "Accept-Encoding: gzip"`
+(and `br`), confirming `Content-Encoding`/`Vary` headers appear only when
+the client actually advertises support for them.
+
+**Run it locally:**
+```bash
+# Any local Redis works — the default connection string points at
+# localhost:6379.
+redis-server
+
+# Every service's own /hc:
+curl http://localhost:5218/hc   # Identity.API
+curl http://localhost:5238/hc   # Warehouse.API
+curl http://localhost:5258/hc   # POS.API
+curl http://localhost:5278/hc   # Reporting.API
+curl http://localhost:5298/hc   # Notifications.API
+
+# Compression, through the gateway:
+curl -sD - -o /dev/null -H "Accept-Encoding: gzip" http://localhost:5058/Warehouse/Items?page=1
+
+# Pagination — the Admin Panel's item list now shows a paginator; or call
+# either paged endpoint directly:
+curl http://localhost:5058/Warehouse/Items?page=2&pageSize=10
+curl http://localhost:5278/Reporting/ReadModels/sales?page=1&pageSize=20
+```

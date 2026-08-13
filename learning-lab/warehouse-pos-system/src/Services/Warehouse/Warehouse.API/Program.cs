@@ -28,6 +28,10 @@ builder.Services.AddCommonExceptionHandling();
 // since C2/C3.
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
+// F1 — a real DB-connectivity check, not a bare liveness probe. Same
+// reasoning as Identity.API's own Program.cs.
+builder.Services.AddHealthChecks().AddDbContextCheck<WarehouseContext>();
+
 // The outbox dispatcher (C3's pattern, generalized in D1) gets its host
 // the moment this class exists — unlike POS's own C3 outbox, which had
 // to wait for POS.API to exist at all, Warehouse.API is already here.
@@ -82,6 +86,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Not routed through Ocelot — same reasoning as Identity.API's own /hc.
+app.MapHealthChecks("/hc");
 
 app.Run();
 

@@ -1,4 +1,5 @@
 using System.Net;
+using Common.Pagination;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -29,10 +30,10 @@ namespace Reporting.API.Controllers
         }
 
         [HttpGet("sales")]
-        [ProducesResponseType(typeof(IEnumerable<SaleRecordDto>), (int)HttpStatusCode.OK)]
-        public async Task<ActionResult<IEnumerable<SaleRecordDto>>> GetSales()
+        [ProducesResponseType(typeof(PagedResult<SaleRecordDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PagedResult<SaleRecordDto>>> GetSales([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            return Ok(await _mediator.Send(new GetSalesQuery()));
+            return Ok(await _mediator.Send(new GetSalesQuery { Page = page, PageSize = pageSize }));
         }
 
         [HttpGet("stock-levels")]

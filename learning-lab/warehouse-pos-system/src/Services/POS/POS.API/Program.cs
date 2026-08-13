@@ -25,6 +25,10 @@ builder.Services.AddCommonExceptionHandling();
 // Warehouse.API.
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
+// F1 — a real DB-connectivity check, not a bare liveness probe. Same
+// reasoning as Identity.API's own Program.cs.
+builder.Services.AddHealthChecks().AddDbContextCheck<PosContext>();
+
 // The actual payoff of POS.API existing at all: OutboxDispatcher (C3,
 // generalized in D1) was written and exercised directly by C3's own
 // runtime test, but had nowhere to run on its own poll loop until there
@@ -81,6 +85,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Not routed through Ocelot — same reasoning as Identity.API's own /hc.
+app.MapHealthChecks("/hc");
 
 app.Run();
 

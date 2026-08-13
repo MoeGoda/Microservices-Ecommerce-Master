@@ -1,3 +1,4 @@
+using Common.Pagination;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -35,10 +36,10 @@ namespace Warehouse.API.Controllers
         }
 
         [HttpGet]
-        [ProducesResponseType(typeof(IEnumerable<ItemSummaryDto>), (int)HttpStatusCode.OK)]
-        public async Task<ActionResult<IEnumerable<ItemSummaryDto>>> GetAll()
+        [ProducesResponseType(typeof(PagedResult<ItemSummaryDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PagedResult<ItemSummaryDto>>> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            return Ok(await _mediator.Send(new GetAllItemsQuery()));
+            return Ok(await _mediator.Send(new GetAllItemsQuery { Page = page, PageSize = pageSize }));
         }
 
         [HttpGet("{id:int}")]

@@ -7,10 +7,12 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin } from 'rxjs';
 import { NotificationService } from '../../../core/notifications/notification.service';
+import { emptyPage, PagedResult } from '../../../shared/models/pagination.models';
 import {
   BARCODE_TYPES,
   CategoryDto,
@@ -43,6 +45,7 @@ import { WarehouseService } from '../warehouse.service';
     MatChipsModule,
     MatFormFieldModule,
     MatInputModule,
+    MatPaginatorModule,
     MatProgressSpinnerModule,
     MatSelectModule,
   ],
@@ -56,7 +59,15 @@ export class ItemsAdminComponent implements OnInit {
   readonly categories = signal<CategoryDto[]>([]);
   readonly locations = signal<LocationDto[]>([]);
   readonly units = signal<UnitOfMeasureDto[]>([]);
-  readonly items = signal<ItemSummaryDto[]>([]);
+  readonly pagedItems = signal<PagedResult<ItemSummaryDto>>(emptyPage());
+  // A separate, unpaged-ish fetch (page size 100 — the max PageSize
+  // GetAllItemsQueryValidator allows) purely to populate the "parent item"
+  // picker in the create form. Reusing pagedItems directly would mean a
+  // create-form dropdown that only ever offers whichever items happen to
+  // be on the CURRENT page of the browsable list below — a real but
+  // pragmatic limitation for catalogs bigger than 100 items, named here
+  // rather than solved with a proper searchable autocomplete (future work).
+  readonly parentCandidates = signal<ItemSummaryDto[]>([]);
   readonly selectedItem = signal<ItemDetailDto | null>(null);
   readonly stockLevels = signal<StockLevelDto[]>([]);
   readonly priceHistory = signal<ItemPriceHistoryDto[]>([]);
@@ -149,14 +160,27 @@ export class ItemsAdminComponent implements OnInit {
     });
 
     this.loadItems();
+    this.loadParentCandidates();
   }
 
-  loadItems(): void {
+  loadItems(page = 1): void {
     this.loadingItems.set(true);
     this.warehouseService
-      .getItems()
+      .getItems(page, this.pagedItems().pageSize)
       .pipe(finalize(() => this.loadingItems.set(false)))
-      .subscribe({ next: (items) => this.items.set(items) });
+      .subscribe({ next: (result) => this.pagedItems.set(result) });
+  }
+
+  onItemsPageChange(event: PageEvent): void {
+    // MatPaginator's pageIndex is 0-based; the backend's Page is 1-based.
+    if (event.pageSize !== this.pagedItems().pageSize) {
+      this.pagedItems.update((current) => ({ ...current, pageSize: event.pageSize }));
+    }
+    this.loadItems(event.pageIndex + 1);
+  }
+
+  private loadParentCandidates(): void {
+    this.warehouseService.getItems(1, 100).subscribe({ next: (result) => this.parentCandidates.set(result.items) });
   }
 
   selectItem(item: ItemSummaryDto): void {
@@ -243,6 +267,7 @@ export class ItemsAdminComponent implements OnInit {
           this.notification.success(`Item "${created.name}" created.`);
           this.createForm.reset({ sku: '', name: '', description: '', unitPrice: 0, categoryId: null, baseUnitOfMeasureId: null, parentItemId: null, barcode: '', barcodeType: 'EAN13' });
           this.loadItems();
+          this.loadParentCandidates();
         },
       });
   }

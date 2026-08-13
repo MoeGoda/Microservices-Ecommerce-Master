@@ -1,7 +1,9 @@
+using System.IO.Compression;
 using System.Threading.RateLimiting;
 using Common.ExceptionHandling;
 using Common.Security;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 
@@ -28,6 +30,23 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 
 builder.Services.AddCommonExceptionHandling();
 builder.Services.AddHealthChecks();
+
+// F1 — every browser-facing response in this system passes through here
+// (the one carve-out, the Notifications SignalR hub, connects directly and
+// was never gatewayed at all — see the README). Compressing at THIS single
+// point covers every REST response Angular ever receives, without needing
+// to touch five separate downstream services' own Program.cs files.
+// Brotli first (better ratio, and it's what Ocelot's own JSON error bodies
+// and every proxied JSON payload compress well with); Gzip as the fallback
+// for clients that don't advertise Brotli support.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
 
 // Ocelot ships its own RateLimitOptions, but it identifies a "client" via a
 // self-declared request header — an attacker credential-stuffing the login
@@ -68,6 +87,11 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddOcelot(builder.Configuration);
 
 var app = builder.Build();
+
+// First in the pipeline — it has to wrap the response stream before
+// anything downstream (including Ocelot's own proxied response) writes to
+// it, or there's nothing left for it to compress by the time it runs.
+app.UseResponseCompression();
 
 app.UseCommonExceptionHandling();
 

@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Warehouse.Application.Behaviours;
 using Warehouse.Application.Features.Items;
+using Warehouse.Application.Features.MasterData;
 using Warehouse.Application.Features.Outbox;
 using Warehouse.Application.Features.Stock;
 
@@ -27,6 +28,7 @@ namespace Warehouse.Application
             // rather than needing Warehouse.Infrastructure to know it exists.
             services.AddScoped<StockAdjustmentStager>();
             services.AddScoped<EffectivePriceResolver>();
+            services.AddScoped<MasterDataCache>();
 
             // Not a MediatR handler — driven by a poll loop
             // (OutboxBackgroundService, Warehouse.Infrastructure), the

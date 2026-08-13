@@ -28,6 +28,15 @@ builder.Services.AddCommonExceptionHandling();
 // token accepted at the gateway is accepted here identically.
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
+// F1 — a real dependency check, not a bare liveness probe: AddDbContextCheck
+// actually opens a connection and runs a trivial query against
+// IdentityContext's own database, so /hc genuinely answers "can this
+// service do its job," not just "is the process alive." The gateway's own
+// /hc (A3) stays a bare liveness check by design — see this project's
+// README for why aggregating downstream health INTO the gateway would be
+// the wrong tradeoff.
+builder.Services.AddHealthChecks().AddDbContextCheck<IdentityContext>();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -87,5 +96,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Not routed through Ocelot — same "service-to-service/infra tooling, not
+// a browser-facing feature" reasoning as EventsController/StockEventsController
+// (D1/C3): a real deployment's orchestrator (docker-compose's own
+// healthcheck directive, F4) hits this directly per-container, the same
+// way it would never ask the gateway "is Identity healthy?" on Identity's
+// behalf.
+app.MapHealthChecks("/hc");
 
 app.Run();

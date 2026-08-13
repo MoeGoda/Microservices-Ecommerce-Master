@@ -22,6 +22,10 @@ builder.Services.AddCommonExceptionHandling();
 // ones POS/Warehouse's own ServiceAuthHandlers mint (D1).
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
+// F1 — a real DB-connectivity check, not a bare liveness probe. Same
+// reasoning as Identity.API's own Program.cs.
+builder.Services.AddHealthChecks().AddDbContextCheck<ReportingContext>();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -70,6 +74,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Not routed through Ocelot — same reasoning as Identity.API's own /hc.
+app.MapHealthChecks("/hc");
 
 app.Run();
 

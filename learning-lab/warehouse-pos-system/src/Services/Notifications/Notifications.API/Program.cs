@@ -76,6 +76,10 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// F1 — a real DB-connectivity check, not a bare liveness probe. Same
+// reasoning as Identity.API's own Program.cs.
+builder.Services.AddHealthChecks().AddDbContextCheck<NotificationsContext>();
+
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationPusher, SignalRNotificationPusher>();
 
@@ -153,6 +157,10 @@ app.MapControllers();
 // README's own reasoning. [Authorize] on NotificationsHub itself (not
 // here) is what actually gates it.
 app.MapHub<NotificationsHub>(NotificationsHubPath);
+
+// Also not routed through Ocelot — same reasoning as every other
+// service's own /hc (Identity.API's Program.cs).
+app.MapHealthChecks("/hc");
 
 app.Run();
 
