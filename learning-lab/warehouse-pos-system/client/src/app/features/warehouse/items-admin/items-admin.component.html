@@ -237,14 +237,6 @@
         }
 
         <h4>Create a promotion</h4>
-        <!--
-          There's no list-existing-promotions endpoint yet (Warehouse only
-          exposes "what's active right now," via the effective-price
-          resolution above, not "every promotion ever created for this
-          item") — flagged here rather than built, the same "don't guess
-          at a shape until a second use needs it" discipline Promotion's
-          own single-item scope follows.
-        -->
         <form [formGroup]="promotionForm" (ngSubmit)="submitCreatePromotion()" class="form-grid inline-form">
           <mat-form-field appearance="outline">
             <mat-label>Discount type</mat-label>
@@ -268,6 +260,54 @@
           </mat-form-field>
           <button mat-stroked-button type="submit" [disabled]="creatingPromotion()">Create promotion</button>
         </form>
+
+        <!--
+          Every promotion this item has ever had — active, upcoming,
+          expired, or cancelled — not just "what's active right now" (the
+          effective-price resolution above). Cancelling doesn't delete the
+          row; it just excludes it from pricing immediately, same
+          reasoning as the backend's own CancelPromotionCommand comment.
+        -->
+        @if (promotions().length > 0) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Discount</th>
+                <th>Starts</th>
+                <th>Ends</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (promotion of promotions(); track promotion.id) {
+                <tr>
+                  <td>
+                    {{ promotion.discountValue }}{{ promotion.discountType === 'PercentageOff' ? '%' : '' }} off
+                  </td>
+                  <td>{{ promotion.startsAtUtc | date: 'short' }}</td>
+                  <td>{{ promotion.endsAtUtc | date: 'short' }}</td>
+                  <td>{{ promotionStatus(promotion) }}</td>
+                  <td>
+                    @if (canCancelPromotion(promotion)) {
+                      <button
+                        mat-button
+                        color="warn"
+                        type="button"
+                        [disabled]="cancellingPromotionId() === promotion.id"
+                        (click)="cancelPromotion(promotion)"
+                      >
+                        Cancel
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="empty-row">No promotions yet for this item.</p>
+        }
 
         <h3>Stock on hand</h3>
         <table class="data-table">

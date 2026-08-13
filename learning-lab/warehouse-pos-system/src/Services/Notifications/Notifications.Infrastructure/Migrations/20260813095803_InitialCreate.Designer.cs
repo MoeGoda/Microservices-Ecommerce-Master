@@ -12,7 +12,7 @@ using Notifications.Infrastructure.Persistence;
 namespace Notifications.Infrastructure.Migrations
 {
     [DbContext(typeof(NotificationsContext))]
-    [Migration("20260813074529_InitialCreate")]
+    [Migration("20260813095803_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -61,6 +61,37 @@ namespace Notifications.Infrastructure.Migrations
                         .HasFilter("SourceSaleId IS NOT NULL");
 
                     b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("Notifications.Domain.Entities.StockLevelSnapshot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityOnHand")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReorderThreshold")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "LocationId")
+                        .IsUnique();
+
+                    b.ToTable("StockLevelSnapshots");
                 });
 #pragma warning restore 612, 618
         }

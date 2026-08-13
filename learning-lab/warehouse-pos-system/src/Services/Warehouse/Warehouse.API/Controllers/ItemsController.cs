@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using Warehouse.Application.Features.Items.Commands.AddItemBarcode;
 using Warehouse.Application.Features.Items.Commands.AddItemUnit;
+using Warehouse.Application.Features.Items.Commands.CancelPromotion;
 using Warehouse.Application.Features.Items.Commands.CreateItem;
 using Warehouse.Application.Features.Items.Commands.CreatePromotion;
 using Warehouse.Application.Features.Items.Commands.UpdateItemPrice;
@@ -11,6 +12,7 @@ using Warehouse.Application.Features.Items.Queries.GetAllItems;
 using Warehouse.Application.Features.Items.Queries.GetItemById;
 using Warehouse.Application.Features.Items.Queries.GetItemPriceHistory;
 using Warehouse.Application.Features.Items.Queries.GetItemVariants;
+using Warehouse.Application.Features.Items.Queries.GetPromotionsForItem;
 using Warehouse.Application.Features.Items.Queries.ResolveBarcode;
 using Warehouse.Application.Models;
 
@@ -120,6 +122,22 @@ namespace Warehouse.API.Controllers
         {
             command.ItemId = id;
             return Ok(await _mediator.Send(command));
+        }
+
+        // Every promotion this item has ever had — the browse view
+        // CreatePromotion's own original gap note asked for.
+        [HttpGet("{id:int}/promotions")]
+        [ProducesResponseType(typeof(IEnumerable<PromotionDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<IEnumerable<PromotionDto>>> GetPromotions(int id)
+        {
+            return Ok(await _mediator.Send(new GetPromotionsForItemQuery { ItemId = id }));
+        }
+
+        [HttpPost("{id:int}/promotions/{promotionId:int}/cancel")]
+        [ProducesResponseType(typeof(PromotionDto), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PromotionDto>> CancelPromotion(int id, int promotionId)
+        {
+            return Ok(await _mediator.Send(new CancelPromotionCommand { ItemId = id, PromotionId = promotionId }));
         }
     }
 }

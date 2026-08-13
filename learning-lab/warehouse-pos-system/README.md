@@ -238,9 +238,22 @@ refactored to use this shared extension instead of its own inline copy.
 - **The JWT secret is now a genuinely shared secret.** Gateway.Ocelot's
   `appsettings.json` has to carry the exact same `JwtSettings:Secret`/`Issuer`/`Audience`
   as Identity.API's. There's no code sharing that enforces this — it's a
-  deployment/config discipline, and duplicating it by hand in two
-  `appsettings.json` files (as done here, for now) is a real gap Phase F2
-  will close with one shared secret source instead of copy-pasted values.
+  deployment/config discipline. This originally shipped as a literal
+  copy-pasted into every service's own `appsettings.json`, flagged here
+  as Phase F2's job to close — but as every later phase added one more
+  service repeating the same copy-paste, the gap only got wider, so it
+  was closed out of turn rather than left to compound further:
+  `src/SharedSettings/jwt.settings.json` is now the ONE physical file
+  that value lives in, loaded by every service's (and the gateway's own)
+  `Program.cs` via `builder.Configuration.AddJsonFile(...)` before
+  `AddJwtAuthentication` (or, for Notifications.API, its own hand-rolled
+  equivalent) ever reads the `JwtSettings` section — nothing about how
+  that section is READ changed, only where its values physically live.
+  A real production deployment would likely source this file's values
+  (or the whole file) from an actual secrets manager rather than a
+  committed JSON file with a `CHANGE_ME` placeholder — that hardening
+  step is still F2's to do; this fix only closes the "N copies that can
+  drift" problem, not the "committed secret" one.
 - **The Authorization header passes through untouched.** Ocelot forwards
   every request header to the downstream service by default — verified
   below by having the (stubbed) downstream echo the header back. That's
@@ -1376,13 +1389,21 @@ than the price" as a data problem to contain, not something worth a
   panel's price-edit form does exactly this, since editing the
   *discounted* number would silently corrupt the real list price).
 
-**A real gap left open, flagged rather than fixed:** there is no
-"list every promotion for this item" query — only "what's active right
-now," reached indirectly through price resolution. An admin who creates
-a promotion can't later browse or cancel it through this UI; the same
-"don't guess at a shape until a second use needs it" reasoning that
-kept `Promotion` scoped to one item applies to not building a
-management screen nothing has asked for yet.
+**Update:** the gap this section originally flagged here — no
+"list every promotion for this item" query, only "what's active right
+now" via price resolution, so an admin who created a promotion couldn't
+later browse or cancel it — has since been closed. `GetPromotionsForItemQuery`
+(returns every promotion, active or not) and `CancelPromotionCommand`
+(adds a `Promotion.IsCancelled` flag; `GetActiveForItem` excludes
+cancelled rows, so a cancelled promotion stops discounting immediately —
+the original `StartsAtUtc`/`EndsAtUtc` window stays as historical
+record, same reasoning `SaleLine`'s own snapshot fields already follow)
+now back the Admin Panel's promotions table, with a Cancel button per
+still-live row. Verified with a 9-check runtime test (create two
+promotions, browse both, cancel the active one, confirm
+`EffectivePriceResolver` stops applying it, confirm cancelling twice or
+cancelling via the wrong item both throw) and an 8-check Playwright pass
+against the built Angular app.
 
 **Verified with a runtime test against an in-memory SQLite database
 (Warehouse) and a second, separate one (POS), 16 checks, all passing:**
@@ -1519,13 +1540,16 @@ fact the event actually represents.
 - **Upsert-based idempotency** as a second, equally valid alternative to
   dedup-based idempotency (C3) — see above.
 
-**A real gap flagged rather than closed:** `ReceiveStockCommand` doesn't
-go through `StockAdjustmentStager` (it needs unit conversion first), so
-receiving stock via a purchase order does NOT emit a `StockLevelChanged`
-event yet — only `AdjustStockCommand` and `ApplySaleCommand` do. A real
-deployment would want received stock to show up in Reporting too;
-narrowing the fix to what's actually wired up and naming what isn't
-follows the same discipline as C5's own "no promotion-listing query yet."
+**Update:** the gap this section originally flagged here — `ReceiveStockCommand`
+didn't go through `StockAdjustmentStager` (it needs unit conversion
+first), so receiving stock via a purchase order never emitted a
+`StockLevelChanged` event, only `AdjustStockCommand`/`ApplySaleCommand`
+did — has since been closed. `Stage()` grew a `createIfMissing` parameter
+(a PO receipt can be the FIRST stock this item has ever had at this
+location, unlike an adjustment or sale, which both require a balance to
+already exist), and `ReceiveStockCommandHandler` now calls it after its
+own unit conversion. Received stock shows up in Reporting (and, once E1
+exists, Notifications) exactly like every other stock change.
 
 **Verified with a 19-check runtime test spanning three separate SQLite
 databases, one per service — Reporting hosted via a real ASP.NET Core
@@ -1641,19 +1665,13 @@ optional polish).
   a new dependency.** The three visualizations here don't need a charting
   library; they do need the same care one would bring to using one.
 
-**A real gap flagged, carried over and now user-visible:** D1 already
-named that `ReceiveStockCommand` doesn't go through `StockAdjustmentStager`
-and so never emits `StockLevelChanged` — at the time that only meant
-Reporting's read model could go briefly stale. In D2 it's no longer just
-an internal staleness detail: an item received via purchase order will
-keep showing up in the low-stock table (or keep reporting a wrong
-`QuantityOnHand`) until an `AdjustStockCommand` or a sale next touches
-that same `(ItemId, LocationId)`, because nothing tells Reporting the
-receipt happened. The fix is the same one D1 already named — route stock
-receiving through the same event path stock adjustment uses — and it's
-still not done here; naming it again, now against a report a real user
-would actually look at, is more honest than letting it quietly disappear
-between steps.
+**Update:** the gap this section originally flagged here — a purchase-
+order receipt keeping the low-stock table stale until an unrelated
+`AdjustStockCommand`/sale next touched the same `(ItemId, LocationId)`,
+because `ReceiveStockCommand` never emitted `StockLevelChanged` — has
+since been closed (see D1's own updated note for the fix itself). A
+receipt now updates the low-stock report the moment it happens, same as
+every other stock change.
 
 **Verified with an 11-check runtime test (three SQLite databases in one
 process — Warehouse and Reporting, same discipline as D1) plus a 9-check
@@ -1719,20 +1737,25 @@ Reporting's own version field-for-field since a low-stock message needs
 the same denormalized `Sku`/`ItemName`/`LocationName`/`ReorderThreshold`
 D2 already added to that event.
 
-**Two idempotency postures, side by side, and one of them is a deliberate
-non-decision.** `SaleCompleted` gets a real dedup key — `Notification.SourceSaleId`,
-unique-indexed, checked via `ExistsForSale` before inserting — the exact
-existence-check idiom D1's `SaleRecord`/C3's `ProcessedSaleEvent` already
-established for a one-time, immutable fact. `LowStock` gets NONE: every
-qualifying event produces its own notification, even a redelivery of the
-identical event, even a second real adjustment that leaves the item just
-as low as before. Detecting "this is the first time this item crossed
-its threshold, not the fifth" would mean Notifications keeping its own
-last-known `QuantityOnHand` per `(ItemId, LocationId)` — a second copy of
-the read model Reporting (D1/D2) already owns, purely to suppress its
-own noise. Scoped out and named rather than quietly shipped as-is; a
-runtime check in this step's own test asserts the redelivered low-stock
-event DOES fire twice, proving the gap is real and not accidental.
+**Two different idempotency shapes, because the two events answer
+different questions.** `SaleCompleted` gets a real dedup key —
+`Notification.SourceSaleId`, unique-indexed, checked via `ExistsForSale`
+before inserting — the exact existence-check idiom D1's `SaleRecord`/C3's
+`ProcessedSaleEvent` already established for a one-time, immutable fact:
+"did we already tell someone about sale #123." `LowStock` answers a
+different question — "did this item just CROSS INTO low stock, or was
+it already there" — which existence-checking can't answer on its own,
+since the same item can legitimately re-cross that line many times.
+Notifications keeps its own tiny `StockLevelSnapshot` per `(ItemId, LocationId)`
+(the last-known `QuantityOnHand`/`ReorderThreshold` it saw), upserted on
+every event regardless of outcome, purely to compute "was it low
+BEFORE this event." A notification fires only when that comparison
+flips from not-low to low; a brand-new pair with no snapshot yet counts
+as "wasn't low," so an item that arrives already low on its very first
+event still notifies. This is deliberately NOT a second copy of
+Reporting's own `StockLevelRecord` (D1/D2) — it carries none of the
+denormalized display fields that table has, only the two numbers needed
+to answer one yes/no question.
 
 **The SignalR hub and its `INotificationPusher` implementation live in
 the API layer, not Infrastructure — a placement decision, not a broken
@@ -1785,9 +1808,12 @@ in this system talks to a truly separate origin for real.
   persistence** as a considered placement, not a violation of the
   Domain→Application→Infrastructure→API layering every other service
   follows — see `INotificationPusher`'s own split above.
-- **Deliberately declining to dedupe** as a legitimate, named alternative
-  to dedup-by-existence-check (D1) — not every event needs the same
-  idempotency treatment, and saying so beats quietly getting it wrong.
+- **Crossing-edge detection via a purpose-built snapshot** as a third
+  idempotency shape alongside dedup-by-existence-check (D1) and
+  upsert-without-dedup (D1's own `StockLevelRecord`) — some questions
+  ("is this the same fact twice") existence-checking answers directly;
+  others ("did a value just cross a line") need the PREVIOUS value on
+  hand to answer at all, which is what `StockLevelSnapshot` exists for.
 - **`NotificationFeedService`, kept deliberately distinct from the
   pre-existing `NotificationService`** (A4's MatSnackBar toast wrapper) —
   one is stateless and transient, the other persists a feed and a live
@@ -1795,14 +1821,21 @@ in this system talks to a truly separate origin for real.
   event is both remembered and immediately seen without either service
   knowing much about the other.
 
-**A real gap flagged rather than closed:** beyond LowStock's no-dedup
-and the CORS-everywhere question above, `ReceiveStockCommand` still
-doesn't route through `StockAdjustmentStager` (the same gap D1/D2 already
-named) — so a purchase-order receipt not only leaves Reporting's
-low-stock report briefly stale, it now also means Notifications never
-hears about that receipt either. One producer-side fix (routing received
-stock through the same event path adjustments already use) would close
-all three consumers' versions of this gap at once; it's still not done.
+**Update:** two of the three gaps this section originally flagged have
+since been closed. `ReceiveStockCommand` now routes through
+`StockAdjustmentStager` (see D1's updated note) — a purchase-order
+receipt reaches Reporting AND Notifications the moment it happens, the
+same as every other stock change. And LowStock notifications no longer
+fire on every qualifying event: `Notifications` now keeps its own tiny
+`StockLevelSnapshot` per `(ItemId, LocationId)` — exactly the "second
+copy of Reporting's read model, purely to suppress its own noise" this
+section originally said it would need to build — and only notifies on
+the actual transition into low stock (a brand-new item/location with no
+prior snapshot that arrives already low still notifies; leaving low
+stock never does; crossing into low stock a second time notifies again,
+so suppression is per-transition, not permanent). The CORS-everywhere
+question above is the one gap that remains open here — still F4's to
+actually confront with a real docker-compose stack.
 
 **Verified with a 19-check runtime test — three SQLite databases, one
 per service, Notifications hosted via a real ASP.NET Core pipeline

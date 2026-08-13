@@ -78,6 +78,7 @@ export interface PromotionDto {
   discountValue: number;
   startsAtUtc: string;
   endsAtUtc: string;
+  isCancelled: boolean;
 }
 
 export interface StockLevelDto {

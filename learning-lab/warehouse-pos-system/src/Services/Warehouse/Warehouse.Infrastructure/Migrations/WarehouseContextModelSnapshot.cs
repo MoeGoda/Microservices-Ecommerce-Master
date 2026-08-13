@@ -374,6 +374,9 @@ namespace Warehouse.Infrastructure.Migrations
                     b.Property<DateTime>("EndsAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("bit");
+
                     b.Property<int>("ItemId")
                         .HasColumnType("int");
 

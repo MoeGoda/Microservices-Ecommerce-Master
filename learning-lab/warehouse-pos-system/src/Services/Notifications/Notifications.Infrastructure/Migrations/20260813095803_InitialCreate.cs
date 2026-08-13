@@ -28,6 +28,23 @@ namespace Notifications.Infrastructure.Migrations
                     table.PrimaryKey("PK_Notifications", x => x.Id);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "StockLevelSnapshots",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ItemId = table.Column<int>(type: "int", nullable: false),
+                    LocationId = table.Column<int>(type: "int", nullable: false),
+                    QuantityOnHand = table.Column<int>(type: "int", nullable: false),
+                    ReorderThreshold = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StockLevelSnapshots", x => x.Id);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_Notifications_CreatedAt",
                 table: "Notifications",
@@ -39,6 +56,12 @@ namespace Notifications.Infrastructure.Migrations
                 column: "SourceSaleId",
                 unique: true,
                 filter: "SourceSaleId IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StockLevelSnapshots_ItemId_LocationId",
+                table: "StockLevelSnapshots",
+                columns: new[] { "ItemId", "LocationId" },
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -46,6 +69,9 @@ namespace Notifications.Infrastructure.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Notifications");
+
+            migrationBuilder.DropTable(
+                name: "StockLevelSnapshots");
         }
     }
 }

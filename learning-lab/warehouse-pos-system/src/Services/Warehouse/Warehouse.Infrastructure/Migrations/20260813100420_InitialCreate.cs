@@ -234,6 +234,7 @@ namespace Warehouse.Infrastructure.Migrations
                     DiscountValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     StartsAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EndsAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsCancelled = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>

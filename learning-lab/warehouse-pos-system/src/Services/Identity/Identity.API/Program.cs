@@ -8,6 +8,15 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// The one physical copy of JwtSettings:Secret/Issuer/Audience every
+// service and the gateway used to duplicate by hand in their own
+// appsettings.json — A3's own README flagged that copy-paste as a real
+// gap. Editing SharedSettings/jwt.settings.json is now the only place
+// that value ever needs to change; nothing below this line changed to
+// pick it up, since AddJwtAuthentication still just reads
+// IConfiguration's "JwtSettings" section, wherever it came from.
+builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "..", "SharedSettings", "jwt.settings.json"), optional: false, reloadOnChange: true);
+
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();

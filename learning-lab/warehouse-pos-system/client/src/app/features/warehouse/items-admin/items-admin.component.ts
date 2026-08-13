@@ -19,6 +19,7 @@ import {
   ItemPriceHistoryDto,
   ItemSummaryDto,
   LocationDto,
+  PromotionDto,
   StockLevelDto,
   UnitOfMeasureDto,
 } from '../../../shared/models/warehouse.models';
@@ -58,6 +59,7 @@ export class ItemsAdminComponent implements OnInit {
   readonly selectedItem = signal<ItemDetailDto | null>(null);
   readonly stockLevels = signal<StockLevelDto[]>([]);
   readonly priceHistory = signal<ItemPriceHistoryDto[]>([]);
+  readonly promotions = signal<PromotionDto[]>([]);
 
   readonly loadingItems = signal(false);
   readonly loadingDetail = signal(false);
@@ -67,6 +69,10 @@ export class ItemsAdminComponent implements OnInit {
   readonly adjustingStock = signal(false);
   readonly updatingPrice = signal(false);
   readonly creatingPromotion = signal(false);
+  // The one promotion currently being cancelled, if any — disables just
+  // that row's button rather than every button in the list while the
+  // request is in flight.
+  readonly cancellingPromotionId = signal<number | null>(null);
 
   readonly createForm = new FormGroup({
     sku: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -167,8 +173,15 @@ export class ItemsAdminComponent implements OnInit {
           this.promotionForm.reset({ discountType: 'PercentageOff', discountValue: 0, startsAt: '', endsAt: '' });
           this.loadStockLevels(item.id);
           this.loadPriceHistory(item.id);
+          this.loadPromotions(item.id);
         },
       });
+  }
+
+  private loadPromotions(itemId: number): void {
+    this.warehouseService.getPromotions(itemId).subscribe({
+      next: (promotions) => this.promotions.set(promotions),
+    });
   }
 
   private loadStockLevels(itemId: number): void {
@@ -340,6 +353,49 @@ export class ItemsAdminComponent implements OnInit {
           this.promotionForm.reset({ discountType: 'PercentageOff', discountValue: 0, startsAt: '', endsAt: '' });
           // Re-fetching the item picks up the discounted price immediately
           // if the new promotion is already active (StartsAtUtc <= now).
+          this.selectItem(item);
+        },
+      });
+  }
+
+  // Plain TS, not template date-string comparisons — comparing ISO
+  // strings lexicographically happens to work but is the wrong tool;
+  // parsing once here keeps the template a pure display layer.
+  promotionStatus(promotion: PromotionDto): 'Cancelled' | 'Expired' | 'Upcoming' | 'Active' {
+    if (promotion.isCancelled) {
+      return 'Cancelled';
+    }
+
+    const now = new Date();
+    if (new Date(promotion.endsAtUtc) < now) {
+      return 'Expired';
+    }
+    if (new Date(promotion.startsAtUtc) > now) {
+      return 'Upcoming';
+    }
+
+    return 'Active';
+  }
+
+  canCancelPromotion(promotion: PromotionDto): boolean {
+    return !promotion.isCancelled && new Date(promotion.endsAtUtc) >= new Date();
+  }
+
+  cancelPromotion(promotion: PromotionDto): void {
+    const item = this.selectedItem();
+    if (!item || this.cancellingPromotionId()) {
+      return;
+    }
+
+    this.cancellingPromotionId.set(promotion.id);
+    this.warehouseService
+      .cancelPromotion(item.id, promotion.id)
+      .pipe(finalize(() => this.cancellingPromotionId.set(null)))
+      .subscribe({
+        next: () => {
+          this.notification.success('Promotion cancelled.');
+          // Re-fetching the item picks up the base price immediately if
+          // the cancelled promotion was the one currently discounting it.
           this.selectItem(item);
         },
       });

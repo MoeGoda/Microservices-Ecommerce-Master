@@ -10,6 +10,7 @@ namespace Notifications.Infrastructure.Persistence
         }
 
         public DbSet<Notification> Notifications => Set<Notification>();
+        public DbSet<StockLevelSnapshot> StockLevelSnapshots => Set<StockLevelSnapshot>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,6 +34,18 @@ namespace Notifications.Infrastructure.Persistence
 
                 // The feed's own access pattern — newest first, capped.
                 builder.HasIndex(n => n.CreatedAt);
+            });
+
+            modelBuilder.Entity<StockLevelSnapshot>(builder =>
+            {
+                // Exactly one snapshot row per (ItemId, LocationId) —
+                // IngestStockLevelChangedCommandHandler upserts against
+                // this, the same "no dedup check needed, the unique index
+                // plus a get-then-add/update is enough" shape D1's
+                // StockLevelRecord (Reporting) already uses for the same
+                // reason: it's a continuously-changing snapshot, not a
+                // one-time fact.
+                builder.HasIndex(s => new { s.ItemId, s.LocationId }).IsUnique();
             });
         }
     }

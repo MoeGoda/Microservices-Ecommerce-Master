@@ -94,10 +94,19 @@
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     },
     {
+      "_comment": "GET added alongside the existing POST (CreatePromotion) — the browse/history view a real gap note asked for.",
       "DownstreamPathTemplate": "/api/v1/Items/{id}/promotions",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
       "UpstreamPathTemplate": "/Warehouse/Items/{id}/promotions",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Items/{id}/promotions/{promotionId}/cancel",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Items/{id}/promotions/{promotionId}/cancel",
       "UpstreamHttpMethod": [ "POST" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     },

@@ -15,6 +15,7 @@ namespace Notifications.Infrastructure
                 options.UseSqlServer(configuration.GetConnectionString("NotificationsConnectionString")));
 
             services.AddScoped<INotificationRepository, NotificationRepository>();
+            services.AddScoped<IStockLevelSnapshotRepository, StockLevelSnapshotRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             // No INotificationPusher registration here — deliberately.

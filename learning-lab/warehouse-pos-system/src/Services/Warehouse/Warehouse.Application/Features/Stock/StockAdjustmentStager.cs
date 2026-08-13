@@ -23,15 +23,19 @@ namespace Warehouse.Application.Features.Stock
     // it's one database, so a normal transaction boundary (deferring
     // SaveChanges) does the job a saga would otherwise have to do by hand.
     //
-    // D1 adds a StockLevelChanged outbox event here too, which means both
-    // of this method's callers (AdjustStockCommand, ApplySaleCommand) now
-    // emit it automatically — but ReceiveStockCommandHandler does NOT,
-    // since it never calls Stage() (it needs unit conversion first,
-    // ConvertToBaseUnit, that Stage() doesn't do). A real deployment would
-    // want stock received via a PO to show up in Reporting too; that gap
-    // is flagged here rather than closed, the same "narrow the fix to
-    // what's actually wired up, name what isn't" discipline this codebase
-    // has followed elsewhere.
+    // D1 adds a StockLevelChanged outbox event here too, which means every
+    // caller of Stage() emits it automatically. ReceiveStockCommandHandler
+    // (a purchase-order receipt) went without this for D1/D2/E1 because it
+    // never called Stage() at all — it needs unit conversion first
+    // (ConvertToBaseUnit, which Stage() doesn't do), AND it can be the
+    // FIRST stock this item has ever had at this location, which Stage()
+    // didn't support (AdjustStockCommand/ApplySaleCommand both require a
+    // balance to already exist — "adjusting" implies one does). The
+    // createIfMissing parameter below is the one behavioral difference
+    // ReceiveStockCommandHandler actually needs; everything else about
+    // staging a change — the negative-balance guard, the StockTransaction,
+    // the outbox event — is identical, so it's a parameter on the same
+    // method rather than a separate one.
     public class StockAdjustmentStager
     {
         // Every consumer a StockLevelChanged event fans out to today —
@@ -62,7 +66,7 @@ namespace Warehouse.Application.Features.Stock
             _outboxRepository = outboxRepository;
         }
 
-        public async Task<StagedAdjustment> Stage(int itemId, int locationId, int quantityChange, StockTransactionReason reason, string? reference)
+        public async Task<StagedAdjustment> Stage(int itemId, int locationId, int quantityChange, StockTransactionReason reason, string? reference, bool createIfMissing = false)
         {
             var item = await _itemRepository.GetById(itemId)
                 ?? throw new NotFoundException(nameof(Item), itemId);
@@ -70,8 +74,35 @@ namespace Warehouse.Application.Features.Stock
             var location = await _locationRepository.GetById(locationId)
                 ?? throw new NotFoundException(nameof(Location), locationId);
 
-            var stockLevel = await _stockLevelRepository.GetByItemAndLocation(item.Id, location.Id)
-                ?? throw new NotFoundException(nameof(StockLevel), $"item {item.Id}, location {location.Id}");
+            var existingStockLevel = await _stockLevelRepository.GetByItemAndLocation(item.Id, location.Id);
+            var isNewStockLevel = existingStockLevel is null;
+            StockLevel stockLevel;
+            if (existingStockLevel is null)
+            {
+                if (!createIfMissing)
+                {
+                    throw new NotFoundException(nameof(StockLevel), $"item {item.Id}, location {location.Id}");
+                }
+
+                // First-ever stock for this item at this location — a
+                // fresh row, not an update. ReorderThreshold defaults to
+                // 0 (never low) until someone sets a real one; that's the
+                // same default ReceiveStockCommandHandler always used.
+                stockLevel = new StockLevel
+                {
+                    ItemId = item.Id,
+                    LocationId = location.Id,
+                    Location = location,
+                    QuantityOnHand = 0,
+                    ReorderThreshold = 0,
+                    UnitOfMeasureId = item.BaseUnitOfMeasureId,
+                    UnitOfMeasure = item.BaseUnitOfMeasure,
+                };
+            }
+            else
+            {
+                stockLevel = existingStockLevel;
+            }
 
             var newQuantity = stockLevel.QuantityOnHand + quantityChange;
             if (newQuantity < 0)
@@ -80,7 +111,20 @@ namespace Warehouse.Application.Features.Stock
             }
 
             stockLevel.QuantityOnHand = newQuantity;
-            await _stockLevelRepository.UpdateAsync(stockLevel);
+
+            // AddAsync with the final quantity already set, rather than
+            // AddAsync-then-UpdateAsync — the entity has no Id yet in the
+            // new-row case, so there's nothing for a second Update() call
+            // to usefully do that setting the property before the single
+            // Add doesn't already cover.
+            if (isNewStockLevel)
+            {
+                await _stockLevelRepository.AddAsync(stockLevel);
+            }
+            else
+            {
+                await _stockLevelRepository.UpdateAsync(stockLevel);
+            }
 
             var transaction = new StockTransaction
             {

@@ -8,6 +8,11 @@ using Reporting.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// The single shared JwtSettings source — see Identity.API's Program.cs
+// for the full reasoning. Editing SharedSettings/jwt.settings.json is now
+// the only place this value ever needs to change.
+builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "..", "SharedSettings", "jwt.settings.json"), optional: false, reloadOnChange: true);
+
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();

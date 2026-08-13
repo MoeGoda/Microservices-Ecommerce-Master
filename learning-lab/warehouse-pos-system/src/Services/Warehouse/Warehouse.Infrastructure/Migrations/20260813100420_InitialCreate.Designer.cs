@@ -12,7 +12,7 @@ using Warehouse.Infrastructure.Persistence;
 namespace Warehouse.Infrastructure.Migrations
 {
     [DbContext(typeof(WarehouseContext))]
-    [Migration("20260813001701_InitialCreate")]
+    [Migration("20260813100420_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -376,6 +376,9 @@ namespace Warehouse.Infrastructure.Migrations
 
                     b.Property<DateTime>("EndsAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ItemId")
                         .HasColumnType("int");

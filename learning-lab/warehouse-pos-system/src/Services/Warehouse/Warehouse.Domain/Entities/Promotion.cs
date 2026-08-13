@@ -25,5 +25,12 @@ namespace Warehouse.Domain.Entities
 
         public DateTime StartsAtUtc { get; set; }
         public DateTime EndsAtUtc { get; set; }
+
+        // Cancelling shortens nothing and doesn't touch StartsAtUtc/EndsAtUtc
+        // (the original window is historical record, same reasoning
+        // SaleLine's snapshot fields already follow) — it just excludes
+        // this row from GetActiveForItem from this point on, immediately,
+        // regardless of where "now" falls in its original window.
+        public bool IsCancelled { get; set; }
     }
 }

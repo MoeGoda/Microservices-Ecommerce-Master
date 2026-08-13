@@ -10,6 +10,7 @@ namespace Warehouse.Application.Models
         public decimal DiscountValue { get; set; }
         public DateTime StartsAtUtc { get; set; }
         public DateTime EndsAtUtc { get; set; }
+        public bool IsCancelled { get; set; }
 
         public static PromotionDto FromEntity(Promotion promotion)
         {
@@ -21,6 +22,7 @@ namespace Warehouse.Application.Models
                 DiscountValue = promotion.DiscountValue,
                 StartsAtUtc = promotion.StartsAtUtc,
                 EndsAtUtc = promotion.EndsAtUtc,
+                IsCancelled = promotion.IsCancelled,
             };
         }
     }

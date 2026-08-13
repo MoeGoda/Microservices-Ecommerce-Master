@@ -6,28 +6,29 @@ using Notifications.Domain.Entities;
 
 namespace Notifications.Application.Features.Ingestion.Commands.IngestStockLevelChanged
 {
-    // Unlike IngestSaleCompletedCommandHandler, this one is NOT idempotent
-    // against redelivery, and it's a deliberate, named gap rather than an
-    // oversight: a low-stock notification fires on EVERY qualifying event,
-    // not just the transition that first crosses the threshold. Detecting
-    // "just crossed" would need Notifications to keep its own last-known
-    // QuantityOnHand per (ItemId, LocationId) — effectively a second copy
-    // of the read model Reporting (D1/D2) already owns — purely to
-    // suppress its own duplicate alerts. Scoped out for this step; a real
-    // deployment would want that dedup (or a client-side debounce) before
-    // this could safely fire on every stock adjustment to an already-low
-    // item without becoming noise.
+    // Notifies only on the TRANSITION into low stock, not on every
+    // qualifying event — StockLevelSnapshot (own tiny table, upserted
+    // below on every event regardless of outcome) is what makes "was this
+    // already low last time" answerable without asking Reporting, which
+    // owns the real read model but isn't something Notifications should
+    // ever query directly (separate services, separate databases). A
+    // brand-new (ItemId, LocationId) with no snapshot yet always counts
+    // as "wasn't low" — the first event Notifications ever sees for a
+    // pair that arrives already low IS real news.
     public class IngestStockLevelChangedCommandHandler : IRequestHandler<IngestStockLevelChangedCommand, IngestResultDto>
     {
+        private readonly IStockLevelSnapshotRepository _snapshotRepository;
         private readonly INotificationRepository _notificationRepository;
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationPusher _notificationPusher;
 
         public IngestStockLevelChangedCommandHandler(
+            IStockLevelSnapshotRepository snapshotRepository,
             INotificationRepository notificationRepository,
             IUnitOfWork unitOfWork,
             INotificationPusher notificationPusher)
         {
+            _snapshotRepository = snapshotRepository;
             _notificationRepository = notificationRepository;
             _unitOfWork = unitOfWork;
             _notificationPusher = notificationPusher;
@@ -35,11 +36,35 @@ namespace Notifications.Application.Features.Ingestion.Commands.IngestStockLevel
 
         public async Task<IngestResultDto> Handle(IngestStockLevelChangedCommand request, CancellationToken cancellationToken)
         {
-            if (request.QuantityOnHand > request.ReorderThreshold)
+            var snapshot = await _snapshotRepository.GetByItemAndLocation(request.ItemId, request.LocationId);
+            var wasLow = snapshot is not null && snapshot.QuantityOnHand <= snapshot.ReorderThreshold;
+            var isLow = request.QuantityOnHand <= request.ReorderThreshold;
+
+            // The snapshot always tracks the latest quantity/threshold,
+            // whether or not this event ends up producing a notification —
+            // otherwise the NEXT event would compare against stale data.
+            if (snapshot is null)
             {
-                // Not low stock — nothing to notify about, and nothing
-                // was persisted, so there's no "already processed" case
-                // to report either.
+                await _snapshotRepository.AddAsync(new StockLevelSnapshot
+                {
+                    ItemId = request.ItemId,
+                    LocationId = request.LocationId,
+                    QuantityOnHand = request.QuantityOnHand,
+                    ReorderThreshold = request.ReorderThreshold,
+                });
+            }
+            else
+            {
+                snapshot.QuantityOnHand = request.QuantityOnHand;
+                snapshot.ReorderThreshold = request.ReorderThreshold;
+                await _snapshotRepository.UpdateAsync(snapshot);
+            }
+
+            if (!isLow || wasLow)
+            {
+                // Either not low right now, or already was low before
+                // this event — nothing NEW to tell anyone about.
+                await _unitOfWork.SaveChangesAsync();
                 return new IngestResultDto { AlreadyProcessed = false };
             }
 

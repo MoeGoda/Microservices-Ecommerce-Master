@@ -87,4 +87,12 @@ export class WarehouseService {
   createPromotion(itemId: number, request: CreatePromotionRequest): Observable<PromotionDto> {
     return this.http.post<PromotionDto>(`${BASE}/Items/${itemId}/promotions`, request);
   }
+
+  getPromotions(itemId: number): Observable<PromotionDto[]> {
+    return this.http.get<PromotionDto[]>(`${BASE}/Items/${itemId}/promotions`);
+  }
+
+  cancelPromotion(itemId: number, promotionId: number): Observable<PromotionDto> {
+    return this.http.post<PromotionDto>(`${BASE}/Items/${itemId}/promotions/${promotionId}/cancel`, null);
+  }
 }

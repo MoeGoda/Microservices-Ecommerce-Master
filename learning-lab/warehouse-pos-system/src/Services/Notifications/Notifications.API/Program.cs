@@ -13,6 +13,15 @@ using Notifications.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// The single shared JwtSettings source — see Identity.API's Program.cs
+// for the full reasoning. Editing SharedSettings/jwt.settings.json is now
+// the only place this value ever needs to change. Notifications.API
+// still reads the "JwtSettings" section itself below (it hand-rolls its
+// own AddJwtBearer rather than calling the shared extension — see that
+// comment) — this only changes WHERE the section's values come from, not
+// how they're read.
+builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "..", "SharedSettings", "jwt.settings.json"), optional: false, reloadOnChange: true);
+
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
