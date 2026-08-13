@@ -1,24 +1,65 @@
-import { Component } from '@angular/core';
+import { Component, effect } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatBadgeModule } from '@angular/material/badge';
 import { AuthService } from './core/auth/auth.service';
+import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
+import { NotificationDto } from './shared/models/notification.models';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatToolbarModule, MatButtonModule, MatIconModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatToolbarModule, MatButtonModule, MatIconModule, MatMenuModule, MatBadgeModule],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
   constructor(
     readonly authService: AuthService,
+    readonly notificationFeed: NotificationFeedService,
     private readonly router: Router,
-  ) {}
+  ) {
+    // Covers both a fresh sign-in (LoginComponent sets currentUser, this
+    // fires right after) and a page reload with an already-valid session
+    // in localStorage (currentUser is set synchronously from storage at
+    // AuthService construction, before this effect ever runs — so the
+    // very first run already sees it). Logging out sets currentUser back
+    // to null, which is exactly when the feed should disconnect and
+    // forget what it knew.
+    effect(() => {
+      if (this.authService.currentUser()) {
+        this.notificationFeed.loadRecent();
+        this.notificationFeed.connect();
+      } else {
+        this.notificationFeed.disconnect();
+      }
+    });
+  }
 
   logout(): void {
     this.authService.logout();
     this.router.navigateByUrl('/login');
+  }
+
+  markRead(notification: NotificationDto): void {
+    if (notification.isRead) {
+      return;
+    }
+
+    this.notificationFeed.markAsRead(notification.id).subscribe({
+      next: (updated) => {
+        this.notificationFeed.notifications.update((list) => list.map((n) => (n.id === updated.id ? updated : n)));
+      },
+    });
+  }
+
+  markAllRead(): void {
+    this.notificationFeed.markAllAsRead().subscribe({
+      next: () => {
+        this.notificationFeed.notifications.update((list) => list.map((n) => ({ ...n, isRead: true })));
+      },
+    });
   }
 }

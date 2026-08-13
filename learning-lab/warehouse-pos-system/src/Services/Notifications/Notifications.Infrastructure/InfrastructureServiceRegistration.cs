@@ -1,0 +1,30 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Notifications.Application.Contracts.Persistence;
+using Notifications.Infrastructure.Persistence;
+using Notifications.Infrastructure.Repositories;
+
+namespace Notifications.Infrastructure
+{
+    public static class InfrastructureServiceRegistration
+    {
+        public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddDbContext<NotificationsContext>(options =>
+                options.UseSqlServer(configuration.GetConnectionString("NotificationsConnectionString")));
+
+            services.AddScoped<INotificationRepository, NotificationRepository>();
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // No INotificationPusher registration here — deliberately.
+            // Unlike every other Infrastructure concern in this project,
+            // the real (SignalR) push implementation is tied to THIS
+            // service's own ASP.NET Core hosting/request pipeline, not a
+            // generic persistence/outbound-HTTP concern, so it's
+            // registered where NotificationsHub is mapped: Notifications.API's
+            // own Program.cs. See INotificationPusher's own comment.
+            return services;
+        }
+    }
+}

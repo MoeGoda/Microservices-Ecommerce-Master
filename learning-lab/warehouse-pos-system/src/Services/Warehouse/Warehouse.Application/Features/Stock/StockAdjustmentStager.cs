@@ -34,6 +34,14 @@ namespace Warehouse.Application.Features.Stock
     // has followed elsewhere.
     public class StockAdjustmentStager
     {
+        // Every consumer a StockLevelChanged event fans out to today —
+        // Reporting (project a StockLevelRecord read model, D1/D2) and now
+        // Notifications (a "Low stock" toast, E1) — the same array-of-
+        // consumers idiom POS's own CheckoutCommandHandler already uses
+        // for SaleCompleted's fan-out, adopted here now that this event
+        // has more than one destination too.
+        private static readonly string[] StockLevelChangedConsumers = { OutboxConsumers.Reporting, OutboxConsumers.Notifications };
+
         private readonly IItemRepository _itemRepository;
         private readonly ILocationRepository _locationRepository;
         private readonly IStockLevelRepository _stockLevelRepository;
@@ -116,11 +124,14 @@ namespace Warehouse.Application.Features.Stock
                     ReorderThreshold = stockLevel.ReorderThreshold,
                 }),
             });
-            await _outboxRepository.AddDeliveryAsync(new OutboxDelivery
+            foreach (var consumer in StockLevelChangedConsumers)
             {
-                OutboxMessage = outboxMessage,
-                ConsumerName = OutboxConsumers.Reporting,
-            });
+                await _outboxRepository.AddDeliveryAsync(new OutboxDelivery
+                {
+                    OutboxMessage = outboxMessage,
+                    ConsumerName = consumer,
+                });
+            }
 
             return new StagedAdjustment { StockLevel = stockLevel, Item = item };
         }

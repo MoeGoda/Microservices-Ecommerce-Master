@@ -239,6 +239,31 @@
       "UpstreamPathTemplate": "/Reporting/reports/low-stock",
       "UpstreamHttpMethod": [ "GET" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "NotificationsController only (E1) — EventsController (Notifications.API's own ingestion endpoints) is service-to-service, same reasoning as Reporting's EventsController above, and has no gateway route either. The SignalR hub (/hubs/notifications) ALSO has no gateway route, for a different reason: it's a live WebSocket connection, and Ocelot's HTTP-forwarding model doesn't proxy the upgrade handshake reliably (see the README's own gap note) — the Angular client connects to Notifications.API's port directly for the hub only, with its own CORS policy standing in for what the gateway would otherwise mediate.",
+      "DownstreamPathTemplate": "/api/v1/Notifications",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5298 }],
+      "UpstreamPathTemplate": "/Notifications",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Notifications/{id}/read",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5298 }],
+      "UpstreamPathTemplate": "/Notifications/{id}/read",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Notifications/read-all",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5298 }],
+      "UpstreamPathTemplate": "/Notifications/read-all",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     }
   ],
   "GlobalConfiguration": {

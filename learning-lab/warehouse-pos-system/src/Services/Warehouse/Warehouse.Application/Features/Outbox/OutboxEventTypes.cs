@@ -8,5 +8,6 @@ namespace Warehouse.Application.Features.Outbox
     public static class OutboxConsumers
     {
         public const string Reporting = "Reporting";
+        public const string Notifications = "Notifications";
     }
 }

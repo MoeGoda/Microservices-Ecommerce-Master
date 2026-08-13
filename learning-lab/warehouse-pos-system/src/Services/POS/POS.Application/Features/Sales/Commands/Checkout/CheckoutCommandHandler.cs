@@ -12,12 +12,12 @@ namespace POS.Application.Features.Sales.Commands.Checkout
     public class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, SaleDto>
     {
         // Every consumer a SaleCompleted event fans out to today —
-        // Warehouse (decrement stock, C3) and Reporting (project a
-        // SaleRecord/SaleLineRecord read model, D1). Adding a THIRD
-        // consumer later (E1's notifications, most likely) means adding
-        // one more name here and one more IEventPublisher implementation —
-        // nothing about the outbox/dispatcher machinery itself changes.
-        private static readonly string[] SaleCompletedConsumers = { OutboxConsumers.Warehouse, OutboxConsumers.Reporting };
+        // Warehouse (decrement stock, C3), Reporting (project a
+        // SaleRecord/SaleLineRecord read model, D1), and now Notifications
+        // (a "Sale #123 completed" toast, E1) — exactly the third consumer
+        // this comment already predicted. Nothing about the
+        // outbox/dispatcher machinery itself changed to add it.
+        private static readonly string[] SaleCompletedConsumers = { OutboxConsumers.Warehouse, OutboxConsumers.Reporting, OutboxConsumers.Notifications };
 
         private readonly ISaleRepository _saleRepository;
         private readonly ISaleLineRepository _saleLineRepository;

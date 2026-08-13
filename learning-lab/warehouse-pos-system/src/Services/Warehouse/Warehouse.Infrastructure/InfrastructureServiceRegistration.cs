@@ -38,6 +38,7 @@ namespace Warehouse.Infrastructure
             // for its own outbound calls (C2/C3).
             services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
             services.Configure<ReportingApiOptions>(configuration.GetSection("ReportingApi"));
+            services.Configure<NotificationsApiOptions>(configuration.GetSection("NotificationsApi"));
 
             services.AddTransient<ServiceAuthHandler>();
             services.AddHttpClient<ReportingEventPublisher>((provider, client) =>
@@ -47,6 +48,17 @@ namespace Warehouse.Infrastructure
             })
             .AddHttpMessageHandler<ServiceAuthHandler>();
             services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<ReportingEventPublisher>());
+
+            // Warehouse's second-ever outbound consumer (E1) — same
+            // typed-HttpClient-plus-ServiceAuthHandler shape as
+            // ReportingEventPublisher above.
+            services.AddHttpClient<NotificationsEventPublisher>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<NotificationsApiOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl);
+            })
+            .AddHttpMessageHandler<ServiceAuthHandler>();
+            services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<NotificationsEventPublisher>());
 
             return services;
         }

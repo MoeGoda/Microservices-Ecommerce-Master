@@ -30,6 +30,7 @@ namespace POS.Infrastructure
             services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
             services.Configure<WarehouseApiOptions>(configuration.GetSection("WarehouseApi"));
             services.Configure<ReportingApiOptions>(configuration.GetSection("ReportingApi"));
+            services.Configure<NotificationsApiOptions>(configuration.GetSection("NotificationsApi"));
 
             services.AddTransient<ServiceAuthHandler>();
             services.AddHttpClient<IWarehouseCatalogClient, WarehouseCatalogClient>((provider, client) =>
@@ -39,7 +40,7 @@ namespace POS.Infrastructure
             })
             .AddHttpMessageHandler<ServiceAuthHandler>();
 
-            // Two IEventPublisher implementations now (D1) — one per
+            // Three IEventPublisher implementations now (D1, E1) — one per
             // consumer a SaleCompleted event fans out to. Each is
             // registered as itself via AddHttpClient<T>() (so it gets its
             // own configured HttpClient) and then re-exposed under
@@ -63,6 +64,14 @@ namespace POS.Infrastructure
             })
             .AddHttpMessageHandler<ServiceAuthHandler>();
             services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<ReportingEventPublisher>());
+
+            services.AddHttpClient<NotificationsEventPublisher>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<NotificationsApiOptions>>().Value;
+                client.BaseAddress = new Uri(options.BaseUrl);
+            })
+            .AddHttpMessageHandler<ServiceAuthHandler>();
+            services.AddScoped<IEventPublisher>(sp => sp.GetRequiredService<NotificationsEventPublisher>());
 
             return services;
         }

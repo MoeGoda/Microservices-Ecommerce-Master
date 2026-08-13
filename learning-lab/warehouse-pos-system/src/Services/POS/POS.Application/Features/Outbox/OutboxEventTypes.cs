@@ -16,5 +16,6 @@ namespace POS.Application.Features.Outbox
     {
         public const string Warehouse = "Warehouse";
         public const string Reporting = "Reporting";
+        public const string Notifications = "Notifications";
     }
 }

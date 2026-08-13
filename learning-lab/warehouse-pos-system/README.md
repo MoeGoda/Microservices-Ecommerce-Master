@@ -49,7 +49,7 @@ a distributed transaction.
 - [x] **D2 — Reports + Angular dashboards**
 
 **Phase E — Notifications / Mailing**
-- [ ] E1 — In-app notifications (SignalR)
+- [x] **E1 — In-app notifications (SignalR)**
 - [ ] E2 — Mailing system
 
 **Phase F — Hardening**
@@ -1680,4 +1680,161 @@ APIs running, per D1):**
 cd client
 npm start   # ng serve — http://localhost:4200
 # → sign in, then /reports
+```
+
+## E1 — In-app notifications (SignalR)
+
+**What it does:** a fifth service, Notifications, that consumes the same
+`SaleCompleted`/`StockLevelChanged` events Reporting already does (D1/D2)
+— fanned out from POS's and Warehouse's existing outbox, not a new event
+source — and turns qualifying ones into short, human-readable messages,
+pushed live to every connected browser over a SignalR hub and persisted
+so a bell dropdown has something to show on page load, before any push
+has happened yet.
+
+**Both outbox producers generalize to a third consumer with zero changes
+to the dispatcher itself — exactly the point of the message/delivery
+split D1 made.** POS's `CheckoutCommandHandler` already fanned
+`SaleCompleted` out over an array of consumer names (its own comment
+literally named this step as the anticipated third); adding
+`Notifications` there was a one-line change. Warehouse's
+`StockAdjustmentStager` had never needed more than one consumer for
+`StockLevelChanged`, so it staged a single hardcoded delivery — this
+step turns that into the same array-loop idiom POS already used, for
+Warehouse's second-ever consumer. `OutboxDispatcher` (both services)
+needed no changes at all: it already resolves `IEnumerable<IEventPublisher>`
+by `ConsumerName`, so a new `NotificationsEventPublisher` in each
+service's own Infrastructure project (same typed-HttpClient-plus-
+`ServiceAuthHandler` shape as their existing `ReportingEventPublisher`)
+was the only new code the producer side needed.
+
+**The ingestion commands bind only what a notification message actually
+needs, and let ASP.NET Core's model binding quietly ignore the rest.**
+`IngestSaleCompletedCommand` declares just `SaleId`/`Total` — POS's
+`NotificationsEventPublisher` still forwards the FULL `SaleCompletedMessage`
+JSON verbatim (the same "no shape translation, no re-serialization"
+idiom D1 established), and the extra fields (`Lines`, `CashierUserId`,
+...) are simply never bound. `IngestStockLevelChangedCommand` mirrors
+Reporting's own version field-for-field since a low-stock message needs
+the same denormalized `Sku`/`ItemName`/`LocationName`/`ReorderThreshold`
+D2 already added to that event.
+
+**Two idempotency postures, side by side, and one of them is a deliberate
+non-decision.** `SaleCompleted` gets a real dedup key — `Notification.SourceSaleId`,
+unique-indexed, checked via `ExistsForSale` before inserting — the exact
+existence-check idiom D1's `SaleRecord`/C3's `ProcessedSaleEvent` already
+established for a one-time, immutable fact. `LowStock` gets NONE: every
+qualifying event produces its own notification, even a redelivery of the
+identical event, even a second real adjustment that leaves the item just
+as low as before. Detecting "this is the first time this item crossed
+its threshold, not the fifth" would mean Notifications keeping its own
+last-known `QuantityOnHand` per `(ItemId, LocationId)` — a second copy of
+the read model Reporting (D1/D2) already owns, purely to suppress its
+own noise. Scoped out and named rather than quietly shipped as-is; a
+runtime check in this step's own test asserts the redelivered low-stock
+event DOES fire twice, proving the gap is real and not accidental.
+
+**The SignalR hub and its `INotificationPusher` implementation live in
+the API layer, not Infrastructure — a placement decision, not a broken
+rule.** Every other cross-service concern in this system (outbound HTTP
+via `IEventPublisher`, `ServiceAuthHandler`) sits in Infrastructure
+because it's genuinely persistence/outbound-call plumbing. A SignalR
+`Hub` is different: it's inseparable from THIS service's own ASP.NET
+Core request pipeline and hosting model — mapping it, authenticating
+its connections, and pushing through it are all things only the API
+layer's `Program.cs` can actually wire up. `Notifications.Application`
+still only knows about the transport-agnostic `INotificationPusher`
+interface; it has no idea SignalR exists.
+
+**A WebSocket handshake can't carry an `Authorization` header, so the
+token travels as a query-string parameter instead — and that couldn't be
+wired into the shared `AddJwtAuthentication` extension without affecting
+every other service's normal header-based validation too.**
+Notifications.API hand-rolls its own `AddJwtBearer` call (same
+`TokenValidationParameters` every service already uses) with one
+addition: `JwtBearerEvents.OnMessageReceived` pulls `?access_token=...`
+out of the query string, but ONLY for requests under `/hubs/notifications`
+— every controller's ordinary `Authorization: Bearer ...` header check is
+completely untouched, and `Common.Security` itself needed no changes.
+
+**The SignalR hub is the one thing in this whole system that does NOT go
+through the gateway — and that decision comes with its own new,
+previously-unneeded piece of infrastructure: CORS.** Ocelot's HTTP-
+forwarding model doesn't reliably proxy a WebSocket upgrade handshake,
+so rather than build and debug that against a reverse proxy with no
+live SQL Server or docker-compose stack to validate it against anyway,
+the Angular client connects to Notifications.API's own port directly for
+the hub connection only — `NotificationsController`'s plain REST
+endpoints (`GetRecent`, mark-as-read) still go through the gateway like
+every other feature. A direct browser-to-service connection is a
+cross-origin request the gateway never had to mediate, which is why this
+is also the first and only place in this project CORS gets configured at
+all: every other feature's browser traffic has only ever gone through
+Ocelot in a mocked-gateway Playwright run, never a real one, so whether
+the REST side would need CORS too has simply never been exercised. That
+gap is real and wider than this step — flagged here rather than solved,
+left for F4's actual docker-compose pass to be the first time anything
+in this system talks to a truly separate origin for real.
+
+**Concepts introduced:**
+- **A live-push transport as a third delivery mechanism**, alongside
+  "plain HTTP through the gateway" (every REST call so far) and
+  "service-to-service ingestion" (`EventsController`, D1) — with its own
+  auth wiring and its own gateway-bypass tradeoff, both named above.
+- **API-layer-owned real-time transport vs. Infrastructure-layer-owned
+  persistence** as a considered placement, not a violation of the
+  Domain→Application→Infrastructure→API layering every other service
+  follows — see `INotificationPusher`'s own split above.
+- **Deliberately declining to dedupe** as a legitimate, named alternative
+  to dedup-by-existence-check (D1) — not every event needs the same
+  idempotency treatment, and saying so beats quietly getting it wrong.
+- **`NotificationFeedService`, kept deliberately distinct from the
+  pre-existing `NotificationService`** (A4's MatSnackBar toast wrapper) —
+  one is stateless and transient, the other persists a feed and a live
+  connection; the new one calls the old one on every push, so a live
+  event is both remembered and immediately seen without either service
+  knowing much about the other.
+
+**A real gap flagged rather than closed:** beyond LowStock's no-dedup
+and the CORS-everywhere question above, `ReceiveStockCommand` still
+doesn't route through `StockAdjustmentStager` (the same gap D1/D2 already
+named) — so a purchase-order receipt not only leaves Reporting's
+low-stock report briefly stale, it now also means Notifications never
+hears about that receipt either. One producer-side fix (routing received
+stock through the same event path adjustments already use) would close
+all three consumers' versions of this gap at once; it's still not done.
+
+**Verified with a 19-check runtime test — three SQLite databases, one
+per service, Notifications hosted via a real ASP.NET Core pipeline
+(`TestServer`, the same approach D1 established for Reporting) with a
+REAL `Microsoft.AspNetCore.SignalR.Client` connection, not a stand-in —
+plus a 9-check Playwright pass against the built Angular app:** the
+backend test proves Warehouse's `AdjustStockCommand` now stages
+deliveries for exactly `{Reporting, Notifications}` and POS's
+`CheckoutCommand` for exactly `{Warehouse, Reporting, Notifications}`;
+that an unauthenticated SignalR connection attempt is actually rejected
+(`[Authorize]` on `NotificationsHub` isn't a no-op); that a real,
+token-bearing connection receives a REAL push — not a mocked one — the
+instant `EventsController` ingests a qualifying event, with the right
+message text; that a repeated delivery of the same sale produces no
+second push; that the identical low-stock event redelivered DOES push
+again (the named gap, proven real); that a normal, non-low stock change
+pushes nothing; and that mark-one/mark-all-as-read both work and are
+reflected in a subsequent `GetRecent`. The Playwright pass mocks every
+gateway REST route as usual but — because the hub bypasses the gateway —
+runs a REAL throwaway `Notifications.API` host on its real port for the
+hub connection alone: a real login token, a real WebSocket, and a real
+server-side `IHubContext` push land in a real Chromium browser, updating
+the bell's unread badge and firing a toast with no page reload, which is
+the one thing a fully mocked gateway could never have actually proven.
+
+**Run it locally (a sixth terminal, alongside
+Identity/Warehouse/POS/Reporting/Gateway):**
+```bash
+cd src/Services/Notifications/Notifications.API
+dotnet run   # http://localhost:5298
+
+cd client
+npm start   # ng serve — http://localhost:4200
+# → sign in; the bell icon in the toolbar shows the live notification feed
 ```
