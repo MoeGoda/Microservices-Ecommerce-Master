@@ -21,5 +21,14 @@ namespace Notifications.Domain.Entities
         // LowStock notifications have no equivalent dedup key — see that
         // handler's own comment for why.
         public int? SourceSaleId { get; set; }
+
+        // Set only for Type == SaleReturned — its own dedup key, kept
+        // SEPARATE from SourceSaleId even though both are a SaleId, for
+        // the same reason Warehouse's ProcessedSaleReturnEvent is its own
+        // table rather than reusing ProcessedSaleEvent: the same SaleId
+        // legitimately produces one SaleCompleted notification AND one
+        // SaleReturned notification, and a single shared column keyed by
+        // SaleId couldn't dedupe those two facts independently.
+        public int? SourceSaleReturnId { get; set; }
     }
 }

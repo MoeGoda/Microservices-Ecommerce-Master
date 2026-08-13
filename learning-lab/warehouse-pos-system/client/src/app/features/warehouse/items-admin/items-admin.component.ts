@@ -21,6 +21,7 @@ import {
   LocationDto,
   PromotionDto,
   StockLevelDto,
+  TransferStockRequest,
   UnitOfMeasureDto,
 } from '../../../shared/models/warehouse.models';
 import { WarehouseService } from '../warehouse.service';
@@ -67,6 +68,7 @@ export class ItemsAdminComponent implements OnInit {
   readonly addingBarcode = signal(false);
   readonly receivingStock = signal(false);
   readonly adjustingStock = signal(false);
+  readonly transferringStock = signal(false);
   readonly updatingPrice = signal(false);
   readonly creatingPromotion = signal(false);
   // The one promotion currently being cancelled, if any — disables just
@@ -102,6 +104,13 @@ export class ItemsAdminComponent implements OnInit {
   readonly adjustForm = new FormGroup({
     locationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     quantityChange: new FormControl(0, { nonNullable: true, validators: [Validators.required] }),
+    reference: new FormControl('', { nonNullable: true }),
+  });
+
+  readonly transferForm = new FormGroup({
+    fromLocationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    toLocationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    quantity: new FormControl(1, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
     reference: new FormControl('', { nonNullable: true }),
   });
 
@@ -191,6 +200,17 @@ export class ItemsAdminComponent implements OnInit {
         // Adjusting requires a StockLevel that already exists — default to
         // the first one on hand rather than leaving the picker empty.
         this.adjustForm.reset({ locationId: levels[0]?.locationId ?? null, quantityChange: 0, reference: '' });
+        // Transferring FROM also requires an existing balance; TO is any
+        // location at all (transferStock creates the destination row if
+        // it doesn't exist yet) — defaulting it to the second stocked
+        // location, if there is one, just avoids the obviously-wrong
+        // same-location default the picker would otherwise start on.
+        this.transferForm.reset({
+          fromLocationId: levels[0]?.locationId ?? null,
+          toLocationId: levels[1]?.locationId ?? this.locations().find((l) => l.id !== levels[0]?.locationId)?.id ?? null,
+          quantity: 1,
+          reference: '',
+        });
       },
     });
   }
@@ -294,6 +314,41 @@ export class ItemsAdminComponent implements OnInit {
       .subscribe({
         next: (level) => {
           this.notification.success(`Stock adjusted — now ${level.quantityOnHand} ${level.unitOfMeasureCode} at ${level.locationName}.`);
+          this.loadStockLevels(item.id);
+        },
+      });
+  }
+
+  submitTransfer(): void {
+    const item = this.selectedItem();
+    if (!item || this.transferForm.invalid || this.transferringStock()) {
+      this.transferForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.transferForm.getRawValue();
+    if (value.fromLocationId === value.toLocationId) {
+      this.notification.error('From and to locations must be different.');
+      return;
+    }
+
+    const request: TransferStockRequest = {
+      itemId: item.id,
+      fromLocationId: value.fromLocationId!,
+      toLocationId: value.toLocationId!,
+      quantity: value.quantity,
+      reference: value.reference,
+    };
+
+    this.transferringStock.set(true);
+    this.warehouseService
+      .transferStock(request)
+      .pipe(finalize(() => this.transferringStock.set(false)))
+      .subscribe({
+        next: (result) => {
+          this.notification.success(
+            `Transferred ${value.quantity} ${result.from.unitOfMeasureCode} from ${result.from.locationName} to ${result.to.locationName}.`,
+          );
           this.loadStockLevels(item.id);
         },
       });

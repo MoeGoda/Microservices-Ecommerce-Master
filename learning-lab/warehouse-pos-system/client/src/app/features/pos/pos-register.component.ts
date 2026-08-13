@@ -45,6 +45,7 @@ export class PosRegisterComponent implements OnInit {
   readonly removingLineId = signal<number | null>(null);
   readonly checkingOut = signal(false);
   readonly cancelling = signal(false);
+  readonly returningSale = signal(false);
 
   readonly startForm = new FormGroup({
     locationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
@@ -165,6 +166,24 @@ export class PosRegisterComponent implements OnInit {
         next: () => {
           this.sale.set(null);
           this.notification.success('Sale cancelled.');
+        },
+      });
+  }
+
+  returnSale(): void {
+    const sale = this.sale();
+    if (!sale || this.returningSale()) {
+      return;
+    }
+
+    this.returningSale.set(true);
+    this.pos
+      .returnSale(sale.id)
+      .pipe(finalize(() => this.returningSale.set(false)))
+      .subscribe({
+        next: (returned) => {
+          this.sale.set(returned);
+          this.notification.success(`Sale #${returned.id} returned.`);
         },
       });
   }

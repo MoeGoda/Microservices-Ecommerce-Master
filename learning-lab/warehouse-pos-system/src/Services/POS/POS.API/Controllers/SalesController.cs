@@ -7,6 +7,7 @@ using POS.Application.Features.Sales.Commands.AddSaleLine;
 using POS.Application.Features.Sales.Commands.CancelSale;
 using POS.Application.Features.Sales.Commands.Checkout;
 using POS.Application.Features.Sales.Commands.RemoveSaleLine;
+using POS.Application.Features.Sales.Commands.ReturnSale;
 using POS.Application.Features.Sales.Commands.StartSale;
 using POS.Application.Features.Sales.Queries.GetSaleById;
 using POS.Application.Models;
@@ -79,6 +80,13 @@ namespace POS.API.Controllers
         public async Task<ActionResult<SaleDto>> Cancel(int id)
         {
             return Ok(await _mediator.Send(new CancelSaleCommand { SaleId = id }));
+        }
+
+        [HttpPost("{id:int}/return")]
+        [ProducesResponseType(typeof(SaleDto), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<SaleDto>> Return(int id)
+        {
+            return Ok(await _mediator.Send(new ReturnSaleCommand { SaleId = id }));
         }
     }
 }

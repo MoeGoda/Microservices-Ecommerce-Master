@@ -12,7 +12,7 @@ using Notifications.Infrastructure.Persistence;
 namespace Notifications.Infrastructure.Migrations
 {
     [DbContext(typeof(NotificationsContext))]
-    [Migration("20260813095803_InitialCreate")]
+    [Migration("20260813145650_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -47,6 +47,9 @@ namespace Notifications.Infrastructure.Migrations
                     b.Property<int?>("SourceSaleId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("SourceSaleReturnId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -59,6 +62,10 @@ namespace Notifications.Infrastructure.Migrations
                     b.HasIndex("SourceSaleId")
                         .IsUnique()
                         .HasFilter("SourceSaleId IS NOT NULL");
+
+                    b.HasIndex("SourceSaleReturnId")
+                        .IsUnique()
+                        .HasFilter("SourceSaleReturnId IS NOT NULL");
 
                     b.ToTable("Notifications");
                 });

@@ -34,6 +34,17 @@ namespace Reporting.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<SaleRecord?> GetBySaleId(int saleId)
+        {
+            return await _context.SaleRecords.FirstOrDefaultAsync(r => r.SaleId == saleId);
+        }
+
+        public Task UpdateAsync(SaleRecord record)
+        {
+            _context.SaleRecords.Update(record);
+            return Task.CompletedTask;
+        }
+
         public async Task<IEnumerable<SalesByDayDto>> GetSalesByDay()
         {
             // Grouping on .Date (translates to the provider's own
@@ -46,8 +57,11 @@ namespace Reporting.Infrastructure.Repositories
             // decimal fine, but this keeps the same query portable across
             // both providers at the cost of double's precision, which is
             // ample for a reporting total.
+            // Excludes returned sales — a sale that's been given back
+            // shouldn't keep counting toward the day's revenue.
             var grouped = await _context.SaleRecords
                 .AsNoTracking()
+                .Where(r => r.ReturnedAtUtc == null)
                 .GroupBy(r => r.CompletedAtUtc.Date)
                 .Select(g => new { Date = g.Key, SaleCount = g.Count(), Total = g.Sum(r => (double)r.Total) })
                 .OrderBy(g => g.Date)

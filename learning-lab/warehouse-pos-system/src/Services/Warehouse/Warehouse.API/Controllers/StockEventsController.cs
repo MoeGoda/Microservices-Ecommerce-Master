@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using Warehouse.Application.Features.Stock.Commands.ApplySale;
+using Warehouse.Application.Features.Stock.Commands.ApplySaleReturn;
 using Warehouse.Application.Models;
 
 namespace Warehouse.API.Controllers
@@ -28,6 +29,13 @@ namespace Warehouse.API.Controllers
         [HttpPost("sale-completed")]
         [ProducesResponseType(typeof(ApplySaleResultDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<ApplySaleResultDto>> SaleCompleted([FromBody] ApplySaleCommand command)
+        {
+            return Ok(await _mediator.Send(command));
+        }
+
+        [HttpPost("sale-returned")]
+        [ProducesResponseType(typeof(ApplySaleResultDto), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<ApplySaleResultDto>> SaleReturned([FromBody] ApplySaleReturnCommand command)
         {
             return Ok(await _mediator.Send(command));
         }

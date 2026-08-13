@@ -21,6 +21,7 @@ namespace Notifications.Infrastructure.Migrations
                     Message = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     IsRead = table.Column<bool>(type: "bit", nullable: false),
                     SourceSaleId = table.Column<int>(type: "int", nullable: true),
+                    SourceSaleReturnId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -56,6 +57,13 @@ namespace Notifications.Infrastructure.Migrations
                 column: "SourceSaleId",
                 unique: true,
                 filter: "SourceSaleId IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Notifications_SourceSaleReturnId",
+                table: "Notifications",
+                column: "SourceSaleReturnId",
+                unique: true,
+                filter: "SourceSaleReturnId IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_StockLevelSnapshots_ItemId_LocationId",

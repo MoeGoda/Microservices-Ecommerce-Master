@@ -65,6 +65,11 @@
   font-style: italic;
 }
 
+.returned-note {
+  color: var(--mat-sys-on-surface-variant, #555);
+  font-style: italic;
+}
+
 .original-price {
   text-decoration: line-through;
   color: #777;

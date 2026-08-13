@@ -12,7 +12,7 @@ using Warehouse.Infrastructure.Persistence;
 namespace Warehouse.Infrastructure.Migrations
 {
     [DbContext(typeof(WarehouseContext))]
-    [Migration("20260813100420_InitialCreate")]
+    [Migration("20260813145206_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -355,6 +355,28 @@ namespace Warehouse.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProcessedSaleEvents");
+                });
+
+            modelBuilder.Entity("Warehouse.Domain.Entities.ProcessedSaleReturnEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId")
+                        .IsUnique();
+
+                    b.ToTable("ProcessedSaleReturnEvents");
                 });
 
             modelBuilder.Entity("Warehouse.Domain.Entities.Promotion", b =>

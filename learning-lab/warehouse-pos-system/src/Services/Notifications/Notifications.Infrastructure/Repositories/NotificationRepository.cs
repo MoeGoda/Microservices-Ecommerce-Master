@@ -46,6 +46,11 @@ namespace Notifications.Infrastructure.Repositories
             return await _context.Notifications.AnyAsync(n => n.SourceSaleId == saleId);
         }
 
+        public async Task<bool> ExistsForSaleReturn(int saleId)
+        {
+            return await _context.Notifications.AnyAsync(n => n.SourceSaleReturnId == saleId);
+        }
+
         public Task UpdateAsync(Notification notification)
         {
             _context.Notifications.Update(notification);

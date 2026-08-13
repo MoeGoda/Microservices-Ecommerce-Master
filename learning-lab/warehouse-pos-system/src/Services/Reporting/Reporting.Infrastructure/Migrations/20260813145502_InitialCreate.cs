@@ -43,6 +43,7 @@ namespace Reporting.Infrastructure.Migrations
                     Total = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     CompletedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     LineCount = table.Column<int>(type: "int", nullable: false),
+                    ReturnedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>

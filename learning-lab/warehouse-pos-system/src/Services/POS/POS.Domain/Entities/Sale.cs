@@ -33,6 +33,11 @@ namespace POS.Domain.Entities
 
         public DateTime? CompletedAt { get; set; }
 
+        // Set only when Status transitions to Returned — mirrors
+        // CompletedAt's own "when did this state change actually happen"
+        // role, one step later in the sale's lifecycle.
+        public DateTime? ReturnedAt { get; set; }
+
         // Set to Pending the moment checkout completes; updated later by
         // the outbox dispatcher once it learns whether Warehouse actually
         // applied the stock decrement. Meaningless (stays at its default)

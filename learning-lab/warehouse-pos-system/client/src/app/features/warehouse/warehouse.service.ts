@@ -18,6 +18,8 @@ import {
   PromotionDto,
   ReceiveStockRequest,
   StockLevelDto,
+  TransferStockRequest,
+  TransferStockResultDto,
   UnitOfMeasureDto,
   UpdateItemPriceRequest,
 } from '../../shared/models/warehouse.models';
@@ -62,6 +64,10 @@ export class WarehouseService {
 
   adjustStock(request: AdjustStockRequest): Observable<StockLevelDto> {
     return this.http.post<StockLevelDto>(`${BASE}/Stock/adjust`, request);
+  }
+
+  transferStock(request: TransferStockRequest): Observable<TransferStockResultDto> {
+    return this.http.post<TransferStockResultDto>(`${BASE}/Stock/transfer`, request);
   }
 
   getCategories(): Observable<CategoryDto[]> {

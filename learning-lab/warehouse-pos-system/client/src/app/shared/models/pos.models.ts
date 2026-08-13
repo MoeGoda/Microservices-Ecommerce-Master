@@ -25,9 +25,12 @@ export interface SaleDto {
   id: number;
   locationId: number;
   cashierUserId: number;
-  status: 'InProgress' | 'Completed' | 'Cancelled';
+  status: 'InProgress' | 'Completed' | 'Cancelled' | 'Returned';
   total: number;
   completedAt: string | null;
+  // Set only once Status transitions to Returned — mirrors completedAt's
+  // own role one step later in the sale's lifecycle (backend, Sale.ReturnedAt).
+  returnedAt: string | null;
   stockSyncStatus: 'Pending' | 'Synced' | 'Failed';
   lines: SaleLineDto[];
 }

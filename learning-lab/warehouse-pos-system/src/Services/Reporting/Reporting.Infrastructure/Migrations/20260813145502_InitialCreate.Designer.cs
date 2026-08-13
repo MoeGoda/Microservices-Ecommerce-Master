@@ -12,7 +12,7 @@ using Reporting.Infrastructure.Persistence;
 namespace Reporting.Infrastructure.Migrations
 {
     [DbContext(typeof(ReportingContext))]
-    [Migration("20260813011030_InitialCreate")]
+    [Migration("20260813145502_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -92,6 +92,9 @@ namespace Reporting.Infrastructure.Migrations
 
                     b.Property<int>("LocationId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("ReturnedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("SaleId")
                         .HasColumnType("int");

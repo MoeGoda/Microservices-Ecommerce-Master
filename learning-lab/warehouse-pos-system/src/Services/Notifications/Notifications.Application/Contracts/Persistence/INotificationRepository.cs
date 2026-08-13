@@ -9,6 +9,7 @@ namespace Notifications.Application.Contracts.Persistence
         Task<IEnumerable<Notification>> GetUnread();
         Task<Notification?> GetById(int id);
         Task<bool> ExistsForSale(int saleId);
+        Task<bool> ExistsForSaleReturn(int saleId);
         Task UpdateAsync(Notification notification);
     }
 }

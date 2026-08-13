@@ -72,6 +72,20 @@ namespace Warehouse.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ProcessedSaleReturnEvents",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    SaleId = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ProcessedSaleReturnEvents", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "UnitsOfMeasure",
                 columns: table => new
                 {
@@ -421,6 +435,12 @@ namespace Warehouse.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ProcessedSaleReturnEvents_SaleId",
+                table: "ProcessedSaleReturnEvents",
+                column: "SaleId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Promotions_ItemId",
                 table: "Promotions",
                 column: "ItemId");
@@ -475,6 +495,9 @@ namespace Warehouse.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ProcessedSaleEvents");
+
+            migrationBuilder.DropTable(
+                name: "ProcessedSaleReturnEvents");
 
             migrationBuilder.DropTable(
                 name: "Promotions");

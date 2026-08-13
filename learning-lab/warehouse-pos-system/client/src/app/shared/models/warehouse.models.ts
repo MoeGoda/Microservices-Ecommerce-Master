@@ -137,6 +137,22 @@ export interface AdjustStockRequest {
   reference?: string;
 }
 
+// Mirrors TransferStockCommand.
+export interface TransferStockRequest {
+  itemId: number;
+  fromLocationId: number;
+  toLocationId: number;
+  quantity: number;
+  reference?: string;
+}
+
+// Mirrors TransferStockResultDto — both sides of the move, so the caller
+// can show the new balance at the source and the destination at once.
+export interface TransferStockResultDto {
+  from: StockLevelDto;
+  to: StockLevelDto;
+}
+
 // Mirrors Warehouse.Domain.Entities.BarcodeType.
 export const BARCODE_TYPES = ['EAN13', 'EAN8', 'UPC', 'Code128', 'QRCode', 'Other'] as const;
 

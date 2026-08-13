@@ -23,7 +23,16 @@ namespace POS.Infrastructure.Http
 
         public async Task<EventPublishResult> PublishAsync(string eventType, string payloadJson, CancellationToken cancellationToken)
         {
-            if (eventType != OutboxEventTypes.SaleCompleted)
+            string downstreamPath;
+            if (eventType == OutboxEventTypes.SaleCompleted)
+            {
+                downstreamPath = "api/v1/Events/sale-completed";
+            }
+            else if (eventType == OutboxEventTypes.SaleReturned)
+            {
+                downstreamPath = "api/v1/Events/sale-returned";
+            }
+            else
             {
                 return EventPublishResult.Failed($"NotificationsEventPublisher doesn't understand event type '{eventType}'.");
             }
@@ -33,7 +42,7 @@ namespace POS.Infrastructure.Http
                 using var content = new StringContent(payloadJson, Encoding.UTF8);
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-                using var response = await _httpClient.PostAsync("api/v1/Events/sale-completed", content, cancellationToken);
+                using var response = await _httpClient.PostAsync(downstreamPath, content, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {

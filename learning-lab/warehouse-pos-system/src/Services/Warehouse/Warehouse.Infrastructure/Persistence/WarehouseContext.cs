@@ -18,6 +18,7 @@ namespace Warehouse.Infrastructure.Persistence
         public DbSet<StockLevel> StockLevels => Set<StockLevel>();
         public DbSet<StockTransaction> StockTransactions => Set<StockTransaction>();
         public DbSet<ProcessedSaleEvent> ProcessedSaleEvents => Set<ProcessedSaleEvent>();
+        public DbSet<ProcessedSaleReturnEvent> ProcessedSaleReturnEvents => Set<ProcessedSaleReturnEvent>();
         public DbSet<ItemPriceHistory> ItemPriceHistories => Set<ItemPriceHistory>();
         public DbSet<Promotion> Promotions => Set<Promotion>();
         public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
@@ -164,6 +165,14 @@ namespace Warehouse.Infrastructure.Persistence
                 // here at most once, so a retried delivery of the same
                 // SaleCompleted event is detectable as a duplicate rather
                 // than silently decrementing stock twice.
+                builder.HasIndex(p => p.SaleId).IsUnique();
+            });
+
+            modelBuilder.Entity<ProcessedSaleReturnEvent>(builder =>
+            {
+                // A separate table from ProcessedSaleEvent's own unique
+                // index — see ProcessedSaleReturnEvent's own comment for
+                // why a SaleId needs independent dedup tracking here.
                 builder.HasIndex(p => p.SaleId).IsUnique();
             });
 

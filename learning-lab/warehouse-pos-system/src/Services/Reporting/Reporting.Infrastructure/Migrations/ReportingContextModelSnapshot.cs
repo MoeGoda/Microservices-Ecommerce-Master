@@ -90,6 +90,9 @@ namespace Reporting.Infrastructure.Migrations
                     b.Property<int>("LocationId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ReturnedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("SaleId")
                         .HasColumnType("int");
 

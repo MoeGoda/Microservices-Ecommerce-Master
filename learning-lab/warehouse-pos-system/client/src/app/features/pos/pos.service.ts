@@ -37,4 +37,8 @@ export class PosService {
   cancelSale(saleId: number): Observable<SaleDto> {
     return this.http.post<SaleDto>(`${BASE}/Sales/${saleId}/cancel`, {});
   }
+
+  returnSale(saleId: number): Observable<SaleDto> {
+    return this.http.post<SaleDto>(`${BASE}/Sales/${saleId}/return`, {});
+  }
 }

@@ -20,5 +20,14 @@ namespace Reporting.Domain.Entities
         public decimal Total { get; set; }
         public DateTime CompletedAtUtc { get; set; }
         public int LineCount { get; set; }
+
+        // Null until IngestSaleReturnedCommand marks this sale returned —
+        // its own idempotency check (mirroring ExistsForSale's "does the
+        // fact already exist" idea, just as a column instead of a
+        // separate inbox table, since there's already exactly one row per
+        // SaleId to hold it on). GetSalesByDay/GetTopSellingItems both
+        // filter on this so a returned sale stops counting toward revenue
+        // once it's flagged.
+        public DateTime? ReturnedAtUtc { get; set; }
     }
 }

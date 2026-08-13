@@ -110,12 +110,16 @@
         </div>
       </mat-card-content>
     </mat-card>
-  } @else if (sale()!.status === 'Completed') {
+  } @else if (sale()!.status === 'Completed' || sale()!.status === 'Returned') {
     <mat-card class="receipt-card">
       <mat-card-header>
         <mat-card-title>Receipt — Sale #{{ sale()!.id }}</mat-card-title>
         <mat-card-subtitle>
-          Completed {{ sale()!.completedAt | date: 'medium' }} · stock sync: {{ sale()!.stockSyncStatus }}
+          @if (sale()!.status === 'Returned') {
+            Returned {{ sale()!.returnedAt | date: 'medium' }} (originally completed {{ sale()!.completedAt | date: 'medium' }})
+          } @else {
+            Completed {{ sale()!.completedAt | date: 'medium' }} · stock sync: {{ sale()!.stockSyncStatus }}
+          }
         </mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
@@ -159,13 +163,22 @@
           a bug to poll away; it's the whole point of decoupling checkout's
           response from Warehouse's own confirmation.
         -->
-        @if (sale()!.stockSyncStatus === 'Failed') {
+        @if (sale()!.status === 'Completed' && sale()!.stockSyncStatus === 'Failed') {
           <p class="sync-failed-note">
             Stock sync failed after retries — flagged for reconciliation. The sale itself is still final.
           </p>
         }
 
-        <button mat-flat-button color="primary" type="button" (click)="startNewSale()">New sale</button>
+        @if (sale()!.status === 'Returned') {
+          <p class="returned-note">This sale was returned — stock has been restocked at its original location.</p>
+        }
+
+        <div class="action-row">
+          @if (sale()!.status === 'Completed') {
+            <button mat-stroked-button type="button" (click)="returnSale()" [disabled]="returningSale()">Return sale</button>
+          }
+          <button mat-flat-button color="primary" type="button" (click)="startNewSale()">New sale</button>
+        </div>
       </mat-card-content>
     </mat-card>
   }

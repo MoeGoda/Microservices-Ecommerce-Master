@@ -7,6 +7,13 @@ namespace POS.Application.Features.Outbox
     public static class OutboxEventTypes
     {
         public const string SaleCompleted = "SaleCompleted";
+
+        // ReturnSaleCommand's own event — same consumers as SaleCompleted
+        // (Warehouse restocks, Reporting excludes it from revenue,
+        // Notifications tells someone), reusing SaleCompletedMessage's
+        // shape since a return describes the exact same sale/lines, just
+        // with the opposite meaning.
+        public const string SaleReturned = "SaleReturned";
     }
 
     // Every ConsumerName an OutboxDelivery can target — has to match the

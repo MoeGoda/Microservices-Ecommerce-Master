@@ -32,6 +32,11 @@ namespace Notifications.Infrastructure.Persistence
                 // trap here).
                 builder.HasIndex(n => n.SourceSaleId).IsUnique().HasFilter("SourceSaleId IS NOT NULL");
 
+                // Same filtered-unique idea, independent key — see
+                // SourceSaleReturnId's own comment for why this can't
+                // share SourceSaleId's index.
+                builder.HasIndex(n => n.SourceSaleReturnId).IsUnique().HasFilter("SourceSaleReturnId IS NOT NULL");
+
                 // The feed's own access pattern — newest first, capped.
                 builder.HasIndex(n => n.CreatedAt);
             });

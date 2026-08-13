@@ -31,8 +31,18 @@ namespace Reporting.Infrastructure.Repositories
             // is summed as double — SQLite has no SUM(decimal) translation
             // (SQL Server sums the real decimal fine) — and cast back after
             // materializing, same tradeoff as SaleRecordRepository.GetSalesByDay.
+            // No navigation property from SaleLineRecord back to SaleRecord
+            // (see SaleLineRecord's own comment on why lines are split
+            // out), so excluding returned sales here is a subquery against
+            // SaleRecords' own SaleId — not an Include/filter on a
+            // relationship that doesn't exist.
+            var returnedSaleIds = _context.SaleRecords
+                .Where(r => r.ReturnedAtUtc != null)
+                .Select(r => r.SaleId);
+
             var grouped = await _context.SaleLineRecords
                 .AsNoTracking()
+                .Where(l => !returnedSaleIds.Contains(l.SaleId))
                 .GroupBy(l => l.ItemId)
                 .Select(g => new
                 {

@@ -37,6 +37,7 @@ namespace POS.Infrastructure.Migrations
                     Status = table.Column<int>(type: "int", nullable: false),
                     Total = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ReturnedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     StockSyncStatus = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },

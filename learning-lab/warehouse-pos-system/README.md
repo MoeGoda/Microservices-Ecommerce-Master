@@ -876,10 +876,15 @@ have to keep two rows in sync and never in the services that don't.
 - **A deliberately narrow `Cancelled`.** It means "abandoned before
   payment," nothing more. A *post-completion* return/refund is a
   materially different feature — it needs a compensating stock increase
-  on Warehouse's side, not just a status flip in POS — and doesn't exist
-  yet. The enum's own comment says so explicitly, so a future "add
-  returns" step finds a clear, named gap instead of ambiguous room to
-  misuse `Cancelled` for something it was never designed to mean.
+  on Warehouse's side, not just a status flip in POS — and the enum's own
+  comment said so explicitly, so a future "add returns" step would find a
+  clear, named gap instead of ambiguous room to misuse `Cancelled` for
+  something it was never designed to mean.
+
+  **Update:** that step has since landed — see the "Sale returns/refunds"
+  section near the end of this document for `ReturnSaleCommand`, the new
+  `Returned` status this bullet anticipated, and the compensating
+  Warehouse/Reporting/Notifications flow it triggers.
 
 **Verified with a focused runtime test (SQLite, deleted after — same
 approach as B1/B2), dispatched through actual MediatR, not calling
@@ -1871,3 +1876,197 @@ cd client
 npm start   # ng serve — http://localhost:4200
 # → sign in; the bell icon in the toolbar shows the live notification feed
 ```
+
+## Business gap — Sale returns/refunds
+
+**What it does:** closes the gap C1's own `SaleStatus` comment named
+explicitly — a completed sale could never be reversed. A new `Returned`
+status and `ReturnSaleCommand` let a cashier return a `Completed` sale;
+POS fans a `SaleReturned` event out to the same three consumers
+`SaleCompleted` already reaches (Warehouse, Reporting, Notifications),
+each applying the reversal in its own way: Warehouse restocks the
+quantity, Reporting stops counting the sale toward revenue, Notifications
+pushes a second, independent "returned" toast.
+
+**`SaleReturned` reuses `SaleCompletedMessage`'s exact shape — only the
+`EventType` string and the downstream URL path change.** A return moves
+the same `{ SaleId, LocationId, Lines[...] }` data as a completion; the
+only thing that differs is which direction each consumer applies it, and
+that's a routing decision each `IEventPublisher` already had to make
+per-event-type anyway. Every producer-side publisher
+(`WarehouseEventPublisher`, `ReportingEventPublisher`,
+`NotificationsEventPublisher`, all in `POS.Infrastructure`) went from a
+single hardcoded `if` guard to an `if`/`else if` on `eventType`, picking a
+different downstream path — no new message class, no new outbox
+machinery, and `OutboxDispatcher` itself needed zero changes: it already
+resolves publishers by `ConsumerName`, not by event type.
+
+**Warehouse's restock is `ApplySaleCommand`'s mirror image, sharing its
+`StockAdjustmentStager` — but with its own idempotency table, not a
+reused one.** `ApplySaleReturnCommand` stages a positive
+`StockAdjustmentStager.Stage(...)` per line (`StockTransactionReason.Return`,
+a new value distinct from `Adjustment` so the audit trail stays
+filterable by reason) instead of `ApplySaleCommand`'s negative one, and
+commits once at the end — the same all-or-nothing atomicity
+`ApplySaleCommand` already relies on. The idempotency check is a
+**separate** table, `ProcessedSaleReturnEvent`, not a second column
+tacked onto the existing `ProcessedSaleEvent`: a given `SaleId`
+legitimately appears in both tables at once — once when the original sale
+decremented stock, once when its return restocked it — and a single
+table keyed by `SaleId` couldn't dedupe those two distinct facts
+independently. Notifications' `Notification.SourceSaleReturnId` (kept
+separate from `SourceSaleId` for the identical reason) and the two
+tables' own unique indexes are the same pattern, twice.
+
+**Reporting doesn't get a second table either — a return is a mutation of
+the existing `SaleRecord`, not a new fact alongside it.**
+`IngestSaleReturnedCommand` finds the `SaleRecord` by `SaleId` and stamps
+`ReturnedAtUtc`, rather than inserting a new row the way `SaleCompleted`
+ingestion does — there's already exactly one row per sale to hold that
+flag on. `GetSalesByDay` and `GetTopSellingItems` both now filter it out;
+the second one has no `SaleLineRecord → SaleRecord` navigation property to
+`Include` through (see that entity's own comment on why lines are split
+out), so the exclusion is a plain subquery against `SaleRecords.SaleId`
+instead.
+
+**If `SaleReturned` is delivered before `SaleCompleted` has been ingested
+yet, `IngestSaleReturnedCommandHandler` throws `NotFoundException` — and
+that's the self-healing path, not a bug.** At-least-once delivery across
+two *separate* outbox messages gives no ordering guarantee between them;
+a `NotFoundException` becomes a failed HTTP response, which POS's
+`OutboxDispatcher` already treats as retryable (`MaxAttempts = 5`) for
+every other consumer. No new retry mechanism was needed — just reusing
+the one that already existed correctly.
+
+**Concepts introduced:**
+- **Reusing one message shape for two semantically opposite events.**
+  `EventType` alone (`SaleCompleted` vs `SaleReturned`) carries the
+  distinction; the payload shape staying identical is what let every
+  consumer's routing collapse to a single `if`/`else if` rather than a
+  parallel set of return-flavored DTOs.
+- **Independent dedup keys for facts that share a natural key.** The same
+  `SaleId` needs to be "have I applied this sale" and "have I reversed
+  this sale" *at the same time*, in the same row's neighborhood
+  (`ProcessedSaleEvent`/`ProcessedSaleReturnEvent`,
+  `SourceSaleId`/`SourceSaleReturnId`) — one column or table per question,
+  never one shared between two.
+- **A mutation-in-place read model vs. an append-only one**, in the same
+  service. `SaleRecord` gets a nullable `ReturnedAtUtc` mutated after the
+  fact (there's only ever one row per sale); Warehouse's `StockTransaction`
+  ledger, by contrast, never mutates a past row for a return — it appends
+  a new one with `Reason = Return`. Which shape fits depends on whether
+  the entity already models "the current state of one thing" or "an
+  immutable history of events."
+
+**Verified with a 30-check runtime test — four SQLite databases, one per
+service, dispatched through actual MediatR pipelines (validators and all),
+not calling handlers directly — plus a Playwright pass against the built
+Angular app:** the backend test proves `ApplySaleCommand` then
+`ApplySaleReturnCommand` round-trips a stock level back to its original
+quantity, with a real `StockTransaction` row stamped `Reason = Return` and
+`Reference = "Return of Sale {id}"`; that redelivering either command a
+second time is a no-op (`AlreadyProcessed = true`) with no double
+decrement/restock; that `ProcessedSaleEvent` and `ProcessedSaleReturnEvent`
+both hold exactly one row for the *same* `SaleId` at the same time, proving
+the separate-table decision actually avoids the collision a shared one
+would hit; that `GetSalesByDay`/`GetTopSellingItems` include a sale's
+revenue before its return and exclude it after; that an unknown `SaleId`
+delivered to `IngestSaleReturnedCommand` throws `NotFoundException`
+rather than silently no-op'ing; that the same `SaleId` produces two
+independently-dedup'd Notifications (`SaleCompleted` and `SaleReturned`);
+and that `ReturnSaleCommand` transitions a `Completed` sale to `Returned`,
+fans exactly 3 pending `OutboxDelivery` rows out
+(Warehouse/Reporting/Notifications), and rejects returning a sale that's
+already `Returned` or still `InProgress`. The Playwright pass mocks the
+gateway's REST routes as usual, drives the register component straight to
+its `Completed` receipt state, clicks "Return sale," and confirms the
+button disappears, a "this sale was returned" note appears, and the real
+`POST .../return` call actually fired.
+
+**Run it:** no new terminal — `ReturnSaleCommand` is a new endpoint on the
+existing POS.API (`POST /api/v1/Sales/{id}/return`, gatewayed as
+`POST /Pos/Sales/{id}/return`); the register screen's receipt card shows a
+"Return sale" button once a sale is `Completed`.
+
+## Business gap — Location-to-location stock transfer
+
+**What it does:** closes the second gap the returns/refunds work above
+surfaced while grepping for it — `StockTransactionReason.TransferIn` and
+`TransferOut` had been declared since B1 but no command anywhere ever
+constructed a `StockTransaction` with either value. `TransferStockCommand`
+is their first (and only) caller: move a quantity of one item from one
+Warehouse location to another, in one atomic operation, through a new
+Admin Panel form.
+
+**One command, two calls to the exact same `StockAdjustmentStager.Stage(...)`
+every other stock command already uses — a negative one at the source,
+a positive one at the destination — committed once.** No new staging
+logic was needed: `AdjustStockCommand` already proved `Stage(...)` handles
+the negative-balance guard, the `StockTransaction` audit row, and the
+`StockLevelChanged` outbox event for a single location; a transfer is
+just that, called twice with `TransferOut`/`TransferIn` instead of
+`Adjustment`, before one shared `SaveChangesAsync()`. The destination call
+passes `createIfMissing: true` (the same flag `ReceiveStockCommandHandler`
+already needed) — a transfer can legitimately be the first stock an item
+has ever had at that location.
+
+**Atomicity here is free, not hand-rolled — the same reasoning
+`ApplySaleCommand`'s own comment already gives for a multi-line sale.**
+`Stage()` only ever stages; it never calls `SaveChangesAsync` itself. The
+source is staged FIRST: if it doesn't have enough stock,
+`InsufficientStockException` throws right there, before the destination
+is ever touched, and nothing has been saved yet — there is no
+half-transfer state where stock vanished from the source without landing
+at the destination, and no compensating rollback needed to prevent one.
+An unknown source `(item, location)` pair throws `NotFoundException` the
+same way `AdjustStockCommand` already does, for the same reason: a
+transfer's source, unlike a transfer's destination, has to already have a
+balance to move.
+
+**A same-location "transfer" is rejected by validation, not left to net
+out to a no-op.** `FromLocationId == ToLocationId` would still stage a
+`-Q` and a `+Q` `StockTransaction` at the same `(item, location)` pair —
+netting to zero real stock change but writing two meaningless audit rows
+— so `TransferStockCommandValidator` rejects it outright with a
+`ValidationException`, the same "reject malformed input before the
+handler ever runs" job every other command's validator already does.
+
+**Concepts introduced:**
+- **A years-old dead enum value finally getting its first real caller.**
+  `TransferIn`/`TransferOut` are proof that a domain model can carry
+  intent ahead of the feature that uses it without that being a design
+  smell — the enum's own comment (added alongside this step) now says so
+  explicitly, the same "name the gap so a future step finds it named"
+  discipline C1's `SaleStatus` comment already modeled for returns/refunds.
+- **Free atomicity from deferred `SaveChangesAsync`, applied to a
+  TWO-location operation** rather than the multi-LINE operation
+  `ApplySaleCommand` originally demonstrated it for — same mechanism,
+  a different shape of "more than one thing has to succeed together."
+
+**Verified with a 14-check runtime test, extending the same SQLite
+Warehouse database and MediatR pipeline the returns/refunds test above
+already set up — plus a Playwright pass against the built Angular app:**
+the backend test proves a normal transfer decrements the source to the
+expected quantity, creates the destination `StockLevel` row with the
+transferred quantity, and records a `TransferOut`/`TransferIn` pair of
+`StockTransaction` rows with the right signs; that two `StockLevelChanged`
+events are staged (one per location) and each fans out to both Reporting
+and Notifications (4 deliveries total); that a same-location transfer is
+rejected by validation before touching the database; that transferring an
+item with no stock at all at the source throws `NotFoundException` and
+leaves NO destination row behind (proving the "source fails first, before
+the destination is touched" ordering actually holds); and that
+transferring MORE than the source has throws `InsufficientStockException`
+and leaves both locations' quantities completely unchanged. The Playwright
+pass mocks the gateway's REST routes, opens the Admin Panel, selects an
+item with existing stock, submits the new "Transfer stock" form, and
+confirms the real `POST .../Stock/transfer` call fired with the right
+body and that the stock-on-hand table refreshes to show both the
+destination's new row and the source's reduced quantity.
+
+**Run it:** no new terminal — `TransferStockCommand` is a new endpoint on
+the existing Warehouse.API (`POST /api/v1/Stock/transfer`, gatewayed as
+`POST /Warehouse/Stock/transfer`); the Admin Panel's item detail view
+shows a "Transfer stock" form alongside the existing "Receive stock"/
+"Adjust stock" ones once an item with at least one stock level is
+selected.

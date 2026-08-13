@@ -8,11 +8,9 @@ namespace POS.Infrastructure.Http
     // The real delivery mechanism behind the "Warehouse" consumer — an
     // HTTP POST to Warehouse.API's StockEventsController (Step C3), using
     // the same typed-HttpClient-plus-ServiceAuthHandler registration
-    // pattern as IWarehouseCatalogClient (C2). Only understands
-    // EventType == "SaleCompleted" — that's the only event Warehouse
-    // subscribes to today; a second event type would need a branch here
-    // (or its own IEventPublisher, if Warehouse ever needed a genuinely
-    // different transport/endpoint for it).
+    // pattern as IWarehouseCatalogClient (C2). Understands SaleCompleted
+    // and SaleReturned — each routes to its own StockEventsController
+    // action, applying the same lines in opposite directions.
     public class WarehouseEventPublisher : IEventPublisher
     {
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -28,7 +26,21 @@ namespace POS.Infrastructure.Http
 
         public async Task<EventPublishResult> PublishAsync(string eventType, string payloadJson, CancellationToken cancellationToken)
         {
-            if (eventType != OutboxEventTypes.SaleCompleted)
+            // SaleReturned routes to Warehouse's own ApplySaleReturnCommand
+            // (a compensating stock INCREASE) instead of ApplySaleCommand's
+            // decrease — same request shape either way, since both only
+            // ever needed ItemId/Quantity per line; the downstream PATH is
+            // what tells Warehouse which direction to apply it.
+            string downstreamPath;
+            if (eventType == OutboxEventTypes.SaleCompleted)
+            {
+                downstreamPath = "api/v1/StockEvents/sale-completed";
+            }
+            else if (eventType == OutboxEventTypes.SaleReturned)
+            {
+                downstreamPath = "api/v1/StockEvents/sale-returned";
+            }
+            else
             {
                 return EventPublishResult.Failed($"WarehouseEventPublisher doesn't understand event type '{eventType}'.");
             }
@@ -36,11 +48,11 @@ namespace POS.Infrastructure.Http
             var message = JsonSerializer.Deserialize<SaleCompletedMessage>(payloadJson, JsonOptions);
             if (message is null)
             {
-                return EventPublishResult.Failed("SaleCompleted payload deserialized to null.");
+                return EventPublishResult.Failed($"{eventType} payload deserialized to null.");
             }
 
-            // Warehouse's ApplySaleCommand only needs ItemId/Quantity per
-            // line to decrement stock — everything else on
+            // Warehouse's ApplySaleCommand/ApplySaleReturnCommand only need
+            // ItemId/Quantity per line to adjust stock — everything else on
             // SaleCompletedMessage (Sku/ItemName/UnitPrice/LineTotal,
             // CashierUserId, Total) exists for Reporting's benefit, not
             // this consumer's.
@@ -53,7 +65,7 @@ namespace POS.Infrastructure.Http
 
             try
             {
-                using var response = await _httpClient.PostAsJsonAsync("api/v1/StockEvents/sale-completed", request, JsonOptions, cancellationToken);
+                using var response = await _httpClient.PostAsJsonAsync(downstreamPath, request, JsonOptions, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {
