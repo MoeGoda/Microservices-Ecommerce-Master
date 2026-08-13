@@ -1,4 +1,5 @@
 using Common.ExceptionHandling;
+using Common.RequestCulture;
 using Common.Security;
 using Identity.Application;
 using Identity.Infrastructure;
@@ -20,6 +21,12 @@ builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPa
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
+
+// F3 — En/Ar culture negotiation via the Accept-Language header. Sets
+// CurrentUICulture per request, which both FluentValidation's own built-in
+// LanguageManager (already ships Arabic translations for every stock
+// validator message) and Common.Localization's Messages class key off of.
+builder.Services.AddSharedRequestLocalization();
 
 // This is the piece that turns "a string in the Authorization header" into
 // a populated User.Claims on every controller. The same shared extension
@@ -85,6 +92,10 @@ using (var scope = app.Services.CreateScope())
 // ValidationException from a MediatR handler, an unexpected NullReferenceException,
 // anything — gets caught here and turned into a consistent ProblemDetails response.
 app.UseCommonExceptionHandling();
+
+// Must run before UseAuthentication/MapControllers — see Common.RequestCulture's
+// own comment for why.
+app.UseSharedRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {

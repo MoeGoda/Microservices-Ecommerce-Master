@@ -1,5 +1,6 @@
 using System.Text;
 using Common.ExceptionHandling;
+using Common.RequestCulture;
 using Common.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,9 @@ builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPa
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
+
+// F3 — En/Ar culture negotiation. See Identity.API's Program.cs for why.
+builder.Services.AddSharedRequestLocalization();
 
 // Hand-rolled rather than a call to Common.Security's shared
 // AddJwtAuthentication — every other service uses that extension
@@ -140,6 +144,7 @@ using (var scope = app.Services.CreateScope())
 
 // First in the pipeline — see Identity.API's Program.cs for why.
 app.UseCommonExceptionHandling();
+app.UseSharedRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {

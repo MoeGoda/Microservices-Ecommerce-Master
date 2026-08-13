@@ -1,17 +1,24 @@
 <mat-toolbar color="primary">
-  <span>Warehouse &amp; POS</span>
+  <span>{{ 'common.appName' | translate }}</span>
   @if (authService.currentUser()) {
     @if (canSeeAdmin()) {
-      <a mat-button routerLink="/admin" routerLinkActive="active-nav-link">Admin</a>
+      <a mat-button routerLink="/admin" routerLinkActive="active-nav-link">{{ 'toolbar.admin' | translate }}</a>
     }
     @if (canSeePos()) {
-      <a mat-button routerLink="/pos" routerLinkActive="active-nav-link">POS</a>
+      <a mat-button routerLink="/pos" routerLinkActive="active-nav-link">{{ 'toolbar.pos' | translate }}</a>
     }
     @if (canSeeReports()) {
-      <a mat-button routerLink="/reports" routerLinkActive="active-nav-link">Reports</a>
+      <a mat-button routerLink="/reports" routerLinkActive="active-nav-link">{{ 'toolbar.reports' | translate }}</a>
     }
   }
   <span class="spacer"></span>
+  <button mat-button [matMenuTriggerFor]="languageMenu" [attr.aria-label]="'toolbar.language' | translate" [attr.title]="'toolbar.language' | translate">
+    {{ currentLang() === 'ar' ? 'AR' : 'EN' }}
+  </button>
+  <mat-menu #languageMenu="matMenu">
+    <button mat-menu-item (click)="switchLanguage('en')">English</button>
+    <button mat-menu-item (click)="switchLanguage('ar')">العربية</button>
+  </mat-menu>
   @if (authService.currentUser(); as user) {
     <button
       mat-icon-button
@@ -19,20 +26,20 @@
       [matBadge]="notificationFeed.unreadCount() || null"
       matBadgeColor="warn"
       matBadgeSize="small"
-      aria-label="Notifications"
-      title="Notifications"
+      [attr.aria-label]="'toolbar.notifications' | translate"
+      [attr.title]="'toolbar.notifications' | translate"
     >
       <mat-icon>notifications</mat-icon>
     </button>
     <mat-menu #notificationMenu="matMenu" class="notification-menu">
       <div class="notification-menu-header" (click)="$event.stopPropagation()">
-        <span>Notifications</span>
+        <span>{{ 'toolbar.notifications' | translate }}</span>
         @if (notificationFeed.unreadCount() > 0) {
-          <button mat-button (click)="markAllRead()">Mark all read</button>
+          <button mat-button (click)="markAllRead()">{{ 'toolbar.markAllRead' | translate }}</button>
         }
       </div>
       @if (notificationFeed.notifications().length === 0) {
-        <div class="notification-empty">No notifications yet.</div>
+        <div class="notification-empty">{{ 'toolbar.noNotifications' | translate }}</div>
       } @else {
         @for (n of notificationFeed.notifications(); track n.id) {
           <button mat-menu-item [class.unread]="!n.isRead" (click)="markRead(n)">
@@ -42,8 +49,8 @@
       }
     </mat-menu>
 
-    <span class="user-badge">{{ user.userName }} ({{ user.role }})</span>
-    <button mat-icon-button (click)="logout()" aria-label="Sign out" title="Sign out">
+    <span class="user-badge">{{ user.userName }} ({{ 'roles.' + user.role | translate }})</span>
+    <button mat-icon-button (click)="logout()" [attr.aria-label]="'toolbar.signOut' | translate" [attr.title]="'toolbar.signOut' | translate">
       <mat-icon>logout</mat-icon>
     </button>
   }

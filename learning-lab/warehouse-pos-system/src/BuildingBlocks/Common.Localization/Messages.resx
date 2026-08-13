@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="EntityNotFound" xml:space="preserve">
+    <value>Entity "{0}" ({1}) was not found.</value>
+  </data>
+  <data name="UnexpectedError" xml:space="preserve">
+    <value>An unexpected error occurred. Please try again later.</value>
+  </data>
+  <data name="PasswordRequiresUppercase" xml:space="preserve">
+    <value>Password must contain at least one uppercase letter.</value>
+  </data>
+  <data name="PasswordRequiresLowercase" xml:space="preserve">
+    <value>Password must contain at least one lowercase letter.</value>
+  </data>
+  <data name="PasswordRequiresDigit" xml:space="preserve">
+    <value>Password must contain at least one digit.</value>
+  </data>
+  <data name="StockTransferLocationsMustDiffer" xml:space="preserve">
+    <value>FromLocationId and ToLocationId must be different.</value>
+  </data>
+  <data name="PromotionPercentageExceeds100" xml:space="preserve">
+    <value>A percentage discount can't exceed 100%.</value>
+  </data>
+  <data name="PromotionFixedAmountUnreasonable" xml:space="preserve">
+    <value>A fixed discount amount is unreasonably large.</value>
+  </data>
+</root>

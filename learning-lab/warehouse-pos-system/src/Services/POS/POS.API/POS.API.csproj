@@ -29,6 +29,7 @@
       Warehouse.API's own comment on this exact line.
     -->
     <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.RequestCulture\Common.RequestCulture.csproj" />
   </ItemGroup>
 
 </Project>

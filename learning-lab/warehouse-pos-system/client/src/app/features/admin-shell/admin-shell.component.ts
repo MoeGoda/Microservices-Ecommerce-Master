@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { AuthService } from '../../core/auth/auth.service';
 import { ItemsAdminComponent } from '../warehouse/items-admin/items-admin.component';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 // Was a placeholder through A4 — proving the auth chain (login → token
 // stored → guard lets you in → currentUser signal populated) worked end to
@@ -9,7 +10,7 @@ import { ItemsAdminComponent } from '../warehouse/items-admin/items-admin.compon
 // to carry is exactly what ItemsAdminComponent below now is.
 @Component({
   selector: 'app-admin-shell',
-  imports: [ItemsAdminComponent],
+  imports: [ItemsAdminComponent, TranslatePipe],
   templateUrl: './admin-shell.component.html',
   styleUrl: './admin-shell.component.scss',
 })

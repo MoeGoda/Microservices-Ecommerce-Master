@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Deliberately no FrameworkReference to Microsoft.AspNetCore.App — this
+       project holds only resx-backed message strings (ResourceManager +
+       CultureInfo, both plain BCL), so it can be referenced by
+       Common.Exceptions and Application-layer projects without pulling
+       ASP.NET Core into layers that must stay framework-agnostic. The
+       ASP.NET Core-dependent half of localization (request culture
+       negotiation) lives in the sibling Common.RequestCulture project,
+       mirroring the existing Common.Exceptions/Common.ExceptionHandling split. -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

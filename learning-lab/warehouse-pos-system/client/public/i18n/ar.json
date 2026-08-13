@@ -1,0 +1,219 @@
+{
+  "common": {
+    "appName": "المستودع ونقاط البيع",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "loading": "جارٍ التحميل...",
+    "actions": "الإجراءات"
+  },
+  "roles": {
+    "Admin": "مسؤول",
+    "Manager": "مدير",
+    "Cashier": "كاشير",
+    "WarehouseStaff": "موظف مستودع"
+  },
+  "toolbar": {
+    "admin": "الإدارة",
+    "pos": "نقطة البيع",
+    "reports": "التقارير",
+    "notifications": "الإشعارات",
+    "markAllRead": "تعليم الكل كمقروء",
+    "noNotifications": "لا توجد إشعارات حتى الآن.",
+    "signOut": "تسجيل الخروج",
+    "language": "اللغة"
+  },
+  "login": {
+    "title": "المستودع ونقاط البيع",
+    "subtitle": "سجّل الدخول للمتابعة",
+    "username": "اسم المستخدم",
+    "usernameRequired": "اسم المستخدم مطلوب.",
+    "password": "كلمة المرور",
+    "passwordRequired": "كلمة المرور مطلوبة.",
+    "signIn": "تسجيل الدخول"
+  },
+  "adminShell": {
+    "signedInAs": "مسجّل الدخول باسم {{userName}} ({{role}})."
+  },
+  "pos": {
+    "startSale": {
+      "title": "بدء عملية بيع جديدة",
+      "locationLabel": "موقع نقطة البيع",
+      "locationRequired": "الموقع مطلوب.",
+      "submit": "بدء البيع"
+    },
+    "table": {
+      "sku": "رمز المنتج (SKU)",
+      "item": "المنتج",
+      "price": "السعر",
+      "qty": "الكمية",
+      "lineTotal": "إجمالي السطر"
+    },
+    "register": {
+      "saleTitle": "عملية بيع رقم {{id}}",
+      "inProgress": "قيد التنفيذ",
+      "scanLabel": "مسح أو إدخال الباركود",
+      "qtyLabel": "الكمية",
+      "addButton": "إضافة",
+      "removeLine": "حذف السطر",
+      "emptyRow": "مسح باركود لإضافة أول سطر.",
+      "cancelSale": "إلغاء البيع",
+      "checkout": "الدفع"
+    },
+    "totalLabel": "الإجمالي",
+    "receipt": {
+      "title": "إيصال — عملية بيع رقم {{id}}",
+      "completedSubtitle": "تم الإتمام في {{completedAt}} · مزامنة المخزون: {{syncStatus}}",
+      "returnedSubtitle": "تم الإرجاع في {{returnedAt}} (تم الإتمام أصلاً في {{completedAt}})",
+      "syncFailedNote": "فشلت مزامنة المخزون بعد عدة محاولات — تم وضع علامة عليها للمطابقة. تبقى عملية البيع نهائية.",
+      "returnedNote": "تم إرجاع عملية البيع هذه — تمت إعادة المخزون إلى موقعه الأصلي.",
+      "returnSale": "إرجاع البيع",
+      "newSale": "عملية بيع جديدة"
+    }
+  },
+  "reports": {
+    "title": "التقارير",
+    "emptyStates": {
+      "noSales": "لا توجد مبيعات مكتملة حتى الآن."
+    },
+    "salesByDay": {
+      "title": "المبيعات اليومية",
+      "chartAriaLabel": "مخطط شريطي لإجمالي عائدات المبيعات لكل يوم"
+    },
+    "topSelling": {
+      "title": "الأكثر مبيعًا",
+      "showLabel": "عرض",
+      "topN": "أفضل {{count}}",
+      "rowTitle": "{{sku}} — تم بيع {{qty}}"
+    },
+    "lowStock": {
+      "title": "المخزون المنخفض",
+      "allGood": "لا يوجد أي عنصر عند حد إعادة الطلب أو أقل منه.",
+      "table": {
+        "status": "الحالة",
+        "sku": "رمز المنتج (SKU)",
+        "item": "المنتج",
+        "location": "الموقع",
+        "onHand": "المتوفر",
+        "reorderThreshold": "حد إعادة الطلب"
+      },
+      "status": {
+        "outOfStock": "نفذ من المخزون",
+        "lowStock": "مخزون منخفض"
+      }
+    }
+  },
+  "items": {
+    "create": {
+      "title": "إنشاء منتج",
+      "sku": "رمز المنتج (SKU)",
+      "skuRequired": "رمز المنتج مطلوب.",
+      "name": "الاسم",
+      "nameRequired": "الاسم مطلوب.",
+      "description": "الوصف",
+      "unitPrice": "سعر الوحدة",
+      "category": "الفئة",
+      "categoryRequired": "الفئة مطلوبة.",
+      "baseUnit": "وحدة القياس الأساسية",
+      "baseUnitRequired": "الوحدة الأساسية مطلوبة.",
+      "parentItem": "المنتج الأصلي (اختياري)",
+      "noParent": "بدون — منتج مستقل",
+      "barcode": "الباركود",
+      "barcodeRequired": "يجب إدخال باركود أول.",
+      "barcodeType": "نوع الباركود",
+      "submit": "إنشاء منتج"
+    },
+    "list": {
+      "title": "المنتجات",
+      "table": {
+        "sku": "رمز المنتج (SKU)",
+        "name": "الاسم",
+        "category": "الفئة",
+        "price": "السعر",
+        "baseUnit": "الوحدة الأساسية"
+      },
+      "manage": "إدارة",
+      "emptyRow": "لا توجد منتجات حتى الآن — أنشئ واحدًا أعلاه."
+    },
+    "detail": {
+      "subtitle": "{{category}} · {{price}} · الوحدة الأساسية {{baseUnit}}",
+      "barcodesHeading": "الباركودات",
+      "primaryTag": "أساسي",
+      "newBarcode": "باركود جديد",
+      "typeLabel": "النوع",
+      "makePrimary": "تعيين كأساسي",
+      "addBarcode": "إضافة باركود",
+      "unitsHeading": "الوحدات البديلة",
+      "unitsTable": {
+        "unit": "الوحدة",
+        "equals": "1 وحدة ="
+      },
+      "variantsHeading": "أشكال التعبئة",
+      "pricingHeading": "التسعير",
+      "promoActive": "يوجد عرض ترويجي نشط الآن:",
+      "listPrice": "السعر المعلن",
+      "updatePrice": "تحديث السعر",
+      "priceHistoryTable": {
+        "changed": "تاريخ التغيير",
+        "oldPrice": "السعر القديم",
+        "newPrice": "السعر الجديد"
+      },
+      "createPromotionHeading": "إنشاء عرض ترويجي",
+      "discountType": "نوع الخصم",
+      "percentOff": "نسبة الخصم",
+      "amountOff": "قيمة الخصم",
+      "starts": "يبدأ",
+      "ends": "ينتهي",
+      "createPromotion": "إنشاء العرض",
+      "promotionsTable": {
+        "discount": "الخصم",
+        "starts": "يبدأ",
+        "ends": "ينتهي",
+        "status": "الحالة"
+      },
+      "off": "خصم",
+      "promotionStatus": {
+        "Cancelled": "ملغى",
+        "Expired": "منتهٍ",
+        "Upcoming": "قادم",
+        "Active": "نشط"
+      },
+      "noPromotions": "لا توجد عروض ترويجية لهذا المنتج حتى الآن.",
+      "stockHeading": "المخزون المتوفر",
+      "stockTable": {
+        "location": "الموقع",
+        "quantity": "الكمية",
+        "reorderThreshold": "حد إعادة الطلب"
+      },
+      "stockEmptyRow": "لا يوجد مخزون مسجل حتى الآن — استلم بعض الكمية أدناه.",
+      "receive": {
+        "heading": "استلام مخزون",
+        "location": "الموقع",
+        "quantity": "الكمية",
+        "unit": "الوحدة",
+        "baseUnitOption": "{{code}} (الوحدة الأساسية)",
+        "reference": "المرجع (اختياري)",
+        "referencePlaceholder": "مثال: رقم أمر الشراء",
+        "submit": "استلام"
+      },
+      "adjust": {
+        "heading": "تعديل المخزون",
+        "location": "الموقع",
+        "change": "التغيير (+/-)",
+        "reference": "المرجع (اختياري)",
+        "referencePlaceholder": "مثال: سبب التصحيح",
+        "submit": "تعديل"
+      },
+      "transfer": {
+        "heading": "نقل المخزون",
+        "fromLocation": "من موقع",
+        "toLocation": "إلى موقع",
+        "quantity": "الكمية",
+        "reference": "المرجع (اختياري)",
+        "referencePlaceholder": "مثال: سبب إعادة التوازن",
+        "submit": "نقل",
+        "fromOption": "{{code}} — {{name}} (المتوفر {{qty}})"
+      }
+    }
+  }
+}

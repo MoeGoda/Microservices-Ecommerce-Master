@@ -55,7 +55,7 @@ a distributed transaction.
 **Phase F — Hardening**
 - [x] **F1 — Performance (Redis caching, pagination, compression, health checks)**
 - [x] **F2 — Security hardening (role-based policies, gateway rate limiting, input validation review)**
-- [ ] F3 — Localization (English/Arabic, RTL)
+- [x] **F3 — Localization (English/Arabic, RTL)**
 - [ ] F4 — Full docker-compose stack + end-to-end walkthrough
 
 ## A1 — Identity service
@@ -2538,4 +2538,149 @@ curl -sD - -o /dev/null http://localhost:5058/hc   # X-Content-Type-Options / X-
 # Role enforcement, in the Angular app: sign in as a Cashier-role account
 # and note the Admin/Reports nav links are simply gone; try navigating to
 # /admin directly and you're bounced back to /login.
+```
+
+## F3 — Localization (English/Arabic, RTL)
+
+**What it does:** every one of the 5 backend services now negotiates
+English/Arabic per request from the `Accept-Language` header, and the
+Angular client gets a real language switcher — English/Arabic UI text on
+all 5 feature screens plus the toolbar, `dir="rtl"` layout mirroring, and
+the same `Accept-Language` header sent on every API call so the two halves
+agree on which language a given request is in.
+
+**The backend's biggest win came almost for free: FluentValidation already
+ships its own Arabic translations.** A survey of every validator in the
+codebase (31 files across all 5 services) found only 6 custom
+`.WithMessage()` call sites, total — the other ~150 validation rules
+(`NotEmpty()`, `MaximumLength()`, `GreaterThan()`, etc.) rely entirely on
+FluentValidation's built-in `LanguageManager`, which already has a
+complete Arabic translation table and picks it automatically from
+`CultureInfo.CurrentUICulture`. So the actual backend work wasn't "write
+Arabic strings for every validator" — it was "get `CurrentUICulture` set
+correctly per request," and FluentValidation's own messages started
+coming back in Arabic with zero additional code.
+
+**Two new BuildingBlocks projects, split along the exact seam
+`Common.Exceptions`/`Common.ExceptionHandling` already established.**
+`Common.Localization` holds `Messages.resx`/`Messages.ar.resx` plus a
+hand-written `Messages` static class (a plain `ResourceManager` lookup
+keyed on `CultureInfo.CurrentUICulture` — no `IStringLocalizer`/DI needed,
+so a bare exception constructor can call it) — no ASP.NET Core dependency,
+so `Common.Exceptions` and the two Application-layer projects with custom
+`.WithMessage()` calls (Identity, Warehouse) can reference it without
+pulling the framework into layers that must stay framework-agnostic.
+`Common.RequestCulture` holds the actual ASP.NET Core middleware wiring
+(`AddSharedRequestLocalization`/`UseSharedRequestLocalization`, restricting
+`SupportedCultures` to `["en", "ar"]`) and is referenced only by the 5
+`*.API` projects — the same "only Web API projects pull in the framework
+reference" split `Common.ExceptionHandling` already used.
+
+**Two message shapes got moved into `Common.Localization.Messages`, not
+all three of `Common.Exceptions`' exception types.** `NotFoundException`'s
+internal fixed template (`Entity "{0}" ({1}) was not found.`) and
+`GlobalExceptionHandler`'s hardcoded 500-level literal both became resx
+entries — both are centralized in exactly one place each, so localizing
+them cost one line change apiece. `ConflictException`/`UnauthorizedException`
+are deliberately NOT touched: they're pure pass-through types where every
+call site across the codebase supplies its own full English string
+inline, and there's no single choke point to intercept — translating
+those would mean editing every throw site individually, which is exactly
+the kind of open-ended, disproportionate-to-this-phase work the project's
+own scoping discipline exists to name rather than silently attempt. Same
+reasoning for `ProblemDetails.Title`, which stays `exception.GetType().Name`
+(the CLR type name) regardless of culture — it was never meant to be
+human-facing prose to begin with.
+
+**The 6 existing custom `.WithMessage()` calls (3 in
+`RegisterCommandValidator`'s password-complexity rules, 1 in
+`TransferStockCommandValidator`, 2 in `CreatePromotionCommandValidator`)
+now call `Common.Localization.Messages` properties instead of hardcoded
+strings**, using the `Func<T, string>` overload (`.WithMessage(_ =>
+Messages.X)`) rather than the plain-string overload — the string overload
+would capture whatever culture was active when the validator was
+*constructed*, and while every validator here is resolved per-request
+through DI anyway, the `Func` form removes that fragility outright rather
+than relying on a lifetime assumption holding.
+
+**The Angular half: a real `i18next` instance (the library the roadmap
+named), not a template-only stub.** `I18nService` fetches
+`public/i18n/en.json`/`ar.json` once at startup (via a `provideAppInitializer`,
+so nothing renders before translations are ready), wraps `i18next.t()`,
+and is the only thing in the app that touches the library directly — the
+same "one gatekeeper service" shape `AuthService` already uses for the
+token. A standalone `TranslatePipe` (`{{ 'namespace.key' | translate }}`)
+is used across app.html (toolbar) and all 5 feature templates:
+login, admin-shell, pos-register, reports-dashboard, items-admin — **157
+leaf translation keys total, structurally verified identical between
+`en.json` and `ar.json`** (a Python key-diff found zero keys present in
+only one file). A new `languageInterceptor` attaches the current UI
+language as `Accept-Language` on every outgoing HTTP call, so a Cashier
+who's switched to Arabic gets Arabic FluentValidation/exception messages
+back from the backend too, not just Arabic static UI chrome.
+
+**Switching language triggers a full page reload, on purpose — not a
+half-working live re-render.** Angular Material's CDK `Directionality`
+reads the `dir` attribute once, at each component's construction; flipping
+`dir` at runtime wouldn't re-flow already-built `mat-form-field`/`mat-menu`
+components to RTL. `I18nService.switchLanguage()` persists the choice to
+`localStorage` (`warehousepos.lang`, the same pattern `AuthService` uses
+for the auth token) and reloads; `main.ts` reads that stored value and
+sets `dir`/`lang` on `<html>` *before* `bootstrapApplication` ever runs,
+so there's no flash of LTR content on an Arabic-preferring reload. The 5
+hardcoded LTR-only CSS declarations the initial survey found (`text-align:
+left` on 3 tables, `margin-right` on 2 elements) were all converted to
+logical properties (`text-align: start`, `margin-inline-end`) so they
+mirror correctly under `dir="rtl"` without any RTL-specific override rules
+needed.
+
+**What's still a named gap, not solved here:** `ConflictException`/
+`UnauthorizedException` call-site messages and `ProblemDetails.Title`
+stay English-only, for the reasons above. Angular Material's own built-in
+strings (the paginator's "Items per page"/"of" on the items-admin list)
+are not localized — that needs a `MatPaginatorIntl` override, which is a
+self-contained follow-up, not done here. Toast/notification strings built
+dynamically in component `.ts` files (e.g. `"Sale cancelled."`,
+`"Price updated to ..."`) are also untranslated — only template-authored
+static copy went through the `translate` pipe, per this phase's own scope
+line (`.ts` business logic wasn't touched beyond adding `TranslatePipe` to
+each component's `imports` array).
+
+**Verified with an 11-check runtime test (a real ASP.NET Core host,
+SQLite, real FluentValidation/MediatR pipeline, sending `Accept-Language:
+en` and `ar` against the same endpoints) plus two Playwright passes:**
+the backend test proves a missing item's 404 detail switches from
+`Entity "Item" (999999) was not found.` to the Arabic resx string; that
+FluentValidation's OWN built-in `NotEmpty` message on an empty `Sku`
+comes back as `'Sku' must not be empty.` vs. `'Sku' لا يجب أن يكون
+فارغاً.` with zero custom `.WithMessage()` involved anywhere in that path;
+and that the custom `CreatePromotionCommandValidator` message switches
+between its English and Arabic `Common.Localization.Messages` strings.
+The first Playwright pass confirms the language switcher flips
+`dir`/`lang` on `<html>`, translates the login screen and toolbar, shows
+Arabic `mat-error` validation text, and survives a plain page reload
+(`localStorage` persistence). The second walks the Admin/POS/Reports
+screens in both languages and confirms the translated headings/labels
+render and — checked via `document.documentElement.scrollWidth` — that
+switching to `dir="rtl"` introduces no horizontal overflow on any of the
+three pages.
+
+**Run it locally:**
+```bash
+# Backend — FluentValidation's built-in Arabic messages, zero custom code:
+curl -X POST http://localhost:5058/Warehouse/Items \
+  -H "Content-Type: application/json" -H "Accept-Language: ar" \
+  -H "Authorization: Bearer <admin/manager/warehousestaff token>" \
+  -d '{"sku":"","name":"","unitPrice":1,"categoryId":1,"baseUnitOfMeasureId":1,"barcode":"","barcodeType":0}'
+# → errors.Sku[0] comes back in Arabic
+
+# Backend — the same request with Accept-Language: en for comparison:
+curl -X POST http://localhost:5058/Warehouse/Items \
+  -H "Content-Type: application/json" -H "Accept-Language: en" \
+  -H "Authorization: Bearer <admin/manager/warehousestaff token>" \
+  -d '{"sku":"","name":"","unitPrice":1,"categoryId":1,"baseUnitOfMeasureId":1,"barcode":"","barcodeType":0}'
+
+# Angular: sign in, click the "EN" button in the toolbar (top right),
+# choose "العربية" — the page reloads in Arabic with dir="rtl". Every
+# subsequent API call the app makes also carries Accept-Language: ar.
 ```

@@ -1,6 +1,6 @@
 <div class="signed-in-as">
   @if (authService.currentUser(); as user) {
-    <p>Signed in as <strong>{{ user.userName }}</strong> ({{ user.role }}).</p>
+    <p>{{ 'adminShell.signedInAs' | translate: { userName: user.userName, role: ('roles.' + user.role | translate) } }}</p>
   }
 </div>
 

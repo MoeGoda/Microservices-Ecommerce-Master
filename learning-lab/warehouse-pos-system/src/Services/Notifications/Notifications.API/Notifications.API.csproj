@@ -31,6 +31,7 @@
       that extension for every other service too.
     -->
     <ProjectReference Include="..\..\..\BuildingBlocks\Common.Security\Common.Security.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.RequestCulture\Common.RequestCulture.csproj" />
   </ItemGroup>
 
 </Project>

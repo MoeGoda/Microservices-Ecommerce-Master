@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
 using Common.Exceptions;
+using Common.Localization;
 
 namespace Common.ExceptionHandling
 {
@@ -58,7 +59,7 @@ namespace Common.ExceptionHandling
                 // server. Expected exceptions (400/401/404) carry messages
                 // that were written to be client-safe in the first place.
                 Detail = statusCode >= StatusCodes.Status500InternalServerError
-                    ? "An unexpected error occurred. Please try again later."
+                    ? Messages.UnexpectedError
                     : exception.Message,
                 Instance = httpContext.Request.Path
             };

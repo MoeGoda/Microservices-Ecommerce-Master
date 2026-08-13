@@ -1,4 +1,5 @@
 using Common.ExceptionHandling;
+using Common.RequestCulture;
 using Common.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -17,6 +18,9 @@ builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPa
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
+
+// F3 — En/Ar culture negotiation. See Identity.API's Program.cs for why.
+builder.Services.AddSharedRequestLocalization();
 
 // Same shared extension Identity.API and Gateway.Ocelot call, with the
 // same JwtSettings:Secret/Issuer/Audience — a token minted by Identity and
@@ -75,6 +79,7 @@ using (var scope = app.Services.CreateScope())
 
 // First in the pipeline — see Identity.API's Program.cs for why.
 app.UseCommonExceptionHandling();
+app.UseSharedRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {

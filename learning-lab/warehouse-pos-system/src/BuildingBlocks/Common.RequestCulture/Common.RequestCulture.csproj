@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- The ASP.NET Core-dependent half of localization (RequestLocalizationOptions,
+         UseRequestLocalization) — only *.API projects reference this, same
+         "only Web API projects pull in the framework reference" split
+         Common.ExceptionHandling already established. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

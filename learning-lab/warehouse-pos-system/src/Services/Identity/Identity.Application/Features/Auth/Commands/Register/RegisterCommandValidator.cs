@@ -1,3 +1,4 @@
+using Common.Localization;
 using FluentValidation;
 
 namespace Identity.Application.Features.Auth.Commands.Register
@@ -25,9 +26,9 @@ namespace Identity.Application.Features.Auth.Commands.Register
                 .NotEmpty()
                 .MinimumLength(8)
                 .MaximumLength(100)
-                .Matches("[A-Z]").WithMessage("Password must contain at least one uppercase letter.")
-                .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter.")
-                .Matches("[0-9]").WithMessage("Password must contain at least one digit.");
+                .Matches("[A-Z]").WithMessage(_ => Messages.PasswordRequiresUppercase)
+                .Matches("[a-z]").WithMessage(_ => Messages.PasswordRequiresLowercase)
+                .Matches("[0-9]").WithMessage(_ => Messages.PasswordRequiresDigit);
         }
     }
 }

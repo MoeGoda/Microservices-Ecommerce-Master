@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Identity.Application\Identity.Application.csproj" />
     <ProjectReference Include="..\Identity.Infrastructure\Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Common.ExceptionHandling\Common.ExceptionHandling.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.RequestCulture\Common.RequestCulture.csproj" />
   </ItemGroup>
 
 </Project>

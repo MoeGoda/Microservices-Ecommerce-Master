@@ -1,3 +1,4 @@
+using Common.Localization;
 using FluentValidation;
 using Warehouse.Domain.Entities;
 
@@ -17,7 +18,7 @@ namespace Warehouse.Application.Features.Items.Commands.CreatePromotion
             RuleFor(c => c.DiscountValue)
                 .LessThanOrEqualTo(100)
                 .When(c => c.DiscountType == DiscountType.PercentageOff)
-                .WithMessage("A percentage discount can't exceed 100%.");
+                .WithMessage(_ => Messages.PromotionPercentageExceeds100);
 
             // F2 — FixedAmountOff had no upper bound at all: a flat
             // discount bigger than any real item's price is already
@@ -31,7 +32,7 @@ namespace Warehouse.Application.Features.Items.Commands.CreatePromotion
             RuleFor(c => c.DiscountValue)
                 .LessThanOrEqualTo(1_000_000)
                 .When(c => c.DiscountType == DiscountType.FixedAmountOff)
-                .WithMessage("A fixed discount amount is unreasonably large.");
+                .WithMessage(_ => Messages.PromotionFixedAmountUnreasonable);
 
             RuleFor(c => c.EndsAtUtc).GreaterThan(c => c.StartsAtUtc);
         }

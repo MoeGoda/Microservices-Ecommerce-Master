@@ -9,19 +9,35 @@ import { AuthService } from './core/auth/auth.service';
 import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
 import { NotificationDto } from './shared/models/notification.models';
 import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES } from './shared/models/roles';
+import { I18nService, SupportedLang } from './core/i18n/i18n.service';
+import { TranslatePipe } from './core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatToolbarModule, MatButtonModule, MatIconModule, MatMenuModule, MatBadgeModule],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    MatToolbarModule,
+    MatButtonModule,
+    MatIconModule,
+    MatMenuModule,
+    MatBadgeModule,
+    TranslatePipe,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
+  readonly currentLang;
+
   constructor(
     readonly authService: AuthService,
     readonly notificationFeed: NotificationFeedService,
+    private readonly i18n: I18nService,
     private readonly router: Router,
   ) {
+    this.currentLang = this.i18n.currentLang;
     // Covers both a fresh sign-in (LoginComponent sets currentUser, this
     // fires right after) and a page reload with an already-valid session
     // in localStorage (currentUser is set synchronously from storage at
@@ -52,6 +68,10 @@ export class App {
 
   canSeeReports(): boolean {
     return this.hasAnyRole(REPORTS_ROLES);
+  }
+
+  switchLanguage(lang: SupportedLang): void {
+    this.i18n.switchLanguage(lang);
   }
 
   private hasAnyRole(roles: readonly string[]): boolean {

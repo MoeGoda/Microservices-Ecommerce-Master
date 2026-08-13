@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common.Exceptions\Common.Exceptions.csproj" />
+    <ProjectReference Include="..\Common.Localization\Common.Localization.csproj" />
   </ItemGroup>
 
   <ItemGroup>

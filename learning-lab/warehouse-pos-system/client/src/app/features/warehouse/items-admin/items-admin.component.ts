@@ -11,6 +11,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin } from 'rxjs';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
 import { emptyPage, PagedResult } from '../../../shared/models/pagination.models';
 import {
@@ -48,6 +49,7 @@ import { WarehouseService } from '../warehouse.service';
     MatPaginatorModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    TranslatePipe,
   ],
   templateUrl: './items-admin.component.html',
   styleUrl: './items-admin.component.scss',

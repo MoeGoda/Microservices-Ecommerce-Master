@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize } from 'rxjs';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { LocationDto } from '../../shared/models/warehouse.models';
 import { SaleDto } from '../../shared/models/pos.models';
@@ -32,6 +33,7 @@ import { PosService } from './pos.service';
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    TranslatePipe,
   ],
   templateUrl: './pos-register.component.html',
   styleUrl: './pos-register.component.scss',
