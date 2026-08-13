@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Notifications.Application.Contracts.Infrastructure;
 using Notifications.Application.Contracts.Persistence;
 using Notifications.Application.Models;
@@ -21,17 +22,23 @@ namespace Notifications.Application.Features.Ingestion.Commands.IngestStockLevel
         private readonly INotificationRepository _notificationRepository;
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationPusher _notificationPusher;
+        private readonly IEmailSender _emailSender;
+        private readonly ILogger<IngestStockLevelChangedCommandHandler> _logger;
 
         public IngestStockLevelChangedCommandHandler(
             IStockLevelSnapshotRepository snapshotRepository,
             INotificationRepository notificationRepository,
             IUnitOfWork unitOfWork,
-            INotificationPusher notificationPusher)
+            INotificationPusher notificationPusher,
+            IEmailSender emailSender,
+            ILogger<IngestStockLevelChangedCommandHandler> logger)
         {
             _snapshotRepository = snapshotRepository;
             _notificationRepository = notificationRepository;
             _unitOfWork = unitOfWork;
             _notificationPusher = notificationPusher;
+            _emailSender = emailSender;
+            _logger = logger;
         }
 
         public async Task<IngestResultDto> Handle(IngestStockLevelChangedCommand request, CancellationToken cancellationToken)
@@ -77,6 +84,25 @@ namespace Notifications.Application.Features.Ingestion.Commands.IngestStockLevel
             await _unitOfWork.SaveChangesAsync();
 
             await _notificationPusher.PushAsync(NotificationDto.FromEntity(notification), cancellationToken);
+
+            // Email is E2's addition — deliberately best-effort, unlike
+            // the outbox pattern's reliable-delivery guarantee for
+            // inter-service events (C3/D1). The notification itself (the
+            // DB row and the SignalR push above) already succeeded and
+            // committed; an SMTP relay being unreachable is a real,
+            // separately-flagged limitation (see the README), not a
+            // reason to fail THIS request or retry through a queue.
+            try
+            {
+                await _emailSender.SendAsync(
+                    $"Low stock: {request.ItemName} at {request.LocationName}",
+                    notification.Message,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send LowStock alert email for {ItemName} at {LocationName}.", request.ItemName, request.LocationName);
+            }
 
             return new IngestResultDto { AlreadyProcessed = false };
         }

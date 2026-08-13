@@ -50,7 +50,7 @@ a distributed transaction.
 
 **Phase E — Notifications / Mailing**
 - [x] **E1 — In-app notifications (SignalR)**
-- [ ] E2 — Mailing system
+- [x] **E2 — Mailing system (SMTP/MailKit)**
 
 **Phase F — Hardening**
 - [ ] F1 — Performance (caching, pagination, health checks)
@@ -1875,6 +1875,104 @@ dotnet run   # http://localhost:5298
 cd client
 npm start   # ng serve — http://localhost:4200
 # → sign in; the bell icon in the toolbar shows the live notification feed
+```
+
+## E2 — Mailing system (SMTP/MailKit)
+
+**What it does:** a second delivery channel for the exact same LowStock
+crossing-edge decision E1 already computes — alongside the in-app
+SignalR toast, `IngestStockLevelChangedCommandHandler` now also emails a
+fixed list of configured alert recipients through a real SMTP relay
+(MailKit's `SmtpClient`), the moment an item/location pair crosses INTO
+low stock. No new event, no new ingestion endpoint, no new command:
+this is entirely a second consumer of a decision E1 already made.
+
+**`IEmailSender` mirrors `INotificationPusher`'s own split exactly — a
+transport-agnostic Application-layer interface, a concrete Infrastructure-
+layer implementation — for the same reason.** Neither interface takes a
+"who" parameter: just as `SignalRNotificationPusher` broadcasts to every
+connected client because there's no per-user targeting concept anywhere
+in this system yet, `IEmailSender.SendAsync(subject, body, ct)` sends to
+a FIXED recipient list (`SmtpSettings.Recipients`, bound from
+configuration) rather than an address the caller picks. Splitting by role
+or letting a user opt in/out of alert emails is the same kind of
+"natural F-phase follow-up, not solved here" gap E1's own
+`SignalRNotificationPusher` comment already named for its own broadcast
+model — this step inherits it rather than re-solving it differently for
+one channel and not the other.
+
+**Unlike `INotificationPusher`, `IEmailSender`'s real implementation lives
+in Infrastructure, not the API layer — and that's not an inconsistency,
+it's the same placement rule correctly applied.** `SignalRNotificationPusher`
+had to live in `Notifications.API` because it's inseparable from THIS
+host's own ASP.NET Core pipeline (`IHubContext`, hub mapping). MailKit's
+`SmtpClient` has no such dependency — it's generic outbound-network
+plumbing, exactly like every `IEventPublisher` HTTP client already
+registered in every other service's own Infrastructure project. Two
+different transports, two different correct answers to "which layer owns
+this," from the same one rule.
+
+**Sending is deliberately best-effort, with no retry queue — a NAMED
+tradeoff, not an oversight.** Every inter-SERVICE event in this system
+(`SaleCompleted`, `StockLevelChanged`, …) goes through the outbox pattern
+specifically because losing one silently would be wrong — C3/D1 built
+real retry/redelivery machinery for that reason. An alert EMAIL is
+different: the notification itself (the DB row, the SignalR push) already
+happened and already succeeded independently of whether the SMTP relay
+answers. `IngestStockLevelChangedCommandHandler` wraps the `SendAsync`
+call in its own `try`/`catch`, logs a warning on failure, and returns the
+same success response either way — an unreachable mail relay degrades
+this ONE channel, not the ingestion pipeline underneath it. Building a
+second outbox just for email would be solving a problem this system
+doesn't have: nothing downstream is waiting on the email to have been
+sent, the way Warehouse's stock decrement genuinely can't be skipped.
+
+**Concepts introduced:**
+- **Two consumers of one decision, reusing the exact same crossing-edge
+  computation.** E1's `StockLevelSnapshot`-based "was it low before this
+  event" logic didn't change at all; this step only adds a second `await`
+  after the existing SignalR push, inside the same `if` branch.
+- **Best-effort vs. reliable delivery as a considered choice per
+  channel**, not a system-wide policy. The outbox pattern is for facts
+  another SERVICE needs to eventually know; a plain try/catch is for a
+  supplementary notification channel whose failure doesn't strand any
+  other state.
+- **No per-call "to" address, mirrored from `INotificationPusher` into a
+  brand-new interface** — proof the "audience is a deployment concern,
+  not a domain decision" idiom generalizes across transports, not just
+  something SignalR needed.
+
+**Verified with a 13-check runtime test — no live SQL Server needed
+(SQLite, same as every other Application-layer test in this project), but
+a REAL fake SMTP server this time (`netDumbster`, a scratchpad-only test
+dependency, never added to the actual project) instead of a mocked
+`IEmailSender` for the wire-format half:** the first half proves the
+HANDLER's own decision — a brand-new item/location pair that arrives
+already low emails once; staying low sends nothing further; leaving low
+stock sends nothing; crossing into low stock a SECOND time emails again
+(per-transition, not permanently suppressed, the same behavior E1's own
+SignalR test already proved for the push side); and a normal,
+never-low pair never emails at all. The second half proves
+`SmtpEmailSender` ITSELF — not a fake standing in for it — actually
+connects to a real SMTP listener and sends a correctly-addressed message:
+the fake server receives exactly one email, with the right `From`
+address, the right `Subject`, BOTH configured recipients on the envelope,
+and the low-stock message text in the body; and that an unconfigured
+recipient list logs a warning and returns cleanly rather than throwing or
+silently attempting to connect anywhere.
+
+**Run it locally (a local SMTP catcher instead of a real mail server —
+smtp4dev, MailHog, or any SMTP-accepting relay on the configured host/port
+works, since `Smtp:Host`/`Smtp:Port` in `appsettings.json` point at
+`localhost:2525` by default):**
+```bash
+# any local SMTP catcher that listens on 2525, e.g.:
+docker run --rm -it -p 2525:25 -p 5080:80 rnwood/smtp4dev
+
+cd src/Services/Notifications/Notifications.API
+dotnet run   # http://localhost:5298
+# → trigger a LowStock event (Admin Panel: adjust an item's stock below
+#   its reorder threshold) and check the catcher's inbox for the alert
 ```
 
 ## Business gap — Sale returns/refunds

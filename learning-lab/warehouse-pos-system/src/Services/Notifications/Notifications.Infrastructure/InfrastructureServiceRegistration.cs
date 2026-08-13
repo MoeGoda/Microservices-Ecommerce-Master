@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Notifications.Application.Contracts.Infrastructure;
 using Notifications.Application.Contracts.Persistence;
+using Notifications.Infrastructure.Email;
 using Notifications.Infrastructure.Persistence;
 using Notifications.Infrastructure.Repositories;
 
@@ -17,6 +19,15 @@ namespace Notifications.Infrastructure
             services.AddScoped<INotificationRepository, NotificationRepository>();
             services.AddScoped<IStockLevelSnapshotRepository, StockLevelSnapshotRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // Unlike INotificationPusher, IEmailSender's real implementation
+            // (MailKit's SmtpClient) is genuinely generic outbound-network
+            // plumbing with no dependency on THIS host's own ASP.NET Core
+            // pipeline — same reasoning every other Infrastructure-layer
+            // HTTP client in this project already follows — so it's
+            // registered here, not in Notifications.API.
+            services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
+            services.AddScoped<IEmailSender, SmtpEmailSender>();
 
             // No INotificationPusher registration here — deliberately.
             // Unlike every other Infrastructure concern in this project,
