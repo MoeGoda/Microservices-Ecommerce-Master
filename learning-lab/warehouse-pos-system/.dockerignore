@@ -1,0 +1,14 @@
+# Every Dockerfile in this repo COPYs the whole src/ (or client/) tree into
+# its build stage rather than cherry-picking project references by hand —
+# see the F4 README section for why. These are exactly the paths that
+# shouldn't ride along: build output that a stale local build would
+# otherwise leak into the image, and dependency caches the build stage
+# reinstalls from scratch anyway.
+**/bin/
+**/obj/
+client/node_modules/
+client/dist/
+client/.angular/
+**/.vs/
+**/.idea/
+.git/

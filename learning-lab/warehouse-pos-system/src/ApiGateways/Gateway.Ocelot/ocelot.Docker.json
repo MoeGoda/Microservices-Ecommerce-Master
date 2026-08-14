@@ -1,0 +1,292 @@
+{
+  "Routes": [
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-api",
+          "Port": 5218
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-api",
+          "Port": 5218
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-api",
+          "Port": 5218
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-api",
+          "Port": 5218
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notifications-api",
+          "Port": 5298
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notifications-api",
+          "Port": 5298
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notifications-api",
+          "Port": 5298
+        }
+      ]
+    }
+  ]
+}

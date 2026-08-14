@@ -14,6 +14,17 @@ var builder = WebApplication.CreateBuilder(args);
 // takes effect without a restart.
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
 
+// F4 — Ocelot's own documented pattern for per-environment downstream
+// hosts: every route in ocelot.json still says "Host": "localhost" (correct
+// for every dev machine running `dotnet run`), but "localhost" inside a
+// container means the gateway's OWN container, not the sibling containers
+// docker-compose starts each service in. ocelot.Docker.json (present only
+// in the Docker image) overrides just the Host field on every route to the
+// matching compose service name — everything else about each route is
+// unchanged. ASPNETCORE_ENVIRONMENT=Docker is what selects this file (see
+// docker-compose.yml); it's a no-op for every other environment (optional: true).
+builder.Configuration.AddJsonFile($"ocelot.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
+
 // The single shared JwtSettings source — see Identity.API's Program.cs
 // for the full reasoning. Editing SharedSettings/jwt.settings.json is now
 // the only place this value ever needs to change; AddJwtAuthentication

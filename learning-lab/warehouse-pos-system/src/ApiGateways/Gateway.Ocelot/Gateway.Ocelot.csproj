@@ -17,6 +17,12 @@
          it exists next to the source (fine for `dotnet run`, whose content
          root is the project directory) but not next to the built DLL. -->
     <Content Update="ocelot.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- F4 — same reasoning as ocelot.json above; without this,
+         ocelot.Docker.json would sit next to the source but never reach
+         the published output the Docker image actually runs, and
+         Program.cs's optional:true AddJsonFile call would silently find
+         nothing instead of erroring loudly. -->
+    <Content Update="ocelot.Docker.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

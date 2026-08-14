@@ -1,0 +1,170 @@
+name: warehousepos
+
+# F4 — one command instead of the "N terminals" instructions every earlier
+# phase's README section documented. Every service keeps the EXACT port
+# number it already used under `dotnet run` (5218/5238/5258/5278/5298 for
+# the 5 APIs, 5058 for the gateway, 4200 for the Angular client) and every
+# one of those ports is published to the host — a browser on the host
+# machine reaches this stack at the identical URLs the manual multi-
+# terminal workflow already used (environment.ts's apiBaseUrl/
+# notificationsHubUrl and Notifications.API's CORS origin are both
+# unmodified for exactly this reason). Nothing here changes what each
+# service actually does; it only changes how the 5 API/gateway processes
+# find SQL Server, Redis, SMTP, and each other — via compose service names
+# instead of localhost, injected as environment-variable config overrides
+# rather than checked-in appsettings changes (see each service's own
+# `environment:` block below).
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "SwN12345678" # matches every service's existing checked-in appsettings.json — see the README's own gap note on secrets management.
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  smtp4dev:
+    image: rnwood/smtp4dev:latest
+    ports:
+      - "5080:80" # web UI — the same "any local SMTP catcher" tool E2's own README section documents, containerized instead of run ad hoc.
+
+  identity-api:
+    build:
+      context: .
+      dockerfile: src/Services/Identity/Identity.API/Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__IdentityConnectionString: "Server=sqlserver,1433;Database=IdentityDb;User Id=sa;Password=SwN12345678;TrustServerCertificate=True"
+    ports:
+      - "5218:5218"
+    healthcheck: &dotnet-hc
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5218 && printf \"GET /hc HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && head -n 1 <&3 | grep -q 200'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  warehouse-api:
+    build:
+      context: .
+      dockerfile: src/Services/Warehouse/Warehouse.API/Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__WarehouseConnectionString: "Server=sqlserver,1433;Database=WarehouseDb;User Id=sa;Password=SwN12345678;TrustServerCertificate=True"
+      ConnectionStrings__Redis: "redis:6379"
+      ReportingApi__BaseUrl: "http://reporting-api:5278"
+      NotificationsApi__BaseUrl: "http://notifications-api:5298"
+    ports:
+      - "5238:5238"
+    healthcheck:
+      <<: *dotnet-hc
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5238 && printf \"GET /hc HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && head -n 1 <&3 | grep -q 200'"]
+
+  pos-api:
+    build:
+      context: .
+      dockerfile: src/Services/POS/POS.API/Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__PosConnectionString: "Server=sqlserver,1433;Database=PosDb;User Id=sa;Password=SwN12345678;TrustServerCertificate=True"
+      WarehouseApi__BaseUrl: "http://warehouse-api:5238"
+      ReportingApi__BaseUrl: "http://reporting-api:5278"
+      NotificationsApi__BaseUrl: "http://notifications-api:5298"
+    ports:
+      - "5258:5258"
+    healthcheck:
+      <<: *dotnet-hc
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5258 && printf \"GET /hc HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && head -n 1 <&3 | grep -q 200'"]
+
+  reporting-api:
+    build:
+      context: .
+      dockerfile: src/Services/Reporting/Reporting.API/Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__ReportingConnectionString: "Server=sqlserver,1433;Database=ReportingDb;User Id=sa;Password=SwN12345678;TrustServerCertificate=True"
+    ports:
+      - "5278:5278"
+    healthcheck:
+      <<: *dotnet-hc
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5278 && printf \"GET /hc HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && head -n 1 <&3 | grep -q 200'"]
+
+  notifications-api:
+    build:
+      context: .
+      dockerfile: src/Services/Notifications/Notifications.API/Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      smtp4dev:
+        condition: service_started
+    environment:
+      ConnectionStrings__NotificationsConnectionString: "Server=sqlserver,1433;Database=NotificationsDb;User Id=sa;Password=SwN12345678;TrustServerCertificate=True"
+      Smtp__Host: "smtp4dev"
+      Smtp__Port: "25" # smtp4dev's own internal SMTP port — its host-published 2525 mapping (E2's README) exists for the local, non-Docker workflow only; containers on the same network talk to each other on the container's real port.
+    ports:
+      - "5298:5298" # published for the SAME reason the gateway is: the Angular client's SignalR connection goes straight to Notifications.API, bypassing the gateway entirely (see the README's own E1 gap note) — the browser needs this port on the host too.
+    healthcheck:
+      <<: *dotnet-hc
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5298 && printf \"GET /hc HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && head -n 1 <&3 | grep -q 200'"]
+
+  gateway:
+    build:
+      context: .
+      dockerfile: src/ApiGateways/Gateway.Ocelot/Dockerfile
+    depends_on:
+      identity-api:
+        condition: service_healthy
+      warehouse-api:
+        condition: service_healthy
+      pos-api:
+        condition: service_healthy
+      reporting-api:
+        condition: service_healthy
+      notifications-api:
+        condition: service_healthy
+    ports:
+      - "5058:5058"
+    healthcheck:
+      <<: *dotnet-hc
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5058 && printf \"GET /hc HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && head -n 1 <&3 | grep -q 200'"]
+
+  client:
+    build:
+      context: client
+      dockerfile: Dockerfile
+    depends_on:
+      gateway:
+        condition: service_healthy
+    ports:
+      - "4200:80" # matches Notifications.API's own hardcoded CORS origin (http://localhost:4200) — see that Program.cs's comment; a different published port would need that origin updated too.
+
+volumes:
+  sqlserver-data: {}

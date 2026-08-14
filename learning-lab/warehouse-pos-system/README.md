@@ -56,7 +56,7 @@ a distributed transaction.
 - [x] **F1 — Performance (Redis caching, pagination, compression, health checks)**
 - [x] **F2 — Security hardening (role-based policies, gateway rate limiting, input validation review)**
 - [x] **F3 — Localization (English/Arabic, RTL)**
-- [ ] F4 — Full docker-compose stack + end-to-end walkthrough
+- [x] **F4 — Full docker-compose stack + end-to-end walkthrough**
 
 ## A1 — Identity service
 
@@ -2683,4 +2683,157 @@ curl -X POST http://localhost:5058/Warehouse/Items \
 # Angular: sign in, click the "EN" button in the toolbar (top right),
 # choose "العربية" — the page reloads in Arabic with dir="rtl". Every
 # subsequent API call the app makes also carries Accept-Language: ar.
+```
+
+## F4 — Full docker-compose stack + end-to-end walkthrough
+
+**What it does:** one `docker compose up -d` instead of the "N terminals"
+instructions every earlier phase's own README section documented —
+SQL Server, Redis, an SMTP catcher, all 5 API services, the gateway, and
+the Angular client, wired together and reachable at the exact same ports
+the manual multi-terminal workflow already used. A new `smoke-test.sh`
+exercises one real cross-service flow against the running stack: register
+→ login → create a Warehouse item → receive stock → a full POS sale →
+checkout → Warehouse's stock actually decrements via the async outbox
+(C3) → Reporting's read model picks the sale up via its own event
+ingestion (D1), not a direct call — plus re-checks of F1's health checks,
+F2's security headers/rate limiting, and F3's Accept-Language
+localization, all through the containerized gateway.
+
+**Every container keeps the exact port its `dotnet run`/`ng serve`
+counterpart already used, published straight to the host — nothing about
+what each service does changed, only how they find each other.**
+5218/5238/5258/5278/5298 for the 5 APIs, 5058 for the gateway, 4200 for
+the client: `client/src/environments/environment.ts`'s `apiBaseUrl`/
+`notificationsHubUrl` and Notifications.API's hardcoded CORS origin are
+both **unmodified**, because the actual consumer of those values is a
+browser running on the host machine, not another container — a browser
+hitting `localhost:5058` reaches the gateway identically whether it was
+started via `docker compose` or five separate terminals. Container-to-
+container traffic (each API talking to SQL Server/Redis/each other) is
+the only thing that needed to change, and it's done entirely through
+`docker-compose.yml`'s `environment:` blocks (`ConnectionStrings__X`,
+`ReportingApi__BaseUrl`, etc. — the standard ASP.NET Core
+double-underscore config-override convention) rather than any checked-in
+`appsettings.json` edit.
+
+**The one genuine code change: Ocelot needed a second, environment-scoped
+config file.** Every route in the existing `ocelot.json` says `"Host":
+"localhost"` — correct for every dev machine running `dotnet run`, wrong
+inside a container (where `localhost` means the gateway's own container,
+not the sibling containers compose starts each service in). `ocelot.Docker.json`
+overrides just the `Host` field on all 36 routes to the matching compose
+service name (`identity-api`, `warehouse-api`, ...); everything else about
+every route is untouched. This is Ocelot's own documented pattern for
+per-environment downstream hosts, not a workaround — `Program.cs` gained
+one line (`AddJsonFile($"ocelot.{Environment.EnvironmentName}.json",
+optional: true, ...)`, layered on top of the base file) and `ASPNETCORE_ENVIRONMENT=Docker`
+in the gateway's own Dockerfile is what selects it. .NET's configuration
+system merges JSON files at the individual key level, not by replacing
+whole objects, so the override file only needs to state the one field
+that actually changes per route — verified directly (a standalone
+`ConfigurationBuilder` test with two JSON files) before trusting it,
+since a silent merge failure here would mean every route quietly 404s.
+
+**Every Dockerfile preserves `SharedSettings/jwt.settings.json`'s existing
+relative-path lookup instead of hardcoding an absolute path for Docker.**
+Every service's `Program.cs` resolves that file via
+`Path.Combine(ContentRootPath, "..", "..", "..", "SharedSettings", ...)`
+(two `..`s for the gateway, which sits one level shallower in the source
+tree) — a relative walk-up that assumes a specific depth under `src/`.
+Rather than touching that code, every Dockerfile's final stage sets
+`WORKDIR` to the exact matching depth (e.g. `/app/src/Services/Identity/Identity.API`)
+and copies `SharedSettings/` to the sibling path that walk-up expects —
+the existing code runs completely unmodified inside a container. The
+build stage itself is intentionally simple, not layer-cache-optimized:
+every service's Dockerfile `COPY`s the whole `src/` tree (Domain/
+Application/Infrastructure/API plus every BuildingBlocks project) into
+one `dotnet publish` step rather than cherry-picking project references
+by hand — slower rebuilds across unrelated services, in exchange for
+never having to keep six Dockerfiles in sync with the project-reference
+graph by hand. A `.dockerignore` keeps `bin/`/`obj/`/`node_modules/` out
+of every build context regardless.
+
+**What's still a named gap, not solved here:** the Angular client's
+`environment.ts` values are baked in at container BUILD time, not read at
+runtime — fine for this compose file specifically (see above), but a
+container-to-container deployment with no published host ports (a real
+production topology) would need the runtime `config.json`-fetched-at-
+startup approach that file's own comment already anticipates; that's a
+genuine redesign, not something this phase's scope covers. Health checks
+on the 5 API containers use a bash `/dev/tcp` HTTP probe against each
+service's own `/hc` rather than `curl`/`wget` — neither exists in the
+Debian-based `mcr.microsoft.com/dotnet/aspnet:8.0` image and installing
+them isn't possible without adding an apt source, so the healthcheck
+reads the raw HTTP response's status line with bash builtins instead;
+it's a real check (it does fail if `/hc` stops returning 200), just an
+unusual-looking one.
+
+**Verified against the real, running compose stack — not just a config
+review — with one explicit exception named below.** Every one of the 8
+services built and ran as real Docker containers on a real Docker
+network: SQL Server (health-checked via `sqlcmd`), all 5 API containers
+(each health-checked via its own `/hc`), and the gateway, all reachable
+by their compose service names exactly as `ocelot.Docker.json` expects.
+`smoke-test.sh`'s full 19-check run passed end to end against this real
+stack: health checks, F2's security headers and `/register` rate
+limiting, F2's register-forced-to-Cashier fix, F3's Arabic
+`Accept-Language` validation messages flowing through the gateway into a
+containerized Identity.API, a Warehouse item created and stocked, a full
+POS sale checked out, Warehouse's stock genuinely decrementing afterward
+(proving the outbox/event pipeline works across containers, not just
+across in-process test hosts), and Reporting's own read model picking up
+that same sale via its independent event ingestion.
+
+The one exception: **this development sandbox's own network egress
+policy blocks Docker Hub** (where the real `redis:7-alpine`,
+`rnwood/smtp4dev`, `node:20-alpine`, and `nginx:alpine` images referenced
+in `docker-compose.yml` actually live — `mcr.microsoft.com`, which every
+.NET/SQL Server image in this stack uses instead, was reachable). This is
+a constraint of the sandbox this phase was verified in, not a flaw in the
+compose file — a developer with normal internet access runs `docker
+compose up -d` and gets the exact stack described above with no
+substitutions. To still get REAL end-to-end verification rather than a
+config review, two of the eight containers were swapped for
+functionally-equivalent stand-ins for the verification session only
+(never committed — `docker-compose.yml` and every Dockerfile reference
+the real images throughout): **Microsoft Garnet** (a real,
+Redis-protocol-compatible, MIT-licensed cache server, run via its own
+NuGet package rather than its Docker image) stood in for `redis:7-alpine`,
+which let the Warehouse.API↔Redis code path in the smoke test above run
+against a genuine RESP-protocol server, not a mock — the one gap found
+this way (Garnet's Lua scripting, which
+`Microsoft.Extensions.Caching.StackExchangeRedis` depends on internally,
+defaults to off; `--lua` turns it on) was a Garnet configuration detail,
+not a bug in this project's own caching code. A `sleep infinity` container
+stood in for `rnwood/smtp4dev` purely to satisfy `notifications-api`'s
+compose-level startup dependency — separately confirmed (starting
+Notifications.API directly with an intentionally-unreachable SMTP host)
+that it starts and serves `/hc` normally either way, since it only
+connects to SMTP when an event actually triggers an email, never at
+startup. The Angular client container specifically was **not** run in
+this sandbox (its own build stage needs `node:20-alpine`) — its Dockerfile
+follows the identical, now-proven-correct pattern the other 6 containers
+use, but building and running it is the one piece of this phase that
+stayed a config review rather than a live-verified run.
+
+**Run it locally:**
+```bash
+docker compose up -d
+# SQL Server takes ~20-30s to report healthy the first time; every API
+# container waits on that before starting, and the gateway waits on all
+# five APIs — `docker compose ps` shows every service's health status.
+
+./smoke-test.sh
+# Runs the full register -> login -> create item -> POS sale -> checkout
+# -> cross-service verification flow described above against the
+# running stack and prints a pass/fail count.
+
+# Angular client: http://localhost:4200
+# Swagger on each service directly: http://localhost:5218/swagger (Identity),
+# :5238 (Warehouse), :5258 (POS), :5278 (Reporting), :5298 (Notifications)
+# smtp4dev's web UI: http://localhost:5080
+
+docker compose down          # stop everything
+docker compose down -v       # also drop the SQL Server data volume
 ```
