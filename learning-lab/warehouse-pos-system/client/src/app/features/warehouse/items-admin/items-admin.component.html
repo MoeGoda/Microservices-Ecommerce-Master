@@ -1,4 +1,4 @@
-<div class="items-admin">
+<div class="page items-admin">
   <mat-card class="create-card">
     <mat-card-header>
       <mat-card-title>{{ 'items.create.title' | translate }}</mat-card-title>
@@ -101,7 +101,7 @@
       @if (loadingItems()) {
         <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
       } @else {
-        <table class="data-table">
+        <table class="data-grid">
           <thead>
             <tr>
               <th>{{ 'items.list.table.sku' | translate }}</th>
@@ -180,7 +180,7 @@
 
         @if (item.units.length > 0) {
           <h3>{{ 'items.detail.unitsHeading' | translate }}</h3>
-          <table class="data-table">
+          <table class="data-grid">
             <thead>
               <tr>
                 <th>{{ 'items.detail.unitsTable.unit' | translate }}</th>
@@ -224,7 +224,7 @@
         </form>
 
         @if (priceHistory().length > 0) {
-          <table class="data-table">
+          <table class="data-grid">
             <thead>
               <tr>
                 <th>{{ 'items.detail.priceHistoryTable.changed' | translate }}</th>
@@ -277,7 +277,7 @@
           reasoning as the backend's own CancelPromotionCommand comment.
         -->
         @if (promotions().length > 0) {
-          <table class="data-table">
+          <table class="data-grid">
             <thead>
               <tr>
                 <th>{{ 'items.detail.promotionsTable.discount' | translate }}</th>
@@ -318,7 +318,7 @@
         }
 
         <h3>{{ 'items.detail.stockHeading' | translate }}</h3>
-        <table class="data-table">
+        <table class="data-grid">
           <thead>
             <tr>
               <th>{{ 'items.detail.stockTable.location' | translate }}</th>

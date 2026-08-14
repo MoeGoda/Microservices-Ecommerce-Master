@@ -1,10 +1,9 @@
+// .page (styles.scss) supplies the flex/gap/padding/margin baseline every
+// screen shares — this override just narrows it: a register is a single
+// focused task, not a data-dense admin table, so it doesn't need the
+// 1280px width every other screen gets.
 .pos-register {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 24px;
   max-width: 720px;
-  margin: 0 auto;
 }
 
 .form-row,
@@ -26,17 +25,8 @@
   width: 100px;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
+.data-grid {
   margin: 12px 0;
-
-  th,
-  td {
-    text-align: start;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--mat-sys-outline-variant, #ddd);
-  }
 }
 
 .empty-row {

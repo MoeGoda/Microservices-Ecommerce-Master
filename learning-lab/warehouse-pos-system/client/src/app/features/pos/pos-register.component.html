@@ -1,4 +1,4 @@
-<div class="pos-register">
+<div class="page pos-register">
   @if (!sale()) {
     <mat-card class="start-card">
       <mat-card-header>
@@ -46,7 +46,7 @@
           <button mat-flat-button color="primary" type="submit" [disabled]="addingLine()">{{ 'pos.register.addButton' | translate }}</button>
         </form>
 
-        <table class="data-table">
+        <table class="data-grid">
           <thead>
             <tr>
               <th>{{ 'pos.table.sku' | translate }}</th>
@@ -123,7 +123,7 @@
         </mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <table class="data-table">
+        <table class="data-grid">
           <thead>
             <tr>
               <th>{{ 'pos.table.sku' | translate }}</th>

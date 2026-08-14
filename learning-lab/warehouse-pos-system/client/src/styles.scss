@@ -7,13 +7,18 @@
 @use '@angular/material' as mat;
 
 html {
+  // G — a deliberate enterprise-dashboard palette (blue primary, cyan
+  // tertiary accent) instead of the scaffolded azure/blue default, and a
+  // slightly denser layout (-1) — this app is data-dense (tables, forms,
+  // stock figures), not a consumer app, so the default M3 comfortable
+  // spacing reads as wasted space rather than polish.
   @include mat.theme((
     color: (
-      primary: mat.$azure-palette,
-      tertiary: mat.$blue-palette,
+      primary: mat.$blue-palette,
+      tertiary: mat.$cyan-palette,
     ),
     typography: Roboto,
-    density: 0,
+    density: -1,
   ));
 }
 
@@ -26,7 +31,7 @@ body {
   // Set a default background, font and text colors for the application using
   // Angular Material's system-level CSS variables. Learn more about these
   // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
+  background-color: var(--mat-sys-surface-container-lowest);
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-body-medium);
 
@@ -34,6 +39,99 @@ body {
   margin: 0;
 }
 html, body { height: 100%; }
+
+// G — shared, app-wide layout primitives. Kept here (not per-component)
+// specifically so every screen's page header/card/empty-state looks
+// identical without every component re-declaring the same rules — the
+// same "one place, not five copies" reasoning F1's compression and F2's
+// security headers already used at the gateway layer, just for CSS.
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  max-width: 1280px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  h1 {
+    font: var(--mat-sys-headline-small);
+    margin: 0;
+  }
+
+  .page-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+}
+
+.surface-card {
+  background: var(--mat-sys-surface-container-low);
+  border-radius: 12px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    opacity: 0.6;
+  }
+}
+
+// A denser, more legible data table than Material's own bare defaults —
+// sticky header (tables here can run long: item lists, transaction
+// ledgers), zebra striping, and a hover row so it's obvious what a click
+// on "Manage"/"View" will act on.
+table.data-grid {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--mat-sys-surface-container-low);
+    text-align: start;
+    font: var(--mat-sys-label-large);
+    color: var(--mat-sys-on-surface-variant);
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--mat-sys-outline-variant);
+  }
+
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    font: var(--mat-sys-body-medium);
+  }
+
+  tbody tr:nth-child(even) {
+    background: var(--mat-sys-surface-container-lowest);
+  }
+
+  tbody tr:hover {
+    background: var(--mat-sys-surface-container);
+  }
+}
 
 /* NotificationService's toast classes. These have to live here, in a
    global stylesheet, rather than in a component's own .scss — MatSnackBar

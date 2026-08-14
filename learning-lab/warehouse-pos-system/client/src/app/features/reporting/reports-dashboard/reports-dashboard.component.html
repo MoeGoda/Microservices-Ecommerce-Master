@@ -1,4 +1,4 @@
-<div class="reports-dashboard">
+<div class="page reports-dashboard">
   <h2>{{ 'reports.title' | translate }}</h2>
 
   @if (loading()) {
@@ -102,7 +102,7 @@
             {{ 'reports.lowStock.allGood' | translate }}
           </p>
         } @else {
-          <table class="data-table">
+          <table class="data-grid">
             <thead>
               <tr>
                 <th>{{ 'reports.lowStock.table.status' | translate }}</th>

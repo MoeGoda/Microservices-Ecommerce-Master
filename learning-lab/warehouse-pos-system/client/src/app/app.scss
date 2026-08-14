@@ -7,8 +7,48 @@
   font-size: 0.9rem;
 }
 
+// G — the whole app shell (sidenav + topbar) below the sidenav-container
+// needs a fixed viewport height for mat-sidenav's own scrolling behavior
+// to kick in, instead of the page growing taller than the screen and
+// pushing the toolbar down off-screen on a long list/table.
+.app-shell {
+  height: 100vh;
+}
+
+.app-sidenav {
+  width: 240px;
+  border-inline-end: 1px solid var(--mat-sys-outline-variant);
+}
+
+.app-brand {
+  font: var(--mat-sys-title-medium);
+  padding: 20px 16px 12px;
+  color: var(--mat-sys-primary);
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+// The sidenav toggle only matters below the responsive breakpoint where
+// the sidenav switches to `mode="over"` (see the media query below) — on
+// a wide screen the nav is always visible and the button would just be
+// dead weight taking up toolbar space.
+.sidenav-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidenav-toggle {
+    display: inline-flex;
+  }
+}
+
 .active-nav-link {
-  text-decoration: underline;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
 }
 
 .notification-menu-header {

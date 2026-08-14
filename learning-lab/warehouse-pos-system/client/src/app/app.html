@@ -1,59 +1,81 @@
-<mat-toolbar color="primary">
-  <span>{{ 'common.appName' | translate }}</span>
-  @if (authService.currentUser()) {
-    @if (canSeeAdmin()) {
-      <a mat-button routerLink="/admin" routerLinkActive="active-nav-link">{{ 'toolbar.admin' | translate }}</a>
-    }
-    @if (canSeePos()) {
-      <a mat-button routerLink="/pos" routerLinkActive="active-nav-link">{{ 'toolbar.pos' | translate }}</a>
-    }
-    @if (canSeeReports()) {
-      <a mat-button routerLink="/reports" routerLinkActive="active-nav-link">{{ 'toolbar.reports' | translate }}</a>
-    }
-  }
-  <span class="spacer"></span>
-  <button mat-button [matMenuTriggerFor]="languageMenu" [attr.aria-label]="'toolbar.language' | translate" [attr.title]="'toolbar.language' | translate">
-    {{ currentLang() === 'ar' ? 'AR' : 'EN' }}
-  </button>
-  <mat-menu #languageMenu="matMenu">
-    <button mat-menu-item (click)="switchLanguage('en')">English</button>
-    <button mat-menu-item (click)="switchLanguage('ar')">العربية</button>
-  </mat-menu>
-  @if (authService.currentUser(); as user) {
-    <button
-      mat-icon-button
-      [matMenuTriggerFor]="notificationMenu"
-      [matBadge]="notificationFeed.unreadCount() || null"
-      matBadgeColor="warn"
-      matBadgeSize="small"
-      [attr.aria-label]="'toolbar.notifications' | translate"
-      [attr.title]="'toolbar.notifications' | translate"
-    >
-      <mat-icon>notifications</mat-icon>
-    </button>
-    <mat-menu #notificationMenu="matMenu" class="notification-menu">
-      <div class="notification-menu-header" (click)="$event.stopPropagation()">
-        <span>{{ 'toolbar.notifications' | translate }}</span>
-        @if (notificationFeed.unreadCount() > 0) {
-          <button mat-button (click)="markAllRead()">{{ 'toolbar.markAllRead' | translate }}</button>
+@if (authService.currentUser()) {
+  <mat-sidenav-container class="app-shell">
+    <mat-sidenav #sidenav [mode]="sidenavMode()" [opened]="sidenavOpened()" class="app-sidenav">
+      <div class="app-brand">{{ 'common.appName' | translate }}</div>
+      <mat-nav-list>
+        @if (canSeeAdmin()) {
+          <a mat-list-item routerLink="/admin" routerLinkActive="active-nav-link">
+            <mat-icon matListItemIcon>inventory_2</mat-icon>
+            <span matListItemTitle>{{ 'toolbar.admin' | translate }}</span>
+          </a>
         }
-      </div>
-      @if (notificationFeed.notifications().length === 0) {
-        <div class="notification-empty">{{ 'toolbar.noNotifications' | translate }}</div>
-      } @else {
-        @for (n of notificationFeed.notifications(); track n.id) {
-          <button mat-menu-item [class.unread]="!n.isRead" (click)="markRead(n)">
-            <span class="notification-message">{{ n.message }}</span>
+        @if (canSeePos()) {
+          <a mat-list-item routerLink="/pos" routerLinkActive="active-nav-link">
+            <mat-icon matListItemIcon>point_of_sale</mat-icon>
+            <span matListItemTitle>{{ 'toolbar.pos' | translate }}</span>
+          </a>
+        }
+        @if (canSeeReports()) {
+          <a mat-list-item routerLink="/reports" routerLinkActive="active-nav-link">
+            <mat-icon matListItemIcon>bar_chart</mat-icon>
+            <span matListItemTitle>{{ 'toolbar.reports' | translate }}</span>
+          </a>
+        }
+      </mat-nav-list>
+    </mat-sidenav>
+
+    <mat-sidenav-content>
+      <mat-toolbar class="app-topbar">
+        <button mat-icon-button (click)="sidenav.toggle()" class="sidenav-toggle" aria-label="Toggle navigation">
+          <mat-icon>menu</mat-icon>
+        </button>
+        <span class="spacer"></span>
+        <app-language-switcher></app-language-switcher>
+        @if (authService.currentUser(); as user) {
+          <button
+            mat-icon-button
+            [matMenuTriggerFor]="notificationMenu"
+            [matBadge]="notificationFeed.unreadCount() || null"
+            matBadgeColor="warn"
+            matBadgeSize="small"
+            [attr.aria-label]="'toolbar.notifications' | translate"
+            [attr.title]="'toolbar.notifications' | translate"
+          >
+            <mat-icon>notifications</mat-icon>
+          </button>
+          <mat-menu #notificationMenu="matMenu" class="notification-menu">
+            <div class="notification-menu-header" (click)="$event.stopPropagation()">
+              <span>{{ 'toolbar.notifications' | translate }}</span>
+              @if (notificationFeed.unreadCount() > 0) {
+                <button mat-button (click)="markAllRead()">{{ 'toolbar.markAllRead' | translate }}</button>
+              }
+            </div>
+            @if (notificationFeed.notifications().length === 0) {
+              <div class="notification-empty">{{ 'toolbar.noNotifications' | translate }}</div>
+            } @else {
+              @for (n of notificationFeed.notifications(); track n.id) {
+                <button mat-menu-item [class.unread]="!n.isRead" (click)="markRead(n)">
+                  <span class="notification-message">{{ n.message }}</span>
+                </button>
+              }
+            }
+          </mat-menu>
+
+          <span class="user-badge">{{ user.userName }} ({{ 'roles.' + user.role | translate }})</span>
+          <button mat-icon-button (click)="logout()" [attr.aria-label]="'toolbar.signOut' | translate" [attr.title]="'toolbar.signOut' | translate">
+            <mat-icon>logout</mat-icon>
           </button>
         }
-      }
-    </mat-menu>
+      </mat-toolbar>
 
-    <span class="user-badge">{{ user.userName }} ({{ 'roles.' + user.role | translate }})</span>
-    <button mat-icon-button (click)="logout()" [attr.aria-label]="'toolbar.signOut' | translate" [attr.title]="'toolbar.signOut' | translate">
-      <mat-icon>logout</mat-icon>
-    </button>
-  }
-</mat-toolbar>
-
-<router-outlet></router-outlet>
+      <router-outlet></router-outlet>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+} @else {
+  <mat-toolbar class="app-topbar" color="primary">
+    <span>{{ 'common.appName' | translate }}</span>
+    <span class="spacer"></span>
+    <app-language-switcher></app-language-switcher>
+  </mat-toolbar>
+  <router-outlet></router-outlet>
+}

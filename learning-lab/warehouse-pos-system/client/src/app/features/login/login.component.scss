@@ -2,14 +2,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  background-color: #f5f5f5;
+  min-height: calc(100vh - 64px);
+  background: linear-gradient(160deg, var(--mat-sys-primary-container) 0%, var(--mat-sys-surface-container-lowest) 55%);
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .login-card {
   width: 100%;
-  max-width: 360px;
-  padding: 8px;
+  max-width: 380px;
+  padding: 12px;
+  border-radius: 16px;
 }
 
 .full-width {

@@ -1,16 +1,19 @@
-import { Component, effect } from '@angular/core';
+import { Component, effect, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatListModule } from '@angular/material/list';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { AuthService } from './core/auth/auth.service';
 import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
 import { NotificationDto } from './shared/models/notification.models';
 import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES } from './shared/models/roles';
-import { I18nService, SupportedLang } from './core/i18n/i18n.service';
 import { TranslatePipe } from './core/i18n/translate.pipe';
+import { LanguageSwitcherComponent } from './shared/components/language-switcher/language-switcher.component';
 
 @Component({
   selector: 'app-root',
@@ -23,21 +26,34 @@ import { TranslatePipe } from './core/i18n/translate.pipe';
     MatIconModule,
     MatMenuModule,
     MatBadgeModule,
+    MatSidenavModule,
+    MatListModule,
     TranslatePipe,
+    LanguageSwitcherComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
-  readonly currentLang;
+  // Narrow screens get an overlay sidenav that starts closed (mode="over"
+  // — a fixed "side" nav would otherwise permanently eat ~240px of a
+  // phone-width viewport); wide screens keep the always-visible "side"
+  // mode this shell was built around. `sidenavMode`/`sidenavOpened` drive
+  // the two mat-sidenav attributes directly from the same breakpoint.
+  readonly sidenavMode = signal<'side' | 'over'>('side');
+  readonly sidenavOpened = signal(true);
 
   constructor(
     readonly authService: AuthService,
     readonly notificationFeed: NotificationFeedService,
-    private readonly i18n: I18nService,
     private readonly router: Router,
+    breakpointObserver: BreakpointObserver,
   ) {
-    this.currentLang = this.i18n.currentLang;
+    breakpointObserver.observe('(max-width: 768px)').subscribe((state) => {
+      this.sidenavMode.set(state.matches ? 'over' : 'side');
+      this.sidenavOpened.set(!state.matches);
+    });
+
     // Covers both a fresh sign-in (LoginComponent sets currentUser, this
     // fires right after) and a page reload with an already-valid session
     // in localStorage (currentUser is set synchronously from storage at
@@ -68,10 +84,6 @@ export class App {
 
   canSeeReports(): boolean {
     return this.hasAnyRole(REPORTS_ROLES);
-  }
-
-  switchLanguage(lang: SupportedLang): void {
-    this.i18n.switchLanguage(lang);
   }
 
   private hasAnyRole(roles: readonly string[]): boolean {
