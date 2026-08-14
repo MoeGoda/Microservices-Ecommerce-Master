@@ -84,3 +84,15 @@ export interface ReceivePurchaseOrderLineRequest {
   quantity: number;
   reference?: string;
 }
+
+// J — mirrors PurchaseOrderAgingLineDto.
+export interface PurchaseOrderAgingLineDto {
+  id: number;
+  orderNumber: string;
+  supplierName: string;
+  status: PurchaseOrderStatus;
+  orderedAtUtc: string | null;
+  ageDaysSinceOrdered: number | null;
+  totalCost: number;
+  receivedValue: number;
+}

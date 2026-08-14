@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Reporting.Application.Features.Ingestion.Commands.IngestSaleCompleted;
 using Reporting.Application.Features.Ingestion.Commands.IngestSaleReturned;
 using Reporting.Application.Features.Ingestion.Commands.IngestStockLevelChanged;
+using Reporting.Application.Features.Ingestion.Commands.IngestStockTransactionRecorded;
 using Reporting.Application.Models;
 
 namespace Reporting.API.Controllers
@@ -45,6 +46,13 @@ namespace Reporting.API.Controllers
         [HttpPost("stock-level-changed")]
         [ProducesResponseType(typeof(IngestResultDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<IngestResultDto>> StockLevelChanged([FromBody] IngestStockLevelChangedCommand command)
+        {
+            return Ok(await _mediator.Send(command));
+        }
+
+        [HttpPost("stock-transaction-recorded")]
+        [ProducesResponseType(typeof(IngestResultDto), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<IngestResultDto>> StockTransactionRecorded([FromBody] IngestStockTransactionRecordedCommand command)
         {
             return Ok(await _mediator.Send(command));
         }

@@ -12,6 +12,7 @@ namespace Reporting.Infrastructure.Persistence
         public DbSet<SaleRecord> SaleRecords => Set<SaleRecord>();
         public DbSet<SaleLineRecord> SaleLineRecords => Set<SaleLineRecord>();
         public DbSet<StockLevelRecord> StockLevelRecords => Set<StockLevelRecord>();
+        public DbSet<StockMovementRecord> StockMovementRecords => Set<StockMovementRecord>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -49,6 +50,23 @@ namespace Reporting.Infrastructure.Persistence
                 builder.Property(r => r.ItemName).HasMaxLength(200);
                 builder.Property(r => r.LocationCode).HasMaxLength(20);
                 builder.Property(r => r.LocationName).HasMaxLength(100);
+            });
+
+            modelBuilder.Entity<StockMovementRecord>(builder =>
+            {
+                builder.Property(m => m.Sku).HasMaxLength(50);
+                builder.Property(m => m.ItemName).HasMaxLength(200);
+                builder.Property(m => m.LocationCode).HasMaxLength(20);
+                builder.Property(m => m.LocationName).HasMaxLength(100);
+                builder.Property(m => m.Reason).HasMaxLength(50);
+                builder.Property(m => m.Reference).HasMaxLength(100);
+
+                // The ledger report's own access pattern — filter/sort by
+                // when the movement happened, optionally narrowed to one
+                // item or location.
+                builder.HasIndex(m => m.TransactionAtUtc);
+                builder.HasIndex(m => m.ItemId);
+                builder.HasIndex(m => m.LocationId);
             });
         }
     }

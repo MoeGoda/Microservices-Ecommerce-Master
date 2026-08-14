@@ -6,6 +6,7 @@ import { PagedResult } from '../../shared/models/pagination.models';
 import {
   CreatePurchaseOrderRequest,
   CreateSupplierRequest,
+  PurchaseOrderAgingLineDto,
   PurchaseOrderDetailDto,
   PurchaseOrderSummaryDto,
   ReceivePurchaseOrderLineRequest,
@@ -53,5 +54,9 @@ export class PurchasingService {
 
   receiveLine(orderId: number, lineId: number, request: ReceivePurchaseOrderLineRequest): Observable<PurchaseOrderDetailDto> {
     return this.http.post<PurchaseOrderDetailDto>(`${BASE}/PurchaseOrders/${orderId}/lines/${lineId}/receive`, request);
+  }
+
+  getPurchaseOrderAging(): Observable<PurchaseOrderAgingLineDto[]> {
+    return this.http.get<PurchaseOrderAgingLineDto[]>(`${BASE}/Reports/purchase-order-aging`);
   }
 }

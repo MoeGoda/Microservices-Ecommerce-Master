@@ -46,5 +46,14 @@ namespace Warehouse.Infrastructure.Repositories
             _context.PurchaseOrders.Update(purchaseOrder);
             return Task.CompletedTask;
         }
+
+        public async Task<IEnumerable<PurchaseOrder>> GetAllForAgingReport()
+        {
+            return await _context.PurchaseOrders
+                .Include(p => p.Supplier)
+                .Include(p => p.Lines)
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+        }
     }
 }

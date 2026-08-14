@@ -62,7 +62,7 @@ a distributed transaction.
 - [x] **G — Professional UI/UX redesign** (M3 theme, responsive sidenav shell)
 - [x] **H — User management screens** (Admin-only user list + create + activate/deactivate)
 - [x] **I — Purchase Orders & Suppliers module**
-- [ ] **J — Expanded reporting suite**
+- [x] **J — Expanded reporting suite**
 
 ## A1 — Identity service
 
@@ -3004,4 +3004,87 @@ actually allows them.
 #   full ordered quantity — the order becomes "Partially received" and
 #   "Cancel order" disappears
 # → Receive the remainder — the order becomes "Received"
+```
+
+## J — Expanded reporting suite
+
+**What it does:** grows the Reports dashboard from three reports to
+eight. Payments/sales ledger (date-range filterable), staff/cashier
+performance, and a stock-movement ledger are new event-sourced reports
+on Reporting.API; inventory valuation and purchase-order status/aging
+are new reports living directly on Warehouse.API instead.
+
+**Not every report belongs in Reporting, and this phase is the first
+time that distinction actually mattered.** D1 built Reporting
+specifically to answer questions about EVENTS that happened, aggregated
+from Warehouse's and POS's outbox messages — that's exactly what the
+sales ledger, cashier performance, and stock-movement ledger are.
+Inventory valuation and PO aging are a different kind of question —
+"what is Warehouse's OWN current state worth right now" — and
+Warehouse already has that state sitting in its own database, correct
+and current, the instant it's asked. Fanning it out as yet another
+event just to duplicate today's `StockLevel`/`PurchaseOrder` rows into
+a second read model would make the report MORE stale, not less, for no
+real benefit — so both live as a new `ReportsController` directly on
+Warehouse.API instead, gated to the same Admin/Manager-only audience
+Reporting.API's own reports use.
+
+**The stock-movement ledger needed something Warehouse never sent
+before: the delta, not just the resulting balance.** `StockLevelChanged`
+(D1) has always carried only "here is the balance now" — exactly what a
+current-snapshot read model needs, and deliberately not a delta. A
+ledger needs the delta, the reason, and the reference, so
+`StockAdjustmentStager.Stage()` — the ONE method every stock-affecting
+command in this system already funnels through (`ReceiveStockCommand`,
+`AdjustStockCommand`, `ApplySaleCommand`, `ApplySaleReturnCommand`,
+`TransferStockCommand`, and now I's `ReceivePurchaseOrderLineCommand`)
+— now stages a SECOND, independent event, `StockTransactionRecorded`,
+alongside the first. `StockLevelChanged` keeps meaning exactly what it
+always meant; this is purely additive. A new
+`StockTransactionReason.PurchaseOrderReceived` value (distinct from the
+plain `Received` a free-text restock uses) keeps the ledger filterable
+by which kind of receipt is which — the same "give it its own value,
+don't overload an existing one" reasoning `Return` already established
+as distinct from `Adjustment`.
+
+**The ledger has no dedup/idempotency check, and that's a named,
+accepted gap, not an oversight.** Every other ingested event in this
+system (`SaleRecord`, `StockLevelRecord`) has a natural key a repeated
+delivery can be checked against — a `SaleId`, an `(ItemId, LocationId)`
+pair. A single stock movement has no equivalent: Warehouse doesn't
+mint a per-transaction id to send along, and inventing one just for
+this would be more machinery than the (rare, retry-only) risk of an
+occasional double-counted row justifies at this scale.
+
+**The sales ledger deliberately does NOT exclude returned sales, unlike
+every other sales report in this system.** `GetSalesByDayQuery`/
+`GetTopSellingItemsQuery` both filter out a returned `SaleRecord` because
+they're revenue totals — a returned sale shouldn't keep counting toward
+one. A ledger is a record of what happened, not a revenue total; a
+returned sale stays in it, with its `ReturnedAtUtc` shown, rather than
+disappearing the moment it's given back.
+
+**Cashier performance shows a username, not a bare id — resolved
+entirely client-side.** `CashierPerformanceDto`/`SalesLedgerEntryDto`
+both carry a plain `CashierUserId`, because Reporting has no reference
+to Identity's `Users` table (no shared domain assemblies, no
+cross-service join). The Angular dashboard resolves it itself, calling
+the same `GET /Identity/Users` H's Users screen already exposes to the
+Admin/Manager audience this dashboard is restricted to — and falls back
+to `"#{id}"` if that call 403s (Identity's `UsersController` is
+Admin-only; this dashboard's own `REPORTS_ROLES` also allows Manager),
+rather than letting one non-essential name lookup fail the whole
+dashboard.
+
+**Try it:**
+```bash
+# Sign in as the seeded admin, then in the Angular app, on /reports:
+# → set a date range at the top of the new reports section — it filters
+#   the payments ledger, cashier performance, and stock movement ledger
+#   together
+# → receive some stock (either a free-text receive on /admin, or a PO
+#   receipt on /purchase-orders) and watch it show up in "Stock movement
+#   ledger" with the correct Received/PurchaseOrderReceived reason
+# → "Inventory valuation" and "Purchase order status / aging" both
+#   reflect Warehouse's current state immediately, with no event delay
 ```

@@ -23,7 +23,18 @@ namespace Warehouse.Infrastructure.Http
 
         public async Task<EventPublishResult> PublishAsync(string eventType, string payloadJson, CancellationToken cancellationToken)
         {
-            if (eventType != OutboxEventTypes.StockLevelChanged)
+            // J — a second event type this publisher forwards, same
+            // shape as the first: PayloadJson is already exactly what the
+            // matching Ingest command wants, just routed to a different
+            // downstream path.
+            var downstreamPath = eventType switch
+            {
+                OutboxEventTypes.StockLevelChanged => "api/v1/Events/stock-level-changed",
+                OutboxEventTypes.StockTransactionRecorded => "api/v1/Events/stock-transaction-recorded",
+                _ => null,
+            };
+
+            if (downstreamPath is null)
             {
                 return EventPublishResult.Failed($"ReportingEventPublisher doesn't understand event type '{eventType}'.");
             }
@@ -33,7 +44,7 @@ namespace Warehouse.Infrastructure.Http
                 using var content = new StringContent(payloadJson, Encoding.UTF8);
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-                using var response = await _httpClient.PostAsync("api/v1/Events/stock-level-changed", content, cancellationToken);
+                using var response = await _httpClient.PostAsync(downstreamPath, content, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {

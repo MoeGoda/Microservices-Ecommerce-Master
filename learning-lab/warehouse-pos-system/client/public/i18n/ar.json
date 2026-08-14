@@ -77,7 +77,9 @@
   "reports": {
     "title": "التقارير",
     "emptyStates": {
-      "noSales": "لا توجد مبيعات مكتملة حتى الآن."
+      "noSales": "لا توجد مبيعات مكتملة حتى الآن.",
+      "noMovements": "لا توجد حركات مخزون حتى الآن.",
+      "noStock": "لا يوجد مخزون متوفر حتى الآن."
     },
     "salesByDay": {
       "title": "المبيعات اليومية",
@@ -103,6 +105,71 @@
       "status": {
         "outOfStock": "نفذ من المخزون",
         "lowStock": "مخزون منخفض"
+      }
+    },
+    "dateRange": {
+      "title": "النطاق الزمني",
+      "from": "من",
+      "to": "إلى",
+      "hint": "ينطبق على سجل المدفوعات، وأداء الكاشير، وسجل حركة المخزون أدناه."
+    },
+    "salesLedger": {
+      "title": "سجل المدفوعات / المبيعات",
+      "table": {
+        "saleId": "البيع",
+        "cashier": "الكاشير",
+        "total": "الإجمالي",
+        "lines": "البنود",
+        "completedAt": "تاريخ الإتمام",
+        "status": "الحالة"
+      },
+      "completed": "مكتمل",
+      "returned": "مرتجع"
+    },
+    "cashierPerformance": {
+      "title": "أداء الموظفين / الكاشير",
+      "table": {
+        "cashier": "الكاشير",
+        "completed": "مبيعات مكتملة",
+        "returned": "مبيعات مرتجعة",
+        "totalRevenue": "الإيراد الإجمالي",
+        "averageSale": "متوسط البيع"
+      }
+    },
+    "stockMovements": {
+      "title": "سجل حركة المخزون",
+      "table": {
+        "when": "الوقت",
+        "item": "المنتج",
+        "location": "الموقع",
+        "change": "التغيير",
+        "reason": "السبب",
+        "reference": "المرجع"
+      }
+    },
+    "inventoryValuation": {
+      "title": "تقييم المخزون",
+      "totalValue": "إجمالي قيمة المخزون (بسعر البيع الحالي): {{total}}",
+      "table": {
+        "sku": "رمز المنتج (SKU)",
+        "item": "المنتج",
+        "category": "الفئة",
+        "onHand": "المتوفر",
+        "unitPrice": "سعر الوحدة",
+        "totalValue": "القيمة الإجمالية"
+      }
+    },
+    "poAging": {
+      "title": "حالة / تقادم أوامر الشراء",
+      "allCaughtUp": "لا توجد أوامر شراء مفتوحة في انتظار المورد.",
+      "daysOld": "{{days}} يومًا",
+      "table": {
+        "orderNumber": "رقم الأمر",
+        "supplier": "المورد",
+        "status": "الحالة",
+        "age": "المدة",
+        "totalCost": "التكلفة الإجمالية",
+        "receivedValue": "القيمة المستلمة"
       }
     }
   },

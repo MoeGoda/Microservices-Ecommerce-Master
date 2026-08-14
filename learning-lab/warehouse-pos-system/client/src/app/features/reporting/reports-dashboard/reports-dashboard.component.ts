@@ -1,14 +1,31 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, computed, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin } from 'rxjs';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
-import { SalesByDayDto, StockLevelRecordDto, TopSellingItemDto } from '../../../shared/models/reporting.models';
+import { emptyPage, PagedResult } from '../../../shared/models/pagination.models';
+import { PurchaseOrderAgingLineDto } from '../../../shared/models/purchasing.models';
+import {
+  CashierPerformanceDto,
+  SalesByDayDto,
+  SalesLedgerEntryDto,
+  StockLevelRecordDto,
+  StockMovementRecordDto,
+  TopSellingItemDto,
+} from '../../../shared/models/reporting.models';
+import { InventoryValuationLineDto } from '../../../shared/models/warehouse.models';
+import { UserDto } from '../../../shared/models/users.models';
+import { PurchasingService } from '../../purchasing/purchasing.service';
+import { UsersService } from '../../users/users.service';
+import { WarehouseService } from '../../warehouse/warehouse.service';
 import { ReportingService } from '../reporting.service';
 
 // One bar's full render geometry, precomputed once per data load rather than
@@ -55,7 +72,20 @@ const MAX_LABELED_BARS = 14;
 
 @Component({
   selector: 'app-reports-dashboard',
-  imports: [DecimalPipe, ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatIconModule, MatProgressSpinnerModule, MatSelectModule, TranslatePipe],
+  imports: [
+    DatePipe,
+    DecimalPipe,
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatPaginatorModule,
+    MatProgressSpinnerModule,
+    MatSelectModule,
+    TranslatePipe,
+  ],
   templateUrl: './reports-dashboard.component.html',
   styleUrl: './reports-dashboard.component.scss',
 })
@@ -120,10 +150,49 @@ export class ReportsDashboardComponent implements OnInit {
 
   readonly topSellingMax = computed(() => Math.max(...this.topSelling().map((r) => r.totalRevenue), 0));
 
-  constructor(private readonly reportingService: ReportingService) {}
+  // J — the five new reports. salesLedger/cashierPerformance/stockMovements
+  // share one date-range filter (dateRangeForm); inventoryValuation/
+  // purchaseOrderAging are live current-state snapshots with no date axis
+  // to filter on.
+  readonly salesLedger = signal<PagedResult<SalesLedgerEntryDto>>(emptyPage());
+  readonly cashierPerformance = signal<CashierPerformanceDto[]>([]);
+  readonly stockMovements = signal<PagedResult<StockMovementRecordDto>>(emptyPage());
+  readonly inventoryValuation = signal<InventoryValuationLineDto[]>([]);
+  readonly purchaseOrderAging = signal<PurchaseOrderAgingLineDto[]>([]);
+  readonly loadingDateFiltered = signal(false);
+  readonly loadingValuation = signal(false);
+  readonly loadingAging = signal(false);
+
+  // CashierUserId -> display name. Best-effort: UsersController is
+  // Admin-only (H), but this dashboard is also open to Manager (see
+  // REPORTS_ROLES) — a Manager viewing this report simply falls back to
+  // "User #N" rather than the whole dashboard failing to load over one
+  // 403 on a name lookup that isn't essential to the report itself.
+  readonly cashierNames = signal<Map<number, string>>(new Map());
+
+  readonly dateRangeForm = new FormGroup({
+    fromDate: new FormControl('', { nonNullable: true }),
+    toDate: new FormControl('', { nonNullable: true }),
+  });
+
+  readonly inventoryValuationTotal = computed(() => this.inventoryValuation().reduce((sum, l) => sum + l.totalValue, 0));
+
+  constructor(
+    private readonly reportingService: ReportingService,
+    private readonly warehouseService: WarehouseService,
+    private readonly purchasingService: PurchasingService,
+    private readonly usersService: UsersService,
+  ) {}
 
   ngOnInit(): void {
     this.loadAll();
+    this.loadDateFilteredReports();
+    this.loadInventoryValuation();
+    this.loadPurchaseOrderAging();
+    this.usersService.getUsers(1, 100).subscribe({
+      next: (result) => this.cashierNames.set(new Map(result.items.map((u: UserDto) => [u.id, u.userName]))),
+      error: () => this.cashierNames.set(new Map()),
+    });
     this.takeControl.valueChanges.subscribe(() => this.loadTopSelling());
   }
 
@@ -146,6 +215,86 @@ export class ReportsDashboardComponent implements OnInit {
     this.reportingService.getTopSellingItems(this.takeControl.value).subscribe({
       next: (top) => this.topSelling.set(top),
     });
+  }
+
+  // fromDate/toDate are native <input type="date"> strings ("YYYY-MM-DD")
+  // in the browser's own local time — converted to UTC ISO instants here,
+  // the same new Date(...).toISOString() idiom items-admin's own
+  // promotion dates already use. toDate is treated as the END of that
+  // calendar day, not its start, so "filter through today" actually
+  // includes today's sales.
+  private dateRangeUtc(): { fromUtc?: string; toUtc?: string } {
+    const { fromDate, toDate } = this.dateRangeForm.getRawValue();
+    return {
+      fromUtc: fromDate ? new Date(`${fromDate}T00:00:00`).toISOString() : undefined,
+      toUtc: toDate ? new Date(`${toDate}T23:59:59.999`).toISOString() : undefined,
+    };
+  }
+
+  onDateRangeChange(): void {
+    this.loadDateFilteredReports();
+  }
+
+  private loadDateFilteredReports(page = 1): void {
+    const { fromUtc, toUtc } = this.dateRangeUtc();
+    this.loadingDateFiltered.set(true);
+    forkJoin({
+      ledger: this.reportingService.getSalesLedger(page, this.salesLedger().pageSize, fromUtc, toUtc),
+      performance: this.reportingService.getCashierPerformance(fromUtc, toUtc),
+      movements: this.reportingService.getStockMovements(1, this.stockMovements().pageSize, fromUtc, toUtc),
+    })
+      .pipe(finalize(() => this.loadingDateFiltered.set(false)))
+      .subscribe(({ ledger, performance, movements }) => {
+        this.salesLedger.set(ledger);
+        this.cashierPerformance.set(performance);
+        this.stockMovements.set(movements);
+      });
+  }
+
+  onSalesLedgerPageChange(event: PageEvent): void {
+    if (event.pageSize !== this.salesLedger().pageSize) {
+      this.salesLedger.update((current) => ({ ...current, pageSize: event.pageSize }));
+    }
+    const { fromUtc, toUtc } = this.dateRangeUtc();
+    this.reportingService.getSalesLedger(event.pageIndex + 1, this.salesLedger().pageSize, fromUtc, toUtc).subscribe({
+      next: (result) => this.salesLedger.set(result),
+    });
+  }
+
+  onStockMovementsPageChange(event: PageEvent): void {
+    if (event.pageSize !== this.stockMovements().pageSize) {
+      this.stockMovements.update((current) => ({ ...current, pageSize: event.pageSize }));
+    }
+    const { fromUtc, toUtc } = this.dateRangeUtc();
+    this.reportingService.getStockMovements(event.pageIndex + 1, this.stockMovements().pageSize, fromUtc, toUtc).subscribe({
+      next: (result) => this.stockMovements.set(result),
+    });
+  }
+
+  private loadInventoryValuation(): void {
+    this.loadingValuation.set(true);
+    this.warehouseService
+      .getInventoryValuation()
+      .pipe(finalize(() => this.loadingValuation.set(false)))
+      .subscribe({ next: (lines) => this.inventoryValuation.set(lines) });
+  }
+
+  private loadPurchaseOrderAging(): void {
+    this.loadingAging.set(true);
+    this.purchasingService
+      .getPurchaseOrderAging()
+      .pipe(finalize(() => this.loadingAging.set(false)))
+      .subscribe({ next: (lines) => this.purchaseOrderAging.set(lines) });
+  }
+
+  cashierName(cashierUserId: number): string {
+    return this.cashierNames().get(cashierUserId) ?? `#${cashierUserId}`;
+  }
+
+  // Only Ordered/PartiallyReceived orders carry an age at all — see
+  // PurchaseOrderAgingLineDto's own comment.
+  openPurchaseOrderAging(): PurchaseOrderAgingLineDto[] {
+    return this.purchaseOrderAging().filter((o) => o.ageDaysSinceOrdered !== null);
   }
 
   // "YYYY-MM-DD" has no time-of-day or timezone — parsing it with `new

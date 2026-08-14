@@ -36,3 +36,39 @@ export interface StockLevelRecordDto {
   reorderThreshold: number;
   asOfUtc: string;
 }
+
+// J — mirrors SalesLedgerEntryDto. Includes returnedAtUtc, unlike
+// SalesByDayDto's revenue total which excludes returned sales entirely —
+// a ledger is a record of what happened, a return included.
+export interface SalesLedgerEntryDto {
+  saleId: number;
+  locationId: number;
+  cashierUserId: number;
+  total: number;
+  completedAtUtc: string;
+  lineCount: number;
+  returnedAtUtc: string | null;
+}
+
+// Mirrors CashierPerformanceDto.
+export interface CashierPerformanceDto {
+  cashierUserId: number;
+  completedSaleCount: number;
+  returnedSaleCount: number;
+  totalRevenue: number;
+  averageSaleTotal: number;
+}
+
+// Mirrors StockMovementRecordDto.
+export interface StockMovementRecordDto {
+  itemId: number;
+  sku: string;
+  itemName: string;
+  locationId: number;
+  locationCode: string;
+  locationName: string;
+  quantityChange: number;
+  reason: string;
+  reference: string | null;
+  transactionAtUtc: string;
+}

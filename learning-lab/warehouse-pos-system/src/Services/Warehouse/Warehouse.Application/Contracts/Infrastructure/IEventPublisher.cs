@@ -43,4 +43,27 @@ namespace Warehouse.Application.Contracts.Infrastructure
         public int QuantityOnHand { get; set; }
         public int ReorderThreshold { get; set; }
     }
+
+    // J — the delta StockLevelChangedMessage never carries: exactly one
+    // of these per StockTransaction row StockAdjustmentStager.Stage()
+    // writes, so Reporting's stock-movement ledger can show "what
+    // happened," not just "what the balance is now."
+    public class StockTransactionRecordedMessage
+    {
+        public int ItemId { get; set; }
+        public string Sku { get; set; } = null!;
+        public string ItemName { get; set; } = null!;
+        public int LocationId { get; set; }
+        public string LocationCode { get; set; } = null!;
+        public string LocationName { get; set; } = null!;
+        public int QuantityChange { get; set; }
+
+        // Serialized as its string name (e.g. "Received",
+        // "PurchaseOrderReceived") — Reporting has no reference to
+        // Warehouse's StockTransactionReason enum type (no shared domain
+        // assemblies across services), so the name itself is the payload.
+        public string Reason { get; set; } = null!;
+        public string? Reference { get; set; }
+        public DateTime TransactionAtUtc { get; set; }
+    }
 }

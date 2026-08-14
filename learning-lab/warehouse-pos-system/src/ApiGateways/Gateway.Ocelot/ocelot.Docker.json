@@ -243,8 +243,16 @@
     {
       "DownstreamHostAndPorts": [
         {
-          "Host": "pos-api",
-          "Port": 5258
+          "Host": "warehouse-api",
+          "Port": 5238
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "warehouse-api",
+          "Port": 5238
         }
       ]
     },
@@ -293,6 +301,38 @@
         {
           "Host": "pos-api",
           "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "pos-api",
+          "Port": 5258
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "reporting-api",
+          "Port": 5278
         }
       ]
     },

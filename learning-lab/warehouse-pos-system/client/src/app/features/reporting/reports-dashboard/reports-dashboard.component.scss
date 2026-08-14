@@ -200,6 +200,37 @@
   &.warning {
     color: color-mix(in srgb, var(--status-warning) 70%, black);
   }
+
+  &.good {
+    color: var(--status-good);
+  }
+}
+
+// --- J: date-range filter, sales/stock ledgers, valuation, PO aging ---
+
+.date-range-form {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.date-range-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.grand-total {
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.positive {
+  color: var(--status-good);
+}
+
+.negative {
+  color: var(--status-critical);
 }
 
 @media (max-width: 800px) {

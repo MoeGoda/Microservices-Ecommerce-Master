@@ -171,3 +171,15 @@ export interface CreatePromotionRequest {
 
 // Mirrors Warehouse.Domain.Entities.DiscountType.
 export const DISCOUNT_TYPES = ['PercentageOff', 'FixedAmountOff'] as const;
+
+// J — mirrors InventoryValuationLineDto. Valued at the item's current
+// selling price, not a purchase cost — see the backend DTO's own comment.
+export interface InventoryValuationLineDto {
+  itemId: number;
+  sku: string;
+  itemName: string;
+  categoryName: string;
+  totalQuantityOnHand: number;
+  unitPrice: number;
+  totalValue: number;
+}

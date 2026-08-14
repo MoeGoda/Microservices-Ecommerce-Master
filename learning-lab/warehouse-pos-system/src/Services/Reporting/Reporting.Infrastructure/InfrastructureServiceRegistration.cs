@@ -17,6 +17,7 @@ namespace Reporting.Infrastructure
             services.AddScoped<ISaleRecordRepository, SaleRecordRepository>();
             services.AddScoped<ISaleLineRecordRepository, SaleLineRecordRepository>();
             services.AddScoped<IStockLevelRecordRepository, StockLevelRecordRepository>();
+            services.AddScoped<IStockMovementRecordRepository, StockMovementRecordRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             return services;

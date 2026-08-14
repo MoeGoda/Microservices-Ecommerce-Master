@@ -77,7 +77,9 @@
   "reports": {
     "title": "Reports",
     "emptyStates": {
-      "noSales": "No completed sales yet."
+      "noSales": "No completed sales yet.",
+      "noMovements": "No stock movements yet.",
+      "noStock": "No stock on hand yet."
     },
     "salesByDay": {
       "title": "Sales by day",
@@ -103,6 +105,71 @@
       "status": {
         "outOfStock": "Out of stock",
         "lowStock": "Low stock"
+      }
+    },
+    "dateRange": {
+      "title": "Date range",
+      "from": "From",
+      "to": "To",
+      "hint": "Applies to the payments ledger, cashier performance, and stock movement ledger below."
+    },
+    "salesLedger": {
+      "title": "Payments / sales ledger",
+      "table": {
+        "saleId": "Sale",
+        "cashier": "Cashier",
+        "total": "Total",
+        "lines": "Lines",
+        "completedAt": "Completed",
+        "status": "Status"
+      },
+      "completed": "Completed",
+      "returned": "Returned"
+    },
+    "cashierPerformance": {
+      "title": "Staff / cashier performance",
+      "table": {
+        "cashier": "Cashier",
+        "completed": "Completed sales",
+        "returned": "Returned sales",
+        "totalRevenue": "Total revenue",
+        "averageSale": "Average sale"
+      }
+    },
+    "stockMovements": {
+      "title": "Stock movement ledger",
+      "table": {
+        "when": "When",
+        "item": "Item",
+        "location": "Location",
+        "change": "Change",
+        "reason": "Reason",
+        "reference": "Reference"
+      }
+    },
+    "inventoryValuation": {
+      "title": "Inventory valuation",
+      "totalValue": "Total inventory value (at current selling price): {{total}}",
+      "table": {
+        "sku": "Sku",
+        "item": "Item",
+        "category": "Category",
+        "onHand": "On hand",
+        "unitPrice": "Unit price",
+        "totalValue": "Total value"
+      }
+    },
+    "poAging": {
+      "title": "Purchase order status / aging",
+      "allCaughtUp": "No open purchase orders are waiting on a supplier.",
+      "daysOld": "{{days}} days",
+      "table": {
+        "orderNumber": "Order #",
+        "supplier": "Supplier",
+        "status": "Status",
+        "age": "Age",
+        "totalCost": "Total cost",
+        "receivedValue": "Received value"
       }
     }
   },

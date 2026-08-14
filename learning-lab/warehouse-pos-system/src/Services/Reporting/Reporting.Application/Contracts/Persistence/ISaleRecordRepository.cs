@@ -26,5 +26,16 @@ namespace Reporting.Application.Contracts.Persistence
         // result row here; there's no separate "entity" underneath a
         // GROUP BY to map from the way GetAll()'s rows map from SaleRecord.
         Task<IEnumerable<SalesByDayDto>> GetSalesByDay();
+
+        // J — the "payment operations by date" ledger: unlike GetPaged
+        // above (a raw, unfiltered dump for ReadModelsController) this
+        // one takes the date range the report is actually filtered by,
+        // and — unlike GetSalesByDay — does NOT exclude returned sales;
+        // see SalesLedgerEntryDto's own comment on why.
+        Task<(IEnumerable<SaleRecord> Records, int TotalCount)> GetLedgerPaged(int page, int pageSize, DateTime? fromUtc, DateTime? toUtc);
+
+        // A GROUP BY, same idiom as GetSalesByDay — CashierPerformanceDto
+        // IS the shape of one result row.
+        Task<IEnumerable<CashierPerformanceDto>> GetCashierPerformance(DateTime? fromUtc, DateTime? toUtc);
     }
 }

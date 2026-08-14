@@ -1,10 +1,14 @@
 using System.Net;
+using Common.Pagination;
 using Common.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Reporting.Application.Features.Reports.Queries.GetCashierPerformance;
 using Reporting.Application.Features.Reports.Queries.GetLowStock;
 using Reporting.Application.Features.Reports.Queries.GetSalesByDay;
+using Reporting.Application.Features.Reports.Queries.GetSalesLedger;
+using Reporting.Application.Features.Reports.Queries.GetStockMovements;
 using Reporting.Application.Features.Reports.Queries.GetTopSellingItems;
 using Reporting.Application.Models;
 
@@ -50,6 +54,52 @@ namespace Reporting.API.Controllers
         public async Task<ActionResult<IEnumerable<StockLevelRecordDto>>> GetLowStock()
         {
             return Ok(await _mediator.Send(new GetLowStockQuery()));
+        }
+
+        // J — every completed/returned sale, date-range filterable — the
+        // "payment operations by date" report, distinct from GetSalesByDay's
+        // per-day revenue total.
+        [HttpGet("sales-ledger")]
+        [ProducesResponseType(typeof(PagedResult<SalesLedgerEntryDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PagedResult<SalesLedgerEntryDto>>> GetSalesLedger(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] DateTime? fromUtc = null,
+            [FromQuery] DateTime? toUtc = null)
+        {
+            return Ok(await _mediator.Send(new GetSalesLedgerQuery { Page = page, PageSize = pageSize, FromUtc = fromUtc, ToUtc = toUtc }));
+        }
+
+        [HttpGet("cashier-performance")]
+        [ProducesResponseType(typeof(IEnumerable<CashierPerformanceDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<IEnumerable<CashierPerformanceDto>>> GetCashierPerformance(
+            [FromQuery] DateTime? fromUtc = null,
+            [FromQuery] DateTime? toUtc = null)
+        {
+            return Ok(await _mediator.Send(new GetCashierPerformanceQuery { FromUtc = fromUtc, ToUtc = toUtc }));
+        }
+
+        // The stock-movement ledger — every StockTransaction Warehouse
+        // has ever staged, via StockTransactionRecorded (J).
+        [HttpGet("stock-movements")]
+        [ProducesResponseType(typeof(PagedResult<StockMovementRecordDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PagedResult<StockMovementRecordDto>>> GetStockMovements(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] DateTime? fromUtc = null,
+            [FromQuery] DateTime? toUtc = null,
+            [FromQuery] int? itemId = null,
+            [FromQuery] int? locationId = null)
+        {
+            return Ok(await _mediator.Send(new GetStockMovementsQuery
+            {
+                Page = page,
+                PageSize = pageSize,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
+                ItemId = itemId,
+                LocationId = locationId,
+            }));
         }
     }
 }

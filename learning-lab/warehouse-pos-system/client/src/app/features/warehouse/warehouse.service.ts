@@ -10,6 +10,7 @@ import {
   CategoryDto,
   CreateItemRequest,
   CreatePromotionRequest,
+  InventoryValuationLineDto,
   ItemBarcodeDto,
   ItemDetailDto,
   ItemPriceHistoryDto,
@@ -101,5 +102,9 @@ export class WarehouseService {
 
   cancelPromotion(itemId: number, promotionId: number): Observable<PromotionDto> {
     return this.http.post<PromotionDto>(`${BASE}/Items/${itemId}/promotions/${promotionId}/cancel`, null);
+  }
+
+  getInventoryValuation(): Observable<InventoryValuationLineDto[]> {
+    return this.http.get<InventoryValuationLineDto[]>(`${BASE}/Reports/inventory-valuation`);
   }
 }

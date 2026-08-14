@@ -177,6 +177,36 @@ namespace Warehouse.Application.Features.Stock
                 });
             }
 
+            // J — the same StockTransaction row just written above, fanned
+            // out as its own event rather than folded into
+            // StockLevelChanged: that message is a balance snapshot and
+            // stays one, so a movement ledger needs a second, independent
+            // event carrying the delta/reason/reference instead. Staged in
+            // the SAME unit of work as everything above, for the identical
+            // atomicity reason.
+            var movementMessage = await _outboxRepository.AddMessageAsync(new OutboxMessage
+            {
+                EventType = OutboxEventTypes.StockTransactionRecorded,
+                PayloadJson = JsonSerializer.Serialize(new StockTransactionRecordedMessage
+                {
+                    ItemId = item.Id,
+                    Sku = item.Sku,
+                    ItemName = item.Name,
+                    LocationId = location.Id,
+                    LocationCode = location.Code,
+                    LocationName = location.Name,
+                    QuantityChange = quantityChange,
+                    Reason = reason.ToString(),
+                    Reference = reference,
+                    TransactionAtUtc = transaction.CreatedAt,
+                }),
+            });
+            await _outboxRepository.AddDeliveryAsync(new OutboxDelivery
+            {
+                OutboxMessage = movementMessage,
+                ConsumerName = OutboxConsumers.Reporting,
+            });
+
             return new StagedAdjustment { StockLevel = stockLevel, Item = item };
         }
     }

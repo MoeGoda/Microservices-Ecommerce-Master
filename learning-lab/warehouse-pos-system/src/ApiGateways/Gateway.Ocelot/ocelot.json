@@ -260,6 +260,23 @@
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     },
     {
+      "_comment": "J — Warehouse's own two reports (live views of Warehouse's current state, not event-sourced into Reporting — see ReportsController's own comment).",
+      "DownstreamPathTemplate": "/api/v1/Reports/inventory-valuation",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Reports/inventory-valuation",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Reports/purchase-order-aging",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5238 }],
+      "UpstreamPathTemplate": "/Warehouse/Reports/purchase-order-aging",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
       "_comment": "Same rule as /Warehouse below it: no anonymous route under /Pos either — a cashier is always signed in before they can touch a register. POS.API's own service-to-service call OUT to Warehouse (StockEventsController, C3) never goes through this gateway at all; only these browser-facing routes do.",
       "DownstreamPathTemplate": "/api/v1/Sales",
       "DownstreamScheme": "http",
@@ -355,6 +372,31 @@
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
       "UpstreamPathTemplate": "/Reporting/reports/low-stock",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "J — the expanded reporting suite's three new Reporting.API reports.",
+      "DownstreamPathTemplate": "/api/v1/Reports/sales-ledger",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/sales-ledger",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Reports/cashier-performance",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/cashier-performance",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Reports/stock-movements",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5278 }],
+      "UpstreamPathTemplate": "/Reporting/reports/stock-movements",
       "UpstreamHttpMethod": [ "GET" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     },

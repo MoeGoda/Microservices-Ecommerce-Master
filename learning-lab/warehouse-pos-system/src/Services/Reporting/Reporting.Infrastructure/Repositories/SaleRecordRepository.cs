@@ -77,5 +77,64 @@ namespace Reporting.Infrastructure.Repositories
                 Total = (decimal)g.Total,
             });
         }
+
+        public async Task<(IEnumerable<SaleRecord> Records, int TotalCount)> GetLedgerPaged(int page, int pageSize, DateTime? fromUtc, DateTime? toUtc)
+        {
+            var query = _context.SaleRecords.AsNoTracking().AsQueryable();
+
+            if (fromUtc.HasValue)
+            {
+                query = query.Where(r => r.CompletedAtUtc >= fromUtc.Value);
+            }
+
+            if (toUtc.HasValue)
+            {
+                query = query.Where(r => r.CompletedAtUtc <= toUtc.Value);
+            }
+
+            query = query.OrderByDescending(r => r.CompletedAtUtc);
+
+            var totalCount = await query.CountAsync();
+            var records = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            return (records, totalCount);
+        }
+
+        public async Task<IEnumerable<CashierPerformanceDto>> GetCashierPerformance(DateTime? fromUtc, DateTime? toUtc)
+        {
+            var query = _context.SaleRecords.AsNoTracking().AsQueryable();
+
+            if (fromUtc.HasValue)
+            {
+                query = query.Where(r => r.CompletedAtUtc >= fromUtc.Value);
+            }
+
+            if (toUtc.HasValue)
+            {
+                query = query.Where(r => r.CompletedAtUtc <= toUtc.Value);
+            }
+
+            // Same double-cast-for-SUM idiom GetSalesByDay uses — see its
+            // own comment on why.
+            var grouped = await query
+                .GroupBy(r => r.CashierUserId)
+                .Select(g => new
+                {
+                    CashierUserId = g.Key,
+                    CompletedSaleCount = g.Count(r => r.ReturnedAtUtc == null),
+                    ReturnedSaleCount = g.Count(r => r.ReturnedAtUtc != null),
+                    TotalRevenue = g.Where(r => r.ReturnedAtUtc == null).Sum(r => (double?)r.Total) ?? 0,
+                })
+                .OrderByDescending(g => g.TotalRevenue)
+                .ToListAsync();
+
+            return grouped.Select(g => new CashierPerformanceDto
+            {
+                CashierUserId = g.CashierUserId,
+                CompletedSaleCount = g.CompletedSaleCount,
+                ReturnedSaleCount = g.ReturnedSaleCount,
+                TotalRevenue = (decimal)g.TotalRevenue,
+                AverageSaleTotal = g.CompletedSaleCount > 0 ? (decimal)g.TotalRevenue / g.CompletedSaleCount : 0,
+            });
+        }
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Warehouse.Application.Contracts.Persistence;
+using Warehouse.Application.Models;
 using Warehouse.Domain.Entities;
 using Warehouse.Infrastructure.Persistence;
 
@@ -41,6 +42,31 @@ namespace Warehouse.Infrastructure.Repositories
         {
             _context.StockLevels.Update(stockLevel);
             return Task.CompletedTask;
+        }
+
+        public async Task<IEnumerable<InventoryValuationLineDto>> GetInventoryValuation()
+        {
+            return await _context.StockLevels
+                .GroupBy(s => new
+                {
+                    s.ItemId,
+                    Sku = s.Item.Sku,
+                    ItemName = s.Item.Name,
+                    CategoryName = s.Item.Category.Name,
+                    UnitPrice = s.Item.UnitPrice,
+                })
+                .Select(g => new InventoryValuationLineDto
+                {
+                    ItemId = g.Key.ItemId,
+                    Sku = g.Key.Sku,
+                    ItemName = g.Key.ItemName,
+                    CategoryName = g.Key.CategoryName,
+                    TotalQuantityOnHand = g.Sum(s => s.QuantityOnHand),
+                    UnitPrice = g.Key.UnitPrice,
+                    TotalValue = g.Sum(s => s.QuantityOnHand) * g.Key.UnitPrice,
+                })
+                .OrderBy(l => l.ItemName)
+                .ToListAsync();
         }
     }
 }
