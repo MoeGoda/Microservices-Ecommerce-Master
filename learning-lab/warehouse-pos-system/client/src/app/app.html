@@ -21,6 +21,12 @@
             <span matListItemTitle>{{ 'toolbar.reports' | translate }}</span>
           </a>
         }
+        @if (canSeeUsers()) {
+          <a mat-list-item routerLink="/users" routerLinkActive="active-nav-link">
+            <mat-icon matListItemIcon>group</mat-icon>
+            <span matListItemTitle>{{ 'toolbar.users' | translate }}</span>
+          </a>
+        }
       </mat-nav-list>
     </mat-sidenav>
 

@@ -1,0 +1,127 @@
+<div class="page users-admin">
+  <h2>{{ 'users.title' | translate }}</h2>
+
+  <mat-card class="create-card">
+    <mat-card-header>
+      <mat-card-title>{{ 'users.create.title' | translate }}</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="createForm" (ngSubmit)="submitCreate()" class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'users.create.userName' | translate }}</mat-label>
+          <input matInput formControlName="userName" />
+          @if (createForm.controls.userName.touched && createForm.controls.userName.invalid) {
+            <mat-error>{{ 'users.create.userNameRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'users.create.email' | translate }}</mat-label>
+          <input matInput type="email" formControlName="email" />
+          @if (createForm.controls.email.touched && createForm.controls.email.invalid) {
+            <mat-error>{{ 'users.create.emailInvalid' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'users.create.firstName' | translate }}</mat-label>
+          <input matInput formControlName="firstName" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'users.create.lastName' | translate }}</mat-label>
+          <input matInput formControlName="lastName" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'users.create.password' | translate }}</mat-label>
+          <input matInput type="password" formControlName="password" />
+          @if (createForm.controls.password.touched && createForm.controls.password.invalid) {
+            <mat-error>{{ 'users.create.passwordRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'users.create.role' | translate }}</mat-label>
+          <mat-select formControlName="role">
+            @for (role of roles; track role) {
+              <mat-option [value]="role">{{ 'roles.' + role | translate }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-flat-button color="primary" type="submit" class="span-2 submit-button" [disabled]="creatingUser()">
+          @if (creatingUser()) {
+            <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+          } @else {
+            {{ 'users.create.submit' | translate }}
+          }
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="list-card">
+    <mat-card-header>
+      <mat-card-title>{{ 'users.list.title' | translate }}</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (loadingUsers()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'users.list.table.userName' | translate }}</th>
+              <th>{{ 'users.list.table.name' | translate }}</th>
+              <th>{{ 'users.list.table.email' | translate }}</th>
+              <th>{{ 'users.list.table.role' | translate }}</th>
+              <th>{{ 'users.list.table.status' | translate }}</th>
+              <th>{{ 'users.list.table.createdAt' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of pagedUsers().items; track user.id) {
+              <tr>
+                <td>{{ user.userName }}</td>
+                <td>{{ user.firstName }} {{ user.lastName }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ 'roles.' + user.role | translate }}</td>
+                <td>
+                  <span class="status-chip" [class.active]="user.isActive" [class.inactive]="!user.isActive">
+                    {{ (user.isActive ? 'users.list.active' : 'users.list.inactive') | translate }}
+                  </span>
+                </td>
+                <td>{{ user.createdAt | date: 'short' }}</td>
+                <td>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="togglingUserId() === user.id || (user.isActive && isSelf(user))"
+                    [attr.title]="user.isActive && isSelf(user) ? ('users.list.cannotDeactivateSelf' | translate) : null"
+                    (click)="toggleActive(user)"
+                  >
+                    {{ (user.isActive ? 'users.list.deactivate' : 'users.list.activate') | translate }}
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-row">{{ 'users.list.emptyRow' | translate }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="pagedUsers().totalCount"
+          [pageSize]="pagedUsers().pageSize"
+          [pageIndex]="pagedUsers().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onUsersPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

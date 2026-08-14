@@ -1,0 +1,40 @@
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  align-items: start;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.submit-button {
+  height: 40px;
+}
+
+.data-grid {
+  margin-bottom: 8px;
+}
+
+.empty-row {
+  color: var(--mat-sys-on-surface-variant);
+  font-style: italic;
+  text-align: center;
+}
+
+.status-chip {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font: var(--mat-sys-label-small);
+
+  &.active {
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+
+  &.inactive {
+    background: var(--mat-sys-surface-container-highest);
+    color: var(--mat-sys-on-surface-variant);
+  }
+}

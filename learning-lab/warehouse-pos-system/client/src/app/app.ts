@@ -11,7 +11,7 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { AuthService } from './core/auth/auth.service';
 import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
 import { NotificationDto } from './shared/models/notification.models';
-import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES } from './shared/models/roles';
+import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from './shared/models/roles';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import { LanguageSwitcherComponent } from './shared/components/language-switcher/language-switcher.component';
 
@@ -84,6 +84,10 @@ export class App {
 
   canSeeReports(): boolean {
     return this.hasAnyRole(REPORTS_ROLES);
+  }
+
+  canSeeUsers(): boolean {
+    return this.hasAnyRole(USER_MANAGEMENT_ROLES);
   }
 
   private hasAnyRole(roles: readonly string[]): boolean {

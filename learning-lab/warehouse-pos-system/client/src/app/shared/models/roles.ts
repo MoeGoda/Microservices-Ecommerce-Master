@@ -14,3 +14,6 @@ export const ROLES = {
 export const ADMIN_ROLES = [ROLES.Admin, ROLES.Manager, ROLES.WarehouseStaff];
 export const POS_ROLES = [ROLES.Admin, ROLES.Manager, ROLES.Cashier];
 export const REPORTS_ROLES = [ROLES.Admin, ROLES.Manager];
+// H — mirrors UsersController's own [Authorize(Roles = RoleNames.Admin)]
+// exactly; unlike the other three areas, there is no Manager/staff carve-out.
+export const USER_MANAGEMENT_ROLES = [ROLES.Admin];

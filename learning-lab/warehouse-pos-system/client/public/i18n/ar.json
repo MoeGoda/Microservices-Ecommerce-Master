@@ -17,6 +17,7 @@
     "admin": "الإدارة",
     "pos": "نقطة البيع",
     "reports": "التقارير",
+    "users": "المستخدمون",
     "notifications": "الإشعارات",
     "markAllRead": "تعليم الكل كمقروء",
     "noNotifications": "لا توجد إشعارات حتى الآن.",
@@ -214,6 +215,39 @@
         "submit": "نقل",
         "fromOption": "{{code}} — {{name}} (المتوفر {{qty}})"
       }
+    }
+  },
+  "users": {
+    "title": "المستخدمون",
+    "create": {
+      "title": "إنشاء مستخدم",
+      "userName": "اسم المستخدم",
+      "userNameRequired": "اسم المستخدم مطلوب.",
+      "email": "البريد الإلكتروني",
+      "emailInvalid": "يجب إدخال بريد إلكتروني صالح.",
+      "firstName": "الاسم الأول",
+      "lastName": "الاسم الأخير",
+      "password": "كلمة المرور",
+      "passwordRequired": "يجب أن تكون كلمة المرور 8 أحرف على الأقل.",
+      "role": "الدور",
+      "submit": "إنشاء مستخدم"
+    },
+    "list": {
+      "title": "المستخدمون الحاليون",
+      "table": {
+        "userName": "اسم المستخدم",
+        "name": "الاسم",
+        "email": "البريد الإلكتروني",
+        "role": "الدور",
+        "status": "الحالة",
+        "createdAt": "تاريخ الإنشاء"
+      },
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "activate": "تفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "cannotDeactivateSelf": "لا يمكنك إلغاء تفعيل حسابك الخاص.",
+      "emptyRow": "لا يوجد مستخدمون حتى الآن."
     }
   }
 }

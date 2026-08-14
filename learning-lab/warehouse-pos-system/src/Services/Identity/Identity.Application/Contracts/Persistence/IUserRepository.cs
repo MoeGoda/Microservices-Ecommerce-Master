@@ -13,5 +13,15 @@ namespace Identity.Application.Contracts.Persistence
         Task<User?> GetByEmail(string email);
         Task<bool> UserNameExists(string userName);
         Task<User> AddAsync(User user);
+
+        // H — user management screen additions. GetByIdAsync/SaveChangesAsync
+        // exist specifically for SetUserActiveCommand: it loads the tracked
+        // entity, flips IsActive, and needs an explicit save — there's no
+        // "UpdateAsync" because EF Core's change tracker already knows about
+        // any entity GetByIdAsync returns, the same reasoning every other
+        // service's mutation handlers already follow.
+        Task<(IReadOnlyList<User> Users, int TotalCount)> GetAllAsync(int page, int pageSize);
+        Task<User?> GetByIdAsync(int id);
+        Task SaveChangesAsync();
     }
 }

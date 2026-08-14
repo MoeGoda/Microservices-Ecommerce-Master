@@ -58,6 +58,12 @@ a distributed transaction.
 - [x] **F3 — Localization (English/Arabic, RTL)**
 - [x] **F4 — Full docker-compose stack + end-to-end walkthrough**
 
+**Phase G–J — UI/UX, user management, purchasing, and reporting depth**
+- [x] **G — Professional UI/UX redesign** (M3 theme, responsive sidenav shell)
+- [x] **H — User management screens** (Admin-only user list + create + activate/deactivate)
+- [ ] **I — Purchase Orders & Suppliers module**
+- [ ] **J — Expanded reporting suite**
+
 ## A1 — Identity service
 
 **What it does:** issues JWTs after registering/logging in a user, backed by
@@ -2836,4 +2842,83 @@ docker compose up -d
 
 docker compose down          # stop everything
 docker compose down -v       # also drop the SQL Server data volume
+```
+
+## G — Professional UI/UX redesign
+
+**What it does:** re-skins every existing screen without touching a
+single backend contract or component's behavior — a presentation-only
+pass. The ad-hoc default Material theme is replaced with an explicit
+`mat.theme()` (a blue primary / cyan tertiary M3 palette, `density: -1`),
+and the flat top-nav-bar-only layout (A4) becomes a responsive
+`mat-sidenav-container` shell: an always-visible side rail on desktop,
+collapsing to a closed overlay on narrow viewports via the CDK's
+`BreakpointObserver` at 768px — the same "no hand-rolled breakpoint math"
+reasoning any other CDK-backed responsive behavior in Angular Material
+follows. A small set of shared layout primitives (`.page`,
+`.page-header`, `.surface-card`, `.empty-state`, `table.data-grid`) live
+once in the global stylesheet rather than being redeclared per component,
+so every screen's spacing/typography/table styling stays visually
+identical without copy-paste.
+
+**Zero i18n/RTL regressions, without any RTL-specific code in the new
+shell.** The sidenav, table, and card styles all use CSS logical
+properties (`border-inline-end`, `text-align: start`, …) that F3 already
+established as the project's convention — flipping `dir="rtl"` mirrors
+the whole shell automatically. All F3 role-nav and translation checks
+were re-run against the new shell and passed unchanged.
+
+**Try it:** sign in and resize the browser window below ~768px — the
+side rail collapses to a hamburger-triggered overlay; above it, it's
+always visible. Switch to Arabic (the language switcher in the topbar)
+and the same shell mirrors correctly with no separate RTL styling.
+
+## H — User management screens
+
+**What it does:** gives the Admin-only "create a Manager/Cashier/
+WarehouseStaff account" capability F2 already built at the API layer
+(`POST /Auth/create-user`) an actual screen, plus two things F2 never
+built at all: a paginated list of every account, and the ability to
+deactivate (or reactivate) one without deleting it. A new `/users`
+route, visible only to the `Admin` role (not the broader `ADMIN_ROLES`
+set the warehouse screen uses — `UsersController` itself only allows
+`Admin`, and the nav link/route guard mirror that exactly), adds a create
+form and a table with a per-row Activate/Deactivate button.
+
+**`IsActive` already existed on the `User` entity (A1) — this phase is
+the first thing that ever reads or writes it.** `SetUserActiveCommand`
+is new, but the column and the seed data using it are not. Login
+(`LoginCommandHandler`) already rejected inactive accounts before this
+phase started; deactivating a user through the new screen is what
+finally gives that check something to actually trigger on.
+
+**The one hazard worth naming: an Admin deactivating their own only
+account.** With a single seeded Admin, that would be a irreversible
+lockout — no one left with the role to undo it. `SetUserActiveCommand`
+carries a `RequestingUserId` set by `UsersController` from the caller's
+own JWT claim, never from the request body — the same "context is
+authoritative over the body" idiom `AuthController.Register` already
+uses for `Role` — and `SetUserActiveCommandHandler` throws a
+`ConflictException` if `RequestingUserId == UserId` and the request is a
+deactivation. The Angular side disables that one button as a UX nicety;
+the backend guard is what actually protects it.
+
+**`UsersController` is deliberately separate from `AuthController`, and
+`create-user` stays exactly where F2 put it.** Auth is about proving who
+you are; this is about an Admin managing OTHER accounts — a different
+concern, and moving the already-load-bearing `create-user` route (wired
+into `ocelot.json` and now the Angular client) into the new controller
+for tidiness would have been a "critical change" this phase didn't need
+to make. The new screen's create form calls the existing endpoint as-is;
+only the list (`GET /Users`) and the toggle (`POST /Users/{id}/active`)
+are new API surface.
+
+**Try it:**
+```bash
+# Sign in as the seeded admin (Admin@12345), then in the Angular app:
+# → the "Users" link in the side rail (Admin-only)
+# → create a Cashier/Manager/WarehouseStaff account with the form
+# → Deactivate any account except your own — that button is disabled
+#   on your own row, and the backend rejects it even if you script
+#   around the disabled button
 ```

@@ -5,7 +5,8 @@ import { LoginComponent } from './features/login/login.component';
 import { AdminShellComponent } from './features/admin-shell/admin-shell.component';
 import { PosRegisterComponent } from './features/pos/pos-register.component';
 import { ReportsDashboardComponent } from './features/reporting/reports-dashboard/reports-dashboard.component';
-import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES } from './shared/models/roles';
+import { UsersAdminComponent } from './features/users/users-admin.component';
+import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from './shared/models/roles';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'login' },
@@ -20,5 +21,6 @@ export const routes: Routes = [
   // point straight at their feature components.
   { path: 'pos', component: PosRegisterComponent, canActivate: [authGuard, roleGuard(POS_ROLES)] },
   { path: 'reports', component: ReportsDashboardComponent, canActivate: [authGuard, roleGuard(REPORTS_ROLES)] },
+  { path: 'users', component: UsersAdminComponent, canActivate: [authGuard, roleGuard(USER_MANAGEMENT_ROLES)] },
   { path: '**', redirectTo: 'login' },
 ];

@@ -35,6 +35,22 @@
     {
       "DownstreamHostAndPorts": [
         {
+          "Host": "identity-api",
+          "Port": 5218
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "identity-api",
+          "Port": 5218
+        }
+      ]
+    },
+    {
+      "DownstreamHostAndPorts": [
+        {
           "Host": "warehouse-api",
           "Port": 5238
         }

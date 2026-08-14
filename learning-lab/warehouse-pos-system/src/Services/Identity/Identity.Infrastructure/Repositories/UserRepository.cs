@@ -42,5 +42,20 @@ namespace Identity.Infrastructure.Repositories
             await _context.SaveChangesAsync();
             return user;
         }
+
+        public async Task<(IReadOnlyList<User> Users, int TotalCount)> GetAllAsync(int page, int pageSize)
+        {
+            var query = _context.Users.Include(u => u.Role).OrderBy(u => u.UserName);
+            var totalCount = await query.CountAsync();
+            var users = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            return (users, totalCount);
+        }
+
+        public async Task<User?> GetByIdAsync(int id)
+        {
+            return await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id);
+        }
+
+        public Task SaveChangesAsync() => _context.SaveChangesAsync();
     }
 }

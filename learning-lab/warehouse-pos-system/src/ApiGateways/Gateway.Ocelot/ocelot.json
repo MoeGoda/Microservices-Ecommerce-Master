@@ -41,6 +41,30 @@
       }
     },
     {
+      "_comment": "H — Admin-only user list, backs the new Users management screen.",
+      "DownstreamPathTemplate": "/api/v1/Users",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5218 }],
+      "UpstreamPathTemplate": "/Identity/Users",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    },
+    {
+      "_comment": "H — activate/deactivate a user account. Same 'Ocelot validates the JWT, Identity.API enforces the Admin role' split as create-user.",
+      "DownstreamPathTemplate": "/api/v1/Users/{id}/active",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5218 }],
+      "UpstreamPathTemplate": "/Identity/Users/{id}/active",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    },
+    {
       "_comment": "Unlike Identity, there is no anonymous route anywhere under /Warehouse — every route below carries AuthenticationOptions.",
       "DownstreamPathTemplate": "/api/v1/Items",
       "DownstreamScheme": "http",

@@ -21,6 +21,7 @@
     <ProjectReference Include="..\Identity.Infrastructure\Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Common.ExceptionHandling\Common.ExceptionHandling.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Common.RequestCulture\Common.RequestCulture.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Common.Pagination\Common.Pagination.csproj" />
   </ItemGroup>
 
 </Project>

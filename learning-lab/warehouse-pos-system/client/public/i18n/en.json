@@ -17,6 +17,7 @@
     "admin": "Admin",
     "pos": "POS",
     "reports": "Reports",
+    "users": "Users",
     "notifications": "Notifications",
     "markAllRead": "Mark all read",
     "noNotifications": "No notifications yet.",
@@ -214,6 +215,39 @@
         "submit": "Transfer",
         "fromOption": "{{code}} — {{name}} ({{qty}} on hand)"
       }
+    }
+  },
+  "users": {
+    "title": "Users",
+    "create": {
+      "title": "Create user",
+      "userName": "Username",
+      "userNameRequired": "Username is required.",
+      "email": "Email",
+      "emailInvalid": "A valid email is required.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "password": "Password",
+      "passwordRequired": "Password must be at least 8 characters.",
+      "role": "Role",
+      "submit": "Create user"
+    },
+    "list": {
+      "title": "Existing users",
+      "table": {
+        "userName": "Username",
+        "name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "status": "Status",
+        "createdAt": "Created"
+      },
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "cannotDeactivateSelf": "You can't deactivate your own account.",
+      "emptyRow": "No users yet."
     }
   }
 }
