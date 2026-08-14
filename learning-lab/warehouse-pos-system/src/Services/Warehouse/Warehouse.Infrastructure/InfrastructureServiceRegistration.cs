@@ -39,6 +39,8 @@ namespace Warehouse.Infrastructure
             services.AddScoped<IProcessedSaleReturnEventRepository, ProcessedSaleReturnEventRepository>();
             services.AddScoped<IItemPriceHistoryRepository, ItemPriceHistoryRepository>();
             services.AddScoped<IPromotionRepository, PromotionRepository>();
+            services.AddScoped<ISupplierRepository, SupplierRepository>();
+            services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
             services.AddScoped<IOutboxRepository, OutboxRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 

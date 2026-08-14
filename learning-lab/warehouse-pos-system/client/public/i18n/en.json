@@ -18,6 +18,8 @@
     "pos": "POS",
     "reports": "Reports",
     "users": "Users",
+    "suppliers": "Suppliers",
+    "purchaseOrders": "Purchase Orders",
     "notifications": "Notifications",
     "markAllRead": "Mark all read",
     "noNotifications": "No notifications yet.",
@@ -248,6 +250,90 @@
       "deactivate": "Deactivate",
       "cannotDeactivateSelf": "You can't deactivate your own account.",
       "emptyRow": "No users yet."
+    }
+  },
+  "suppliers": {
+    "title": "Suppliers",
+    "create": {
+      "title": "Add supplier",
+      "name": "Name",
+      "nameRequired": "Name is required.",
+      "contactName": "Contact name",
+      "email": "Email",
+      "emailInvalid": "Enter a valid email.",
+      "phone": "Phone",
+      "address": "Address",
+      "submit": "Add supplier"
+    },
+    "list": {
+      "title": "Existing suppliers",
+      "table": {
+        "name": "Name",
+        "contactName": "Contact",
+        "email": "Email",
+        "phone": "Phone",
+        "status": "Status"
+      },
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "emptyRow": "No suppliers yet — add one above."
+    }
+  },
+  "purchaseOrders": {
+    "title": "Purchase Orders",
+    "create": {
+      "title": "Create purchase order",
+      "supplier": "Supplier",
+      "supplierRequired": "A supplier is required.",
+      "inactiveSupplier": "inactive",
+      "notes": "Notes (optional)",
+      "linesHeading": "Lines",
+      "item": "Item",
+      "unit": "Unit",
+      "quantity": "Ordered quantity",
+      "unitCost": "Unit cost",
+      "addLine": "Add line",
+      "removeLine": "Remove line",
+      "submit": "Create as Draft"
+    },
+    "list": {
+      "title": "All purchase orders",
+      "table": {
+        "orderNumber": "Order #",
+        "supplier": "Supplier",
+        "status": "Status",
+        "lines": "Lines",
+        "totalCost": "Total cost",
+        "createdAt": "Created"
+      },
+      "view": "View",
+      "emptyRow": "No purchase orders yet."
+    },
+    "status": {
+      "Draft": "Draft",
+      "Ordered": "Ordered",
+      "PartiallyReceived": "Partially received",
+      "Received": "Received",
+      "Cancelled": "Cancelled"
+    },
+    "detail": {
+      "table": {
+        "item": "Item",
+        "unit": "Unit",
+        "ordered": "Ordered",
+        "received": "Received",
+        "unitCost": "Unit cost"
+      },
+      "receive": "Receive",
+      "receiveHeading": "Receive stock for {{sku}}",
+      "location": "Location",
+      "quantity": "Quantity ({{remaining}} {{unit}} remaining)",
+      "reference": "Reference (optional)",
+      "confirmReceive": "Confirm receipt",
+      "submitOrder": "Submit order (mark as Ordered)",
+      "cancelOrder": "Cancel order"
     }
   }
 }

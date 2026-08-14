@@ -6,6 +6,8 @@ import { AdminShellComponent } from './features/admin-shell/admin-shell.componen
 import { PosRegisterComponent } from './features/pos/pos-register.component';
 import { ReportsDashboardComponent } from './features/reporting/reports-dashboard/reports-dashboard.component';
 import { UsersAdminComponent } from './features/users/users-admin.component';
+import { PurchaseOrdersAdminComponent } from './features/purchasing/purchase-orders-admin.component';
+import { SuppliersAdminComponent } from './features/purchasing/suppliers-admin.component';
 import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from './shared/models/roles';
 
 export const routes: Routes = [
@@ -22,5 +24,9 @@ export const routes: Routes = [
   { path: 'pos', component: PosRegisterComponent, canActivate: [authGuard, roleGuard(POS_ROLES)] },
   { path: 'reports', component: ReportsDashboardComponent, canActivate: [authGuard, roleGuard(REPORTS_ROLES)] },
   { path: 'users', component: UsersAdminComponent, canActivate: [authGuard, roleGuard(USER_MANAGEMENT_ROLES)] },
+  // Same role set as /admin — a PO/Supplier is warehouse-management data,
+  // same [Authorize(Roles = CatalogManagerRoles)] set Items/Stock use.
+  { path: 'suppliers', component: SuppliersAdminComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  { path: 'purchase-orders', component: PurchaseOrdersAdminComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
   { path: '**', redirectTo: 'login' },
 ];

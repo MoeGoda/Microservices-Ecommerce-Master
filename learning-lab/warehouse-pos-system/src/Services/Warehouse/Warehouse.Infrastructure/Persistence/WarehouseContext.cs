@@ -23,6 +23,9 @@ namespace Warehouse.Infrastructure.Persistence
         public DbSet<Promotion> Promotions => Set<Promotion>();
         public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
         public DbSet<OutboxDelivery> OutboxDeliveries => Set<OutboxDelivery>();
+        public DbSet<Supplier> Suppliers => Set<Supplier>();
+        public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+        public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -197,6 +200,56 @@ namespace Warehouse.Infrastructure.Persistence
                 builder.HasOne(p => p.Item)
                        .WithMany()
                        .HasForeignKey(p => p.ItemId)
+                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Supplier>(builder =>
+            {
+                builder.Property(s => s.Name).HasMaxLength(200);
+                builder.Property(s => s.ContactName).HasMaxLength(200);
+                builder.Property(s => s.Email).HasMaxLength(200);
+                builder.Property(s => s.Phone).HasMaxLength(50);
+                builder.Property(s => s.Address).HasMaxLength(500);
+            });
+
+            modelBuilder.Entity<PurchaseOrder>(builder =>
+            {
+                builder.HasIndex(p => p.OrderNumber).IsUnique();
+                builder.Property(p => p.OrderNumber).HasMaxLength(20);
+                builder.Property(p => p.Notes).HasMaxLength(1000);
+                builder.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+
+                // Restrict, same reasoning as Item.Category — a Supplier
+                // with existing PurchaseOrder history can't be deleted out
+                // from under it (deactivating instead is the supported path).
+                builder.HasOne(p => p.Supplier)
+                       .WithMany()
+                       .HasForeignKey(p => p.SupplierId)
+                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<PurchaseOrderLine>(builder =>
+            {
+                builder.Property(l => l.OrderedQuantity).HasColumnType("decimal(18,4)");
+                builder.Property(l => l.ReceivedQuantity).HasColumnType("decimal(18,4)");
+                builder.Property(l => l.UnitCost).HasColumnType("decimal(18,2)");
+
+                // Cascade — a line has no meaning independent of its
+                // order, same reasoning as ItemBarcode's own Item
+                // relationship.
+                builder.HasOne(l => l.PurchaseOrder)
+                       .WithMany(p => p.Lines)
+                       .HasForeignKey(l => l.PurchaseOrderId)
+                       .OnDelete(DeleteBehavior.Cascade);
+
+                builder.HasOne(l => l.Item)
+                       .WithMany()
+                       .HasForeignKey(l => l.ItemId)
+                       .OnDelete(DeleteBehavior.Restrict);
+
+                builder.HasOne(l => l.UnitOfMeasure)
+                       .WithMany()
+                       .HasForeignKey(l => l.UnitOfMeasureId)
                        .OnDelete(DeleteBehavior.Restrict);
             });
 

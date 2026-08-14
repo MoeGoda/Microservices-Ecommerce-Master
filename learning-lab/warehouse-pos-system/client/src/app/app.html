@@ -27,6 +27,16 @@
             <span matListItemTitle>{{ 'toolbar.users' | translate }}</span>
           </a>
         }
+        @if (canSeeAdmin()) {
+          <a mat-list-item routerLink="/suppliers" routerLinkActive="active-nav-link">
+            <mat-icon matListItemIcon>local_shipping</mat-icon>
+            <span matListItemTitle>{{ 'toolbar.suppliers' | translate }}</span>
+          </a>
+          <a mat-list-item routerLink="/purchase-orders" routerLinkActive="active-nav-link">
+            <mat-icon matListItemIcon>receipt_long</mat-icon>
+            <span matListItemTitle>{{ 'toolbar.purchaseOrders' | translate }}</span>
+          </a>
+        }
       </mat-nav-list>
     </mat-sidenav>
 

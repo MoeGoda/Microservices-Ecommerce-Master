@@ -18,6 +18,8 @@
     "pos": "نقطة البيع",
     "reports": "التقارير",
     "users": "المستخدمون",
+    "suppliers": "الموردون",
+    "purchaseOrders": "أوامر الشراء",
     "notifications": "الإشعارات",
     "markAllRead": "تعليم الكل كمقروء",
     "noNotifications": "لا توجد إشعارات حتى الآن.",
@@ -248,6 +250,90 @@
       "deactivate": "إلغاء التفعيل",
       "cannotDeactivateSelf": "لا يمكنك إلغاء تفعيل حسابك الخاص.",
       "emptyRow": "لا يوجد مستخدمون حتى الآن."
+    }
+  },
+  "suppliers": {
+    "title": "الموردون",
+    "create": {
+      "title": "إضافة مورد",
+      "name": "الاسم",
+      "nameRequired": "الاسم مطلوب.",
+      "contactName": "اسم جهة الاتصال",
+      "email": "البريد الإلكتروني",
+      "emailInvalid": "أدخل بريدًا إلكترونيًا صالحًا.",
+      "phone": "الهاتف",
+      "address": "العنوان",
+      "submit": "إضافة مورد"
+    },
+    "list": {
+      "title": "الموردون الحاليون",
+      "table": {
+        "name": "الاسم",
+        "contactName": "جهة الاتصال",
+        "email": "البريد الإلكتروني",
+        "phone": "الهاتف",
+        "status": "الحالة"
+      },
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "activate": "تفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "emptyRow": "لا يوجد موردون حتى الآن — أضف واحدًا أعلاه."
+    }
+  },
+  "purchaseOrders": {
+    "title": "أوامر الشراء",
+    "create": {
+      "title": "إنشاء أمر شراء",
+      "supplier": "المورد",
+      "supplierRequired": "المورد مطلوب.",
+      "inactiveSupplier": "غير نشط",
+      "notes": "ملاحظات (اختياري)",
+      "linesHeading": "البنود",
+      "item": "المنتج",
+      "unit": "الوحدة",
+      "quantity": "الكمية المطلوبة",
+      "unitCost": "تكلفة الوحدة",
+      "addLine": "إضافة بند",
+      "removeLine": "حذف البند",
+      "submit": "إنشاء كمسودة"
+    },
+    "list": {
+      "title": "جميع أوامر الشراء",
+      "table": {
+        "orderNumber": "رقم الأمر",
+        "supplier": "المورد",
+        "status": "الحالة",
+        "lines": "البنود",
+        "totalCost": "التكلفة الإجمالية",
+        "createdAt": "تاريخ الإنشاء"
+      },
+      "view": "عرض",
+      "emptyRow": "لا توجد أوامر شراء حتى الآن."
+    },
+    "status": {
+      "Draft": "مسودة",
+      "Ordered": "تم الطلب",
+      "PartiallyReceived": "استلام جزئي",
+      "Received": "تم الاستلام",
+      "Cancelled": "ملغى"
+    },
+    "detail": {
+      "table": {
+        "item": "المنتج",
+        "unit": "الوحدة",
+        "ordered": "المطلوب",
+        "received": "المستلم",
+        "unitCost": "تكلفة الوحدة"
+      },
+      "receive": "استلام",
+      "receiveHeading": "استلام مخزون لـ {{sku}}",
+      "location": "الموقع",
+      "quantity": "الكمية (المتبقي {{remaining}} {{unit}})",
+      "reference": "المرجع (اختياري)",
+      "confirmReceive": "تأكيد الاستلام",
+      "submitOrder": "إرسال الأمر (تعيينه كـ 'تم الطلب')",
+      "cancelOrder": "إلغاء الأمر"
     }
   }
 }

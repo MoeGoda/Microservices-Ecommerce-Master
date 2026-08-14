@@ -61,7 +61,7 @@ a distributed transaction.
 **Phase G–J — UI/UX, user management, purchasing, and reporting depth**
 - [x] **G — Professional UI/UX redesign** (M3 theme, responsive sidenav shell)
 - [x] **H — User management screens** (Admin-only user list + create + activate/deactivate)
-- [ ] **I — Purchase Orders & Suppliers module**
+- [x] **I — Purchase Orders & Suppliers module**
 - [ ] **J — Expanded reporting suite**
 
 ## A1 — Identity service
@@ -2921,4 +2921,87 @@ are new API surface.
 # → Deactivate any account except your own — that button is disabled
 #   on your own row, and the backend rejects it even if you script
 #   around the disabled button
+```
+
+## I — Purchase Orders & Suppliers module
+
+**What it does:** adds a real procurement workflow on top of Warehouse —
+a `Supplier` entity, a `PurchaseOrder`/`PurchaseOrderLine` with a
+`Draft -> Ordered -> PartiallyReceived/Received` lifecycle (plus
+`Cancelled`), and a way to receive stock against a specific PO line. It's
+adapted from a third-party warehouse-management manual's PO -> Receipt
+pattern, with the telecom-specific concepts that manual also covered
+(CSO/project/customer/AWB) deliberately dropped — a retail warehouse PO
+only needs a supplier, a set of ordered lines, and how much of each has
+actually arrived. Per the explicit brief for this phase, nothing about
+the existing free-text stock flow changed: `ReceiveStockCommand` (B2) is
+untouched, byte for byte.
+
+**The whole module sits beside `ReceiveStockCommand`, not on top of
+it.** `ReceivePurchaseOrderLineCommand` is a new, separate command that
+happens to call the same `StockAdjustmentStager.Stage(...)`
+`ReceiveStockCommandHandler` already uses (`createIfMissing: true`, for
+the identical reason — a PO receipt can be the first stock this item has
+ever had at this location) — but its own unit-conversion logic
+(`ConvertToBaseUnit`) is a deliberate copy, not an extracted shared
+helper. Refactoring `ReceiveStockCommandHandler` to share it would touch
+an existing, already-verified handler for a module whose own brief said
+not to; a dozen duplicated lines was the safer trade. The one place the
+two receipts ARE told apart on purpose is the ledger:
+`StockTransactionReason.PurchaseOrderReceived` is a new enum value,
+distinct from the plain `Received` a free-text restock uses — same
+"keep the audit trail filterable by which is which" reasoning
+`Return` already established as distinct from `Adjustment`.
+
+**A PurchaseOrder is created with every line at once, and Draft is the
+only state where that's still true.** `CreatePurchaseOrderCommand` takes
+a `SupplierId` plus a full line list in one call — the same "everything
+the first save needs, in one call" shape `CreateItemCommand` already
+uses for an item and its first barcode — rather than a separate
+add-line-later endpoint. `SubmitPurchaseOrderCommand` (`Draft ->
+Ordered`) is the line the whole module is built around: nothing about
+WHAT was ordered can change after it, only how much has arrived.
+Cancelling is only allowed from `Draft` or an `Ordered` order with
+nothing received yet — the instant ANY line receives a quantity, the
+order's status leaves `Ordered` for good (see below), so "still
+Ordered" already means "cancellable," with no separate check needed.
+
+**`PartiallyReceived`/`Received` are never set directly by a request —
+they're recomputed from every line's own quantities after each
+receipt.** `ReceivePurchaseOrderLineCommandHandler` rejects a quantity
+that would exceed a line's own remaining balance (no over-receipt), then
+recomputes the whole order's `Status` as `Received` if every line's
+`ReceivedQuantity >= OrderedQuantity`, `PartiallyReceived` otherwise —
+the stock update, the line's running total, and the order's status all
+land in the same `SaveChangesAsync()` call the staged `StockLevel`/
+`StockTransaction` change is already part of.
+
+**`OrderNumber` is assigned in a deliberate second save, not computed
+from anything client-supplied.** A `PurchaseOrder`'s real Id doesn't
+exist until the first `SaveChangesAsync()` returns it; `OrderNumber` is
+set to `$"PO-{Id:D6}"` and saved again right after — the unique index on
+`OrderNumber` means two orders can never collide on the empty placeholder
+in between, and nothing else ever reads it before that second save
+completes.
+
+**Angular gets two new Admin-area screens** (`/suppliers`, `/purchase-
+orders`, same role set as `/admin` — `Admin`/`Manager`/`WarehouseStaff`,
+matching `PurchaseOrdersController`'s own `[Authorize(Roles = ...)]`):
+Suppliers is a create-form + list + activate/deactivate toggle, the same
+shape H's Users screen already established; Purchase Orders adds a
+dynamic multi-line create form (`FormArray`, add/remove line rows), a
+list with a status chip per order, and a detail view with Submit/Cancel/
+Receive actions that only show up when the order's current status
+actually allows them.
+
+**Try it:**
+```bash
+# Sign in as the seeded admin, then in the Angular app:
+# → "Suppliers": add a supplier
+# → "Purchase Orders": create a Draft PO for that supplier with one or
+#   more lines, then open it and click "Submit order" (-> Ordered)
+# → Click "Receive" on a line, pick a location, receive less than the
+#   full ordered quantity — the order becomes "Partially received" and
+#   "Cancel order" disappears
+# → Receive the remainder — the order becomes "Received"
 ```

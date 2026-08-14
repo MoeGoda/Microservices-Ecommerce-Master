@@ -21,5 +21,14 @@ namespace Warehouse.Domain.Entities
         // "Return of Sale {id}") can be filtered by reason, not just by
         // reading the reference text.
         Return,
+
+        // I — ReceivePurchaseOrderLineCommand's own reason, kept distinct
+        // from the plain `Received` a free-text restock
+        // (ReceiveStockCommand) uses — same "Return vs. Adjustment"
+        // reasoning above: a receipt against a real PO and an ad-hoc
+        // receipt are both increases, but only one of them has a supplier
+        // and an order number behind it, and the ledger should stay
+        // filterable by which is which.
+        PurchaseOrderReceived,
     }
 }
