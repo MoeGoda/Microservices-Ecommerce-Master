@@ -1,4 +1,5 @@
 using Common.ExceptionHandling;
+using Common.RequestCulture;
 using Common.Security;
 using Identity.Application;
 using Identity.Infrastructure;
@@ -21,12 +22,27 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
 
+// F3 — En/Ar culture negotiation via the Accept-Language header. Sets
+// CurrentUICulture per request, which both FluentValidation's own built-in
+// LanguageManager (already ships Arabic translations for every stock
+// validator message) and Common.Localization's Messages class key off of.
+builder.Services.AddSharedRequestLocalization();
+
 // This is the piece that turns "a string in the Authorization header" into
 // a populated User.Claims on every controller. The same shared extension
 // (Common.Security) is what Gateway.Ocelot calls too — same
 // TokenValidationParameters, same JwtSettings:Secret/Issuer/Audience, so a
 // token accepted at the gateway is accepted here identically.
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// F1 — a real dependency check, not a bare liveness probe: AddDbContextCheck
+// actually opens a connection and runs a trivial query against
+// IdentityContext's own database, so /hc genuinely answers "can this
+// service do its job," not just "is the process alive." The gateway's own
+// /hc (A3) stays a bare liveness check by design — see this project's
+// README for why aggregating downstream health INTO the gateway would be
+// the wrong tradeoff.
+builder.Services.AddHealthChecks().AddDbContextCheck<IdentityContext>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -77,6 +93,10 @@ using (var scope = app.Services.CreateScope())
 // anything — gets caught here and turned into a consistent ProblemDetails response.
 app.UseCommonExceptionHandling();
 
+// Must run before UseAuthentication/MapControllers — see Common.RequestCulture's
+// own comment for why.
+app.UseSharedRequestLocalization();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -87,5 +107,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Not routed through Ocelot — same "service-to-service/infra tooling, not
+// a browser-facing feature" reasoning as EventsController/StockEventsController
+// (D1/C3): a real deployment's orchestrator (docker-compose's own
+// healthcheck directive, F4) hits this directly per-container, the same
+// way it would never ask the gateway "is Identity healthy?" on Identity's
+// behalf.
+app.MapHealthChecks("/hc");
 
 app.Run();

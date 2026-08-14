@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin } from 'rxjs';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { SalesByDayDto, StockLevelRecordDto, TopSellingItemDto } from '../../../shared/models/reporting.models';
 import { ReportingService } from '../reporting.service';
 
@@ -54,7 +55,7 @@ const MAX_LABELED_BARS = 14;
 
 @Component({
   selector: 'app-reports-dashboard',
-  imports: [DecimalPipe, ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatIconModule, MatProgressSpinnerModule, MatSelectModule],
+  imports: [DecimalPipe, ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatIconModule, MatProgressSpinnerModule, MatSelectModule, TranslatePipe],
   templateUrl: './reports-dashboard.component.html',
   styleUrl: './reports-dashboard.component.scss',
 })

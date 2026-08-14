@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { PagedResult } from '../../shared/models/pagination.models';
 import {
   AddItemBarcodeRequest,
   AddItemUnitRequest,
@@ -34,8 +35,8 @@ const BASE = `${environment.apiBaseUrl}/Warehouse`;
 export class WarehouseService {
   constructor(private readonly http: HttpClient) {}
 
-  getItems(): Observable<ItemSummaryDto[]> {
-    return this.http.get<ItemSummaryDto[]>(`${BASE}/Items`);
+  getItems(page = 1, pageSize = 20): Observable<PagedResult<ItemSummaryDto>> {
+    return this.http.get<PagedResult<ItemSummaryDto>>(`${BASE}/Items`, { params: { page, pageSize } });
   }
 
   getItem(id: number): Observable<ItemDetailDto> {

@@ -15,8 +15,12 @@ namespace Identity.Application.Features.Auth.Commands.Register
         public string LastName { get; set; } = string.Empty;
 
         // Defaults to the least-privileged role. Only an existing Admin
-        // should be able to create Admin/Manager/WarehouseStaff accounts —
-        // that authorization rule is enforced at the controller (F2), not here.
+        // can actually get a non-Cashier value through, though: this
+        // command has no idea which of its two callers it's talking to,
+        // and shouldn't — AuthController's own two actions (F2) draw that
+        // line. Register (anonymous) overwrites this to Cashier
+        // unconditionally before sending; CreateUser (Admin-only) sends
+        // it through untouched.
         public string Role { get; set; } = Domain.Entities.RoleNames.Cashier;
     }
 }

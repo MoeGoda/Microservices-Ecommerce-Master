@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="EntityNotFound" xml:space="preserve">
+    <value>لم يتم العثور على العنصر "{0}" ({1}).</value>
+  </data>
+  <data name="UnexpectedError" xml:space="preserve">
+    <value>حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى لاحقًا.</value>
+  </data>
+  <data name="PasswordRequiresUppercase" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على حرف كبير واحد على الأقل.</value>
+  </data>
+  <data name="PasswordRequiresLowercase" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل.</value>
+  </data>
+  <data name="PasswordRequiresDigit" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على رقم واحد على الأقل.</value>
+  </data>
+  <data name="StockTransferLocationsMustDiffer" xml:space="preserve">
+    <value>يجب أن يكون موقع المصدر وموقع الوجهة مختلفين.</value>
+  </data>
+  <data name="PromotionPercentageExceeds100" xml:space="preserve">
+    <value>لا يمكن أن يتجاوز الخصم بالنسبة المئوية 100%.</value>
+  </data>
+  <data name="PromotionFixedAmountUnreasonable" xml:space="preserve">
+    <value>قيمة الخصم الثابت كبيرة بشكل غير معقول.</value>
+  </data>
+</root>

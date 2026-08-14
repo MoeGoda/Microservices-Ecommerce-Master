@@ -53,10 +53,10 @@ a distributed transaction.
 - [x] **E2 — Mailing system (SMTP/MailKit)**
 
 **Phase F — Hardening**
-- [ ] F1 — Performance (caching, pagination, health checks)
-- [ ] F2 — Security hardening (role policies, rate limiting)
-- [ ] F3 — Localization (English/Arabic, RTL)
-- [ ] F4 — Full docker-compose stack + end-to-end walkthrough
+- [x] **F1 — Performance (Redis caching, pagination, compression, health checks)**
+- [x] **F2 — Security hardening (role-based policies, gateway rate limiting, input validation review)**
+- [x] **F3 — Localization (English/Arabic, RTL)**
+- [x] **F4 — Full docker-compose stack + end-to-end walkthrough**
 
 ## A1 — Identity service
 
@@ -2168,3 +2168,672 @@ the existing Warehouse.API (`POST /api/v1/Stock/transfer`, gatewayed as
 shows a "Transfer stock" form alongside the existing "Receive stock"/
 "Adjust stock" ones once an item with at least one stock level is
 selected.
+
+## F1 — Performance (Redis caching, pagination, compression, health checks)
+
+**What it does:** four independent performance concerns, each solved once
+at its own natural, highest-leverage point rather than mechanically
+everywhere it could theoretically apply — real dependency health checks
+on every service, response compression at the one place ALL browser
+traffic passes through, real pagination on the two rawest unbounded list
+endpoints, and a Redis-backed cache for Warehouse's read-heavy,
+effectively-immutable master data.
+
+**Health checks: a real DB-connectivity probe on all 5 services, not just
+the gateway's existing bare liveness check.** A3 already gave the
+gateway a `/hc` endpoint, but a deliberately bare one — no downstream
+service had one of its own at all, and the gateway's own check never
+verified anything past "the process is running." Every service now calls
+`AddHealthChecks().AddDbContextCheck<TContext>()` + `MapHealthChecks("/hc")`
+in its own `Program.cs` — the exact same two-line idiom five times, so
+each service's own `/hc` genuinely answers "can this service reach its
+database," not just "is Kestrel listening." None of these are routed
+through Ocelot — same "service-to-service/infra tooling, not a
+browser-facing feature" reasoning `EventsController`/`StockEventsController`
+already established: a real deployment's orchestrator (docker-compose's
+own `healthcheck:` directive, F4) hits each container's `/hc` directly,
+the same way it would never ask the gateway "is Identity healthy?" on
+Identity's behalf. The gateway's own `/hc` stays a bare liveness check on
+purpose — aggregating five downstream health checks INTO the gateway
+would make the gateway's own health depend on every service it fronts,
+which is exactly backwards for a reverse proxy that should stay reporting
+healthy even while one backend is degraded.
+
+**Compression: one `AddResponseCompression` call in the gateway covers
+every browser-facing response in the system.** Every REST call Angular
+makes goes through Ocelot's upstream routes — the one carve-out
+(Notifications' SignalR hub, E1) connects directly and was never
+gatewayed at all, so it was never in scope here either. Rather than add
+compression middleware to five separate downstream `Program.cs` files,
+one `AddResponseCompression`/`UseResponseCompression` pair in
+`Gateway.Ocelot`, placed as the FIRST middleware (before `UseOcelot()`
+wraps the response stream itself), compresses every proxied JSON payload
+on its way out. Brotli first, gzip as the fallback for clients that don't
+advertise it — negotiated automatically via the request's own
+`Accept-Encoding` header, exactly like a browser already does without
+Angular needing to know compression exists at all.
+
+**Pagination: a new shared `Common.Pagination` building block, and real
+paging on the two rawest, most obviously-unbounded list endpoints.**
+`PagedResult<T>` lives in `BuildingBlocks/Common.Pagination` — shared
+across services the same way `Common.Exceptions` already is, and for the
+identical reason: it's not domain data (no service's own `EntityBase`/
+`DbContext` lives there, so the "no shared domain assemblies" rule this
+project otherwise follows everywhere else stays intact), it's a generic
+wire-format envelope, the same category as `Common.ExceptionHandling`'s
+`ProblemDetails` shape. `GetAllItemsQuery` (Warehouse's item catalog) and
+`GetSalesQuery` (Reporting's raw sale-record dump) both moved from an
+unbounded `IEnumerable<T>` to `PagedResult<T>`, each repository gaining a
+`GetPaged(page, pageSize)` that returns the total row count alongside the
+page (one `CountAsync()` plus one `Skip().Take()`, not one clever query
+trying to do both at once — EF Core has no way to project "the page" and
+"the total" out of a single `SELECT` without materializing every row
+first). `GetTopSellingItemsQuery`/`GetRecentNotificationsQuery` keep
+their existing flat "top N" shape rather than being converted too — a
+ranked top-N list and a raw table dump answer different questions, and
+the former was never the unbounded-growth problem this step exists to
+solve.
+
+**The Angular "parent item" picker exposed the real tension in paginating
+a list that's ALSO used as a lookup — solved by giving it its own,
+separate, unpaged-ish request rather than reusing the paged one.**
+`items-admin.component.ts`'s create-item form offers every existing item
+as a possible parent via the same `items` signal the browsable list
+below used to populate from — once that signal only holds one page,
+reusing it would mean the picker only ever offers whichever items happen
+to be on the CURRENTLY VIEWED page. The fix is a second signal,
+`parentCandidates`, populated by its own call to the identical
+`GetAllItemsQuery` endpoint with `pageSize=100` (the max
+`GetAllItemsQueryValidator` allows) — a real, named limitation for a
+catalog bigger than 100 items (the picker would then miss some), left as
+a future "replace with a searchable autocomplete" improvement rather than
+solved here, the same "name the gap explicitly" discipline this project
+uses throughout rather than silently capping something and moving on.
+
+**Redis caching: `MasterDataCache`, a cache-aside helper extracted the
+moment a THIRD caller needed the identical shape — same reasoning
+`StockAdjustmentStager` was extracted for a SECOND.** Categories,
+Locations, and UnitsOfMeasure are all seeded reference data with no
+mutating command anywhere in this system (confirmed by grepping for one
+before writing a single line of caching code) — read on nearly every
+Admin Panel and POS screen load, changed never. `MasterDataCache` wraps
+`IDistributedCache` (a framework ABSTRACTION from
+`Microsoft.Extensions.Caching.Abstractions`, not a concrete Infrastructure
+detail — the same category `ILogger<T>` already falls into, which
+Application-layer handlers elsewhere in this project, like Notifications'
+`IngestStockLevelChangedCommandHandler`, already inject directly) behind
+a `GetOrSetAsync<T>(key, factory, ct)` cache-aside shape: check Redis,
+deserialize on a hit, fall through to the real repository and repopulate
+on a miss. The three `GetCategories`/`GetLocations`/`GetUnitsOfMeasure`
+query handlers each shrink to a five-line cache-key-plus-factory call. The
+concrete Redis implementation
+(`AddStackExchangeRedisCache`, bound from a plain `ConnectionStrings:Redis`
+value — no dedicated options class needed since there's nothing else to
+configure) is registered in `Warehouse.Infrastructure`, same as every
+other concrete Infrastructure detail; `MasterDataCache` itself, like
+`StockAdjustmentStager`, has no idea Redis exists. The 10-minute TTL
+exists purely as a safety net, not because this data is expected to
+change — if a future step ever adds the first command that mutates a
+Category/Location/UnitOfMeasure, THAT step will need to add cache
+invalidation here too; until then, a page that's up to 10 minutes stale
+is indistinguishable from a fresh one, because the underlying data never
+actually moves.
+
+**Concepts introduced:**
+- **A shared BuildingBlocks project for a wire-format shape, not domain
+  data.** `Common.Pagination` joins `Common.Exceptions`/
+  `Common.Security`/`Common.ExceptionHandling` as the fourth building
+  block every service is allowed to reference directly — the dividing
+  line was never "nothing shared," it was always "nothing DOMAIN shared,"
+  and a generic paged-response envelope was always on the allowed side of
+  that line, same as `ProblemDetails` already was.
+- **Extracting a cache-aside helper the moment a THIRD caller needs the
+  identical shape** — the same "extract on the Nth real need, not
+  preemptively" discipline `StockAdjustmentStager`/`EffectivePriceResolver`
+  already modeled, applied to a caching concern instead of a stock or
+  pricing one.
+- **A TTL as a pure safety net, with no invalidation logic, justified by
+  an actual grep proving no mutation path exists** — not "cache
+  everything and hope," a specific, checked precondition (`Category`/
+  `Location`/`UnitOfMeasure` are genuinely immutable at runtime today)
+  that the next person to violate it (by adding a mutating command) is
+  now on notice to also revisit.
+- **Two independent scoped-vs-unpaged-view needs on the same underlying
+  list**, solved with two separate signals/requests rather than
+  contorting one paged response to serve both — the same "don't force one
+  shape to answer two different questions" instinct that produced
+  `ProcessedSaleEvent`/`ProcessedSaleReturnEvent` as separate tables
+  earlier in this project.
+
+**Verified with a 24-check runtime test — real infrastructure throughout,
+not mocks: a real Kestrel HTTP listener for the health-check mechanism (a
+genuinely-reachable SQLite connection proving `/hc` returns 200 Healthy,
+and a genuinely-unreachable one proving it returns 503 Unhealthy), real
+MediatR-dispatched pagination proving page boundaries/counts/ordering are
+correct and out-of-range `Page`/`PageSize` values are rejected by
+validation, and a real local `redis-server` instance (not a mocked
+`IDistributedCache`) proving a cache miss reaches the repository exactly
+once, a cache hit does NOT reach it again, and an evicted/expired entry
+transparently falls back and repopulates — plus a Playwright pass
+confirming the Admin Panel's item list actually paginates (a second page
+of results, no row overlap with the first) and that the "parent item"
+picker keeps offering every item regardless of which page the browsable
+list is currently showing.** Response compression was verified directly
+against a running gateway process with `curl -H "Accept-Encoding: gzip"`
+(and `br`), confirming `Content-Encoding`/`Vary` headers appear only when
+the client actually advertises support for them.
+
+**Run it locally:**
+```bash
+# Any local Redis works — the default connection string points at
+# localhost:6379.
+redis-server
+
+# Every service's own /hc:
+curl http://localhost:5218/hc   # Identity.API
+curl http://localhost:5238/hc   # Warehouse.API
+curl http://localhost:5258/hc   # POS.API
+curl http://localhost:5278/hc   # Reporting.API
+curl http://localhost:5298/hc   # Notifications.API
+
+# Compression, through the gateway:
+curl -sD - -o /dev/null -H "Accept-Encoding: gzip" http://localhost:5058/Warehouse/Items?page=1
+
+# Pagination — the Admin Panel's item list now shows a paginator; or call
+# either paged endpoint directly:
+curl http://localhost:5058/Warehouse/Items?page=2&pageSize=10
+curl http://localhost:5278/Reporting/ReadModels/sales?page=1&pageSize=20
+```
+
+## F2 — Security hardening (role-based policies, gateway rate limiting, input validation review)
+
+**What it does:** closes a real, self-flagged privilege-escalation hole in
+registration; adds role-based `[Authorize(Roles = ...)]` restrictions to
+every mutation endpoint (Warehouse catalog/stock, POS sales) and every
+report endpoint, without touching a single service-to-service call path;
+extends the gateway's existing rate limiter to the one other anonymous,
+abuse-prone route; adds three safe-default security response headers; and
+fixes a handful of concrete input-validation gaps a targeted review turned
+up.
+
+**The standout finding: anyone, with no token at all, could register as
+Admin.** `RegisterCommand`'s own comment (A1) already named
+this explicitly — "Only an existing Admin should be able to create
+Admin/Manager/WarehouseStaff accounts — that authorization rule is
+enforced at the controller (F2), not here" — and until this step, nothing
+actually enforced it. `AuthController.Register` now overwrites
+`command.Role` to `Cashier` unconditionally, no matter what the request
+body claims, the identical "context is authoritative over the body" idiom
+`SalesController.Start` already uses for `CashierUserId`. The other half
+of the fix is a NEW endpoint, `POST /Auth/create-user`
+(`[Authorize(Roles = Admin)]`), which reuses `RegisterCommand` as-is and
+trusts its submitted `Role` — safe specifically because only a caller who
+already holds a verified Admin token can reach it at all. No Angular UI
+was built for it (the client never had a public registration screen to
+begin with — A4 built login only); the backend capability exists and is
+verified end-to-end, calling it a curl/Swagger operation for now is a
+named, deliberate scope cut, not an oversight.
+
+**Every OTHER `[Authorize(Roles = ...)]` addition had to answer one
+question first: does anything call this endpoint service-to-service?**
+Warehouse's `ServiceAuthHandler`/POS's own copy each mint a token with
+exactly ONE claim — `ClaimTypes.Name` — and nothing else. No `Role` claim
+at all. `[Authorize(Roles = "...")]` on an endpoint POS's own
+`WarehouseCatalogClient` (C2) or Warehouse's `StockAdjustmentStager`
+outbox events call would 403 every checkout in the system, silently,
+the moment this shipped. So the actual work here was mapping every
+controller action in Warehouse.API/POS.API/Reporting.API against "is this
+ever reached by anything other than a human's browser request through
+the gateway" BEFORE deciding where a Roles restriction is even safe to
+add:
+- **Warehouse's `ItemsController`/`StockController`** keep their
+  class-level bare `[Authorize]` and get a SECOND, per-action
+  `[Authorize(Roles = "Admin,Manager,WarehouseStaff")]` layer added only
+  to the mutation actions (`Create`, `AddBarcode`, `AddUnit`,
+  `UpdatePrice`, `CreatePromotion`, `CancelPromotion`, `Receive`,
+  `Adjust`, `Transfer`) — both `[Authorize]` attributes on the same
+  target combine (a request must satisfy ALL of them), so these actions
+  now require "signed in" AND "one of these roles." Every read action —
+  including `ResolveBarcode` and `GetByItem` (Stock), the two endpoints
+  POS's own service-to-service catalog client actually calls — is left
+  completely untouched.
+- **POS's `SalesController`** gets its Roles restriction at the
+  CONTROLLER level instead (`Admin,Manager,Cashier`, covering even the
+  read-only `GetById`) — safe here specifically because nothing calls
+  INTO `SalesController` service-to-service; POS only ever calls OUT.
+- **Reporting's `ReportsController`/`ReadModelsController`** get the same
+  controller-level treatment (`Admin,Manager`) for the identical reason —
+  `EventsController` is a SEPARATE, still-bare controller that POS's/
+  Warehouse's own outbox dispatchers actually push events to, and was
+  never touched.
+- **Notifications** gets no role restriction at all — a low-stock or
+  sale alert is for everyone regardless of role, the same "broadcast to
+  all, no per-user targeting" model E1 already established.
+
+**A new `Common.Security.RoleNames`, alongside Identity.Domain's own
+copy — not a violation of "no shared domain assemblies," a second
+instance of the exact tradeoff `Common.Pagination` already made.**
+`[Authorize(Roles = ...)]` arguments must be compile-time constants, and
+Warehouse/POS/Reporting have no reference to Identity.Domain at all (by
+design) — so a shared `const string` set living in Common.Security (which
+every service already references for `AddJwtAuthentication`) is the
+typo-proof alternative to hand-copying the literal strings `"Admin"`,
+`"Manager"`, etc. into a dozen attribute arguments across three services.
+Identity's OWN copy in `Identity.Domain.Entities.RoleNames` stays the real
+source of truth for the seeded `Role` table rows; the two are duplicated
+on purpose, the same way `EntityBase` is duplicated per service, for the
+same underlying reason.
+
+**Angular gets a second guard, mirroring the backend's role matrix
+one-for-one — a UX guard, not a security boundary, same as `authGuard`
+already was.** `roleGuard(allowedRoles)` sits alongside `authGuard` on
+`/admin`, `/pos`, and `/reports`; without it, a signed-in Cashier clicking
+"Admin" in the toolbar would land on a real page that immediately fails
+every API call with 403, instead of being redirected before that ever
+renders. The toolbar's own three nav links are now conditionally rendered
+by the identical role check (`canSeeAdmin()`/`canSeePos()`/`canSeeReports()`
+in `app.ts`) — a Cashier never even sees a door that leads to a 403.
+
+**Gateway rate limiting: the login-only limiter now also covers
+`/register`, partitioned independently.** It was the only other
+anonymous, abuse-prone POST route in the system — every other route
+needs a token an attacker doesn't have yet — and it had zero throttling
+before this. The partition key became `"route:ip"` instead of just `"ip"`,
+so hammering `/login` doesn't also burn a legitimate user's separate
+`/register` budget; the two anonymous endpoints are throttled
+independently of each other, same `PermitLimit = 5` / `Window = 30s` as
+before. Every other route stays exactly as unlimited as the rate
+limiter's own comment already said it was designed to be — this still
+isn't a general-purpose throttle.
+
+**Three response headers, set once at the gateway via `Response.OnStarting`
+— the same "one point, every browser-facing response passes through it"
+reasoning F1's compression already used.** `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` — all three are
+safe, context-free defaults. Deliberately NOT included: HSTS (meaningless
+until HTTPS is actually enforced, which local `dotnet run` doesn't do) and
+a CSP (a real one needs to know every script/style/connect-src the Angular
+app legitimately uses, which is a genuine per-app policy decision this
+project hasn't made yet — a wrong CSP is worse than none, so this is a
+named gap, not a safe default to just add).
+
+**Input validation: a handful of concrete gaps a targeted review
+surfaced, not a blanket rewrite.** `LoginCommandValidator` had no
+`MaximumLength` on `UserName`/`Password` at all (added, matching
+`RegisterCommandValidator`'s existing `UserName` cap) — this isn't
+re-checking password complexity (that's `RegisterCommandValidator`'s job,
+once, at account creation), it's rejecting an oversized request body
+before it reaches PBKDF2 hashing. `RegisterCommandValidator` gained an
+`Email` length cap and a `Password` upper bound for the same reason.
+`AddItemUnitCommandValidator.ConversionFactor` and
+`CreatePromotionCommandValidator.DiscountValue` (the `FixedAmountOff`
+case) both had a lower bound but no upper one — neither is an actual
+security hole (`EffectivePriceResolver` already floors a discounted price
+at zero, so an absurd flat discount was already harmless in practice),
+but both now reject an obvious data-entry mistake or overflow-style input
+at the validator instead of relying solely on that apply-time floor.
+
+**What's still a named gap, not solved here:** the JWT secret
+(`SharedSettings/jwt.settings.json`) and every service's SQL Server
+credentials remain plaintext strings in checked-in `appsettings.json`
+files — real secrets-manager integration (user-secrets locally, Key Vault
+or equivalent in a real deployment) is a disproportionate detour for a
+single-tenant local learning-lab and stays exactly the "F2's to actually
+confront" pattern this project already flagged for itself, still
+unconfronted. A meaningful Content-Security-Policy is the other
+deliberately-skipped item, for the reason given above.
+
+**Verified with a 20-check runtime test — four real ASP.NET Core hosts
+(Identity/Warehouse/POS/Reporting), each with REAL JWT authentication
+wired up (`AddJwtAuthentication` against an in-memory `JwtSettings`,
+tokens minted by the same `JwtTokenFactory` every service already uses)
+and REAL controllers (`AddApplicationPart`), not MediatR calls that would
+skip the ASP.NET Core authorization pipeline entirely — plus a 16-check
+Playwright pass on the Angular guard/nav-visibility changes:** the
+backend test proves a Cashier token gets a genuine 403 on Warehouse's
+`POST /Stock/adjust` and `POST /Items` while a WarehouseStaff token
+succeeds (and the stock adjustment actually applies); a WarehouseStaff
+token gets 403 on POS's `POST /Sales` while a Cashier token succeeds; a
+Cashier token gets 403 on Reporting's `GET /Reports/sales-by-day` while
+an Admin token succeeds; and — the check that matters most — a
+service-to-service token with NO Role claim at all still succeeds on
+Warehouse's `GET /Stock/{itemId}` and `GET /Items/barcodes/{barcode}` and
+on Reporting's `POST /Events/sale-completed`, proving none of this broke
+the actual inter-service call paths the whole system depends on. The
+Identity test proves an anonymous `/register` submitting `role: "Admin"`
+comes back as `Cashier` regardless, that `/create-user` rejects both no
+token (401) and a non-Admin token (403), and that a real Admin token
+succeeds and the created account gets the role it actually asked for. The
+Playwright pass confirms a Cashier only ever sees the POS nav link and is
+redirected away from `/admin`/`/reports` on direct navigation, a
+WarehouseStaff sees the mirror image, and an Admin sees and can reach all
+three. Rate limiting and security headers were verified directly against
+a running gateway process: 6 rapid `POST /register` calls → the first 5
+proxy through (502, no live Identity.API in this sandbox — expected) and
+the 6th returns `429`; an immediately-following `/login` attempt still
+proxies through unblocked, proving the two anonymous routes have
+independent budgets; and `curl`'s response headers show
+`X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy` present on
+every response.
+
+**Run it locally:**
+```bash
+# Sign in as the seeded admin (Admin@12345) to get a token, then:
+
+# The fix — role in the body is ignored for public signup:
+curl -X POST http://localhost:5058/Identity/Auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"userName":"newuser","email":"newuser@example.com","password":"Password123","role":"Admin"}'
+# → response.role is "Cashier" regardless
+
+# The Admin-only counterpart — creates a Manager/WarehouseStaff/Admin account:
+curl -X POST http://localhost:5058/Identity/Auth/create-user \
+  -H "Authorization: Bearer <admin token>" -H "Content-Type: application/json" \
+  -d '{"userName":"newmanager","email":"newmanager@example.com","password":"Password123","role":"Manager"}'
+
+# Rate limiting + security headers, against the gateway directly:
+for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:5058/Identity/Auth/register -d '{}'; done
+curl -sD - -o /dev/null http://localhost:5058/hc   # X-Content-Type-Options / X-Frame-Options / Referrer-Policy
+
+# Role enforcement, in the Angular app: sign in as a Cashier-role account
+# and note the Admin/Reports nav links are simply gone; try navigating to
+# /admin directly and you're bounced back to /login.
+```
+
+## F3 — Localization (English/Arabic, RTL)
+
+**What it does:** every one of the 5 backend services now negotiates
+English/Arabic per request from the `Accept-Language` header, and the
+Angular client gets a real language switcher — English/Arabic UI text on
+all 5 feature screens plus the toolbar, `dir="rtl"` layout mirroring, and
+the same `Accept-Language` header sent on every API call so the two halves
+agree on which language a given request is in.
+
+**The backend's biggest win came almost for free: FluentValidation already
+ships its own Arabic translations.** A survey of every validator in the
+codebase (31 files across all 5 services) found only 6 custom
+`.WithMessage()` call sites, total — the other ~150 validation rules
+(`NotEmpty()`, `MaximumLength()`, `GreaterThan()`, etc.) rely entirely on
+FluentValidation's built-in `LanguageManager`, which already has a
+complete Arabic translation table and picks it automatically from
+`CultureInfo.CurrentUICulture`. So the actual backend work wasn't "write
+Arabic strings for every validator" — it was "get `CurrentUICulture` set
+correctly per request," and FluentValidation's own messages started
+coming back in Arabic with zero additional code.
+
+**Two new BuildingBlocks projects, split along the exact seam
+`Common.Exceptions`/`Common.ExceptionHandling` already established.**
+`Common.Localization` holds `Messages.resx`/`Messages.ar.resx` plus a
+hand-written `Messages` static class (a plain `ResourceManager` lookup
+keyed on `CultureInfo.CurrentUICulture` — no `IStringLocalizer`/DI needed,
+so a bare exception constructor can call it) — no ASP.NET Core dependency,
+so `Common.Exceptions` and the two Application-layer projects with custom
+`.WithMessage()` calls (Identity, Warehouse) can reference it without
+pulling the framework into layers that must stay framework-agnostic.
+`Common.RequestCulture` holds the actual ASP.NET Core middleware wiring
+(`AddSharedRequestLocalization`/`UseSharedRequestLocalization`, restricting
+`SupportedCultures` to `["en", "ar"]`) and is referenced only by the 5
+`*.API` projects — the same "only Web API projects pull in the framework
+reference" split `Common.ExceptionHandling` already used.
+
+**Two message shapes got moved into `Common.Localization.Messages`, not
+all three of `Common.Exceptions`' exception types.** `NotFoundException`'s
+internal fixed template (`Entity "{0}" ({1}) was not found.`) and
+`GlobalExceptionHandler`'s hardcoded 500-level literal both became resx
+entries — both are centralized in exactly one place each, so localizing
+them cost one line change apiece. `ConflictException`/`UnauthorizedException`
+are deliberately NOT touched: they're pure pass-through types where every
+call site across the codebase supplies its own full English string
+inline, and there's no single choke point to intercept — translating
+those would mean editing every throw site individually, which is exactly
+the kind of open-ended, disproportionate-to-this-phase work the project's
+own scoping discipline exists to name rather than silently attempt. Same
+reasoning for `ProblemDetails.Title`, which stays `exception.GetType().Name`
+(the CLR type name) regardless of culture — it was never meant to be
+human-facing prose to begin with.
+
+**The 6 existing custom `.WithMessage()` calls (3 in
+`RegisterCommandValidator`'s password-complexity rules, 1 in
+`TransferStockCommandValidator`, 2 in `CreatePromotionCommandValidator`)
+now call `Common.Localization.Messages` properties instead of hardcoded
+strings**, using the `Func<T, string>` overload (`.WithMessage(_ =>
+Messages.X)`) rather than the plain-string overload — the string overload
+would capture whatever culture was active when the validator was
+*constructed*, and while every validator here is resolved per-request
+through DI anyway, the `Func` form removes that fragility outright rather
+than relying on a lifetime assumption holding.
+
+**The Angular half: a real `i18next` instance (the library the roadmap
+named), not a template-only stub.** `I18nService` fetches
+`public/i18n/en.json`/`ar.json` once at startup (via a `provideAppInitializer`,
+so nothing renders before translations are ready), wraps `i18next.t()`,
+and is the only thing in the app that touches the library directly — the
+same "one gatekeeper service" shape `AuthService` already uses for the
+token. A standalone `TranslatePipe` (`{{ 'namespace.key' | translate }}`)
+is used across app.html (toolbar) and all 5 feature templates:
+login, admin-shell, pos-register, reports-dashboard, items-admin — **157
+leaf translation keys total, structurally verified identical between
+`en.json` and `ar.json`** (a Python key-diff found zero keys present in
+only one file). A new `languageInterceptor` attaches the current UI
+language as `Accept-Language` on every outgoing HTTP call, so a Cashier
+who's switched to Arabic gets Arabic FluentValidation/exception messages
+back from the backend too, not just Arabic static UI chrome.
+
+**Switching language triggers a full page reload, on purpose — not a
+half-working live re-render.** Angular Material's CDK `Directionality`
+reads the `dir` attribute once, at each component's construction; flipping
+`dir` at runtime wouldn't re-flow already-built `mat-form-field`/`mat-menu`
+components to RTL. `I18nService.switchLanguage()` persists the choice to
+`localStorage` (`warehousepos.lang`, the same pattern `AuthService` uses
+for the auth token) and reloads; `main.ts` reads that stored value and
+sets `dir`/`lang` on `<html>` *before* `bootstrapApplication` ever runs,
+so there's no flash of LTR content on an Arabic-preferring reload. The 5
+hardcoded LTR-only CSS declarations the initial survey found (`text-align:
+left` on 3 tables, `margin-right` on 2 elements) were all converted to
+logical properties (`text-align: start`, `margin-inline-end`) so they
+mirror correctly under `dir="rtl"` without any RTL-specific override rules
+needed.
+
+**What's still a named gap, not solved here:** `ConflictException`/
+`UnauthorizedException` call-site messages and `ProblemDetails.Title`
+stay English-only, for the reasons above. Angular Material's own built-in
+strings (the paginator's "Items per page"/"of" on the items-admin list)
+are not localized — that needs a `MatPaginatorIntl` override, which is a
+self-contained follow-up, not done here. Toast/notification strings built
+dynamically in component `.ts` files (e.g. `"Sale cancelled."`,
+`"Price updated to ..."`) are also untranslated — only template-authored
+static copy went through the `translate` pipe, per this phase's own scope
+line (`.ts` business logic wasn't touched beyond adding `TranslatePipe` to
+each component's `imports` array).
+
+**Verified with an 11-check runtime test (a real ASP.NET Core host,
+SQLite, real FluentValidation/MediatR pipeline, sending `Accept-Language:
+en` and `ar` against the same endpoints) plus two Playwright passes:**
+the backend test proves a missing item's 404 detail switches from
+`Entity "Item" (999999) was not found.` to the Arabic resx string; that
+FluentValidation's OWN built-in `NotEmpty` message on an empty `Sku`
+comes back as `'Sku' must not be empty.` vs. `'Sku' لا يجب أن يكون
+فارغاً.` with zero custom `.WithMessage()` involved anywhere in that path;
+and that the custom `CreatePromotionCommandValidator` message switches
+between its English and Arabic `Common.Localization.Messages` strings.
+The first Playwright pass confirms the language switcher flips
+`dir`/`lang` on `<html>`, translates the login screen and toolbar, shows
+Arabic `mat-error` validation text, and survives a plain page reload
+(`localStorage` persistence). The second walks the Admin/POS/Reports
+screens in both languages and confirms the translated headings/labels
+render and — checked via `document.documentElement.scrollWidth` — that
+switching to `dir="rtl"` introduces no horizontal overflow on any of the
+three pages.
+
+**Run it locally:**
+```bash
+# Backend — FluentValidation's built-in Arabic messages, zero custom code:
+curl -X POST http://localhost:5058/Warehouse/Items \
+  -H "Content-Type: application/json" -H "Accept-Language: ar" \
+  -H "Authorization: Bearer <admin/manager/warehousestaff token>" \
+  -d '{"sku":"","name":"","unitPrice":1,"categoryId":1,"baseUnitOfMeasureId":1,"barcode":"","barcodeType":0}'
+# → errors.Sku[0] comes back in Arabic
+
+# Backend — the same request with Accept-Language: en for comparison:
+curl -X POST http://localhost:5058/Warehouse/Items \
+  -H "Content-Type: application/json" -H "Accept-Language: en" \
+  -H "Authorization: Bearer <admin/manager/warehousestaff token>" \
+  -d '{"sku":"","name":"","unitPrice":1,"categoryId":1,"baseUnitOfMeasureId":1,"barcode":"","barcodeType":0}'
+
+# Angular: sign in, click the "EN" button in the toolbar (top right),
+# choose "العربية" — the page reloads in Arabic with dir="rtl". Every
+# subsequent API call the app makes also carries Accept-Language: ar.
+```
+
+## F4 — Full docker-compose stack + end-to-end walkthrough
+
+**What it does:** one `docker compose up -d` instead of the "N terminals"
+instructions every earlier phase's own README section documented —
+SQL Server, Redis, an SMTP catcher, all 5 API services, the gateway, and
+the Angular client, wired together and reachable at the exact same ports
+the manual multi-terminal workflow already used. A new `smoke-test.sh`
+exercises one real cross-service flow against the running stack: register
+→ login → create a Warehouse item → receive stock → a full POS sale →
+checkout → Warehouse's stock actually decrements via the async outbox
+(C3) → Reporting's read model picks the sale up via its own event
+ingestion (D1), not a direct call — plus re-checks of F1's health checks,
+F2's security headers/rate limiting, and F3's Accept-Language
+localization, all through the containerized gateway.
+
+**Every container keeps the exact port its `dotnet run`/`ng serve`
+counterpart already used, published straight to the host — nothing about
+what each service does changed, only how they find each other.**
+5218/5238/5258/5278/5298 for the 5 APIs, 5058 for the gateway, 4200 for
+the client: `client/src/environments/environment.ts`'s `apiBaseUrl`/
+`notificationsHubUrl` and Notifications.API's hardcoded CORS origin are
+both **unmodified**, because the actual consumer of those values is a
+browser running on the host machine, not another container — a browser
+hitting `localhost:5058` reaches the gateway identically whether it was
+started via `docker compose` or five separate terminals. Container-to-
+container traffic (each API talking to SQL Server/Redis/each other) is
+the only thing that needed to change, and it's done entirely through
+`docker-compose.yml`'s `environment:` blocks (`ConnectionStrings__X`,
+`ReportingApi__BaseUrl`, etc. — the standard ASP.NET Core
+double-underscore config-override convention) rather than any checked-in
+`appsettings.json` edit.
+
+**The one genuine code change: Ocelot needed a second, environment-scoped
+config file.** Every route in the existing `ocelot.json` says `"Host":
+"localhost"` — correct for every dev machine running `dotnet run`, wrong
+inside a container (where `localhost` means the gateway's own container,
+not the sibling containers compose starts each service in). `ocelot.Docker.json`
+overrides just the `Host` field on all 36 routes to the matching compose
+service name (`identity-api`, `warehouse-api`, ...); everything else about
+every route is untouched. This is Ocelot's own documented pattern for
+per-environment downstream hosts, not a workaround — `Program.cs` gained
+one line (`AddJsonFile($"ocelot.{Environment.EnvironmentName}.json",
+optional: true, ...)`, layered on top of the base file) and `ASPNETCORE_ENVIRONMENT=Docker`
+in the gateway's own Dockerfile is what selects it. .NET's configuration
+system merges JSON files at the individual key level, not by replacing
+whole objects, so the override file only needs to state the one field
+that actually changes per route — verified directly (a standalone
+`ConfigurationBuilder` test with two JSON files) before trusting it,
+since a silent merge failure here would mean every route quietly 404s.
+
+**Every Dockerfile preserves `SharedSettings/jwt.settings.json`'s existing
+relative-path lookup instead of hardcoding an absolute path for Docker.**
+Every service's `Program.cs` resolves that file via
+`Path.Combine(ContentRootPath, "..", "..", "..", "SharedSettings", ...)`
+(two `..`s for the gateway, which sits one level shallower in the source
+tree) — a relative walk-up that assumes a specific depth under `src/`.
+Rather than touching that code, every Dockerfile's final stage sets
+`WORKDIR` to the exact matching depth (e.g. `/app/src/Services/Identity/Identity.API`)
+and copies `SharedSettings/` to the sibling path that walk-up expects —
+the existing code runs completely unmodified inside a container. The
+build stage itself is intentionally simple, not layer-cache-optimized:
+every service's Dockerfile `COPY`s the whole `src/` tree (Domain/
+Application/Infrastructure/API plus every BuildingBlocks project) into
+one `dotnet publish` step rather than cherry-picking project references
+by hand — slower rebuilds across unrelated services, in exchange for
+never having to keep six Dockerfiles in sync with the project-reference
+graph by hand. A `.dockerignore` keeps `bin/`/`obj/`/`node_modules/` out
+of every build context regardless.
+
+**What's still a named gap, not solved here:** the Angular client's
+`environment.ts` values are baked in at container BUILD time, not read at
+runtime — fine for this compose file specifically (see above), but a
+container-to-container deployment with no published host ports (a real
+production topology) would need the runtime `config.json`-fetched-at-
+startup approach that file's own comment already anticipates; that's a
+genuine redesign, not something this phase's scope covers. Health checks
+on the 5 API containers use a bash `/dev/tcp` HTTP probe against each
+service's own `/hc` rather than `curl`/`wget` — neither exists in the
+Debian-based `mcr.microsoft.com/dotnet/aspnet:8.0` image and installing
+them isn't possible without adding an apt source, so the healthcheck
+reads the raw HTTP response's status line with bash builtins instead;
+it's a real check (it does fail if `/hc` stops returning 200), just an
+unusual-looking one.
+
+**Verified against the real, running compose stack — not just a config
+review — with one explicit exception named below.** Every one of the 8
+services built and ran as real Docker containers on a real Docker
+network: SQL Server (health-checked via `sqlcmd`), all 5 API containers
+(each health-checked via its own `/hc`), and the gateway, all reachable
+by their compose service names exactly as `ocelot.Docker.json` expects.
+`smoke-test.sh`'s full 19-check run passed end to end against this real
+stack: health checks, F2's security headers and `/register` rate
+limiting, F2's register-forced-to-Cashier fix, F3's Arabic
+`Accept-Language` validation messages flowing through the gateway into a
+containerized Identity.API, a Warehouse item created and stocked, a full
+POS sale checked out, Warehouse's stock genuinely decrementing afterward
+(proving the outbox/event pipeline works across containers, not just
+across in-process test hosts), and Reporting's own read model picking up
+that same sale via its independent event ingestion.
+
+The one exception: **this development sandbox's own network egress
+policy blocks Docker Hub** (where the real `redis:7-alpine`,
+`rnwood/smtp4dev`, `node:20-alpine`, and `nginx:alpine` images referenced
+in `docker-compose.yml` actually live — `mcr.microsoft.com`, which every
+.NET/SQL Server image in this stack uses instead, was reachable). This is
+a constraint of the sandbox this phase was verified in, not a flaw in the
+compose file — a developer with normal internet access runs `docker
+compose up -d` and gets the exact stack described above with no
+substitutions. To still get REAL end-to-end verification rather than a
+config review, two of the eight containers were swapped for
+functionally-equivalent stand-ins for the verification session only
+(never committed — `docker-compose.yml` and every Dockerfile reference
+the real images throughout): **Microsoft Garnet** (a real,
+Redis-protocol-compatible, MIT-licensed cache server, run via its own
+NuGet package rather than its Docker image) stood in for `redis:7-alpine`,
+which let the Warehouse.API↔Redis code path in the smoke test above run
+against a genuine RESP-protocol server, not a mock — the one gap found
+this way (Garnet's Lua scripting, which
+`Microsoft.Extensions.Caching.StackExchangeRedis` depends on internally,
+defaults to off; `--lua` turns it on) was a Garnet configuration detail,
+not a bug in this project's own caching code. A `sleep infinity` container
+stood in for `rnwood/smtp4dev` purely to satisfy `notifications-api`'s
+compose-level startup dependency — separately confirmed (starting
+Notifications.API directly with an intentionally-unreachable SMTP host)
+that it starts and serves `/hc` normally either way, since it only
+connects to SMTP when an event actually triggers an email, never at
+startup. The Angular client container specifically was **not** run in
+this sandbox (its own build stage needs `node:20-alpine`) — its Dockerfile
+follows the identical, now-proven-correct pattern the other 6 containers
+use, but building and running it is the one piece of this phase that
+stayed a config review rather than a live-verified run.
+
+**Run it locally:**
+```bash
+docker compose up -d
+# SQL Server takes ~20-30s to report healthy the first time; every API
+# container waits on that before starting, and the gateway waits on all
+# five APIs — `docker compose ps` shows every service's health status.
+
+./smoke-test.sh
+# Runs the full register -> login -> create item -> POS sale -> checkout
+# -> cross-service verification flow described above against the
+# running stack and prints a pass/fail count.
+
+# Angular client: http://localhost:4200
+# Swagger on each service directly: http://localhost:5218/swagger (Identity),
+# :5238 (Warehouse), :5258 (POS), :5278 (Reporting), :5298 (Notifications)
+# smtp4dev's web UI: http://localhost:5080
+
+docker compose down          # stop everything
+docker compose down -v       # also drop the SQL Server data volume
+```

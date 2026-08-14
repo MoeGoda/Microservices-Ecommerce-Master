@@ -1,0 +1,219 @@
+{
+  "common": {
+    "appName": "Warehouse & POS",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "loading": "Loading...",
+    "actions": "Actions"
+  },
+  "roles": {
+    "Admin": "Admin",
+    "Manager": "Manager",
+    "Cashier": "Cashier",
+    "WarehouseStaff": "Warehouse Staff"
+  },
+  "toolbar": {
+    "admin": "Admin",
+    "pos": "POS",
+    "reports": "Reports",
+    "notifications": "Notifications",
+    "markAllRead": "Mark all read",
+    "noNotifications": "No notifications yet.",
+    "signOut": "Sign out",
+    "language": "Language"
+  },
+  "login": {
+    "title": "Warehouse & POS",
+    "subtitle": "Sign in to continue",
+    "username": "Username",
+    "usernameRequired": "Username is required.",
+    "password": "Password",
+    "passwordRequired": "Password is required.",
+    "signIn": "Sign in"
+  },
+  "adminShell": {
+    "signedInAs": "Signed in as {{userName}} ({{role}})."
+  },
+  "pos": {
+    "startSale": {
+      "title": "Start a new sale",
+      "locationLabel": "Register location",
+      "locationRequired": "A location is required.",
+      "submit": "Start sale"
+    },
+    "table": {
+      "sku": "Sku",
+      "item": "Item",
+      "price": "Price",
+      "qty": "Qty",
+      "lineTotal": "Line total"
+    },
+    "register": {
+      "saleTitle": "Sale #{{id}}",
+      "inProgress": "In progress",
+      "scanLabel": "Scan or type barcode",
+      "qtyLabel": "Qty",
+      "addButton": "Add",
+      "removeLine": "Remove line",
+      "emptyRow": "Scan a barcode to add the first line.",
+      "cancelSale": "Cancel sale",
+      "checkout": "Checkout"
+    },
+    "totalLabel": "Total",
+    "receipt": {
+      "title": "Receipt — Sale #{{id}}",
+      "completedSubtitle": "Completed {{completedAt}} · stock sync: {{syncStatus}}",
+      "returnedSubtitle": "Returned {{returnedAt}} (originally completed {{completedAt}})",
+      "syncFailedNote": "Stock sync failed after retries — flagged for reconciliation. The sale itself is still final.",
+      "returnedNote": "This sale was returned — stock has been restocked at its original location.",
+      "returnSale": "Return sale",
+      "newSale": "New sale"
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "emptyStates": {
+      "noSales": "No completed sales yet."
+    },
+    "salesByDay": {
+      "title": "Sales by day",
+      "chartAriaLabel": "Bar chart of total sales revenue per day"
+    },
+    "topSelling": {
+      "title": "Top-selling items",
+      "showLabel": "Show",
+      "topN": "Top {{count}}",
+      "rowTitle": "{{sku}} — {{qty}} sold"
+    },
+    "lowStock": {
+      "title": "Low stock",
+      "allGood": "Nothing is at or below its reorder threshold.",
+      "table": {
+        "status": "Status",
+        "sku": "Sku",
+        "item": "Item",
+        "location": "Location",
+        "onHand": "On hand",
+        "reorderThreshold": "Reorder threshold"
+      },
+      "status": {
+        "outOfStock": "Out of stock",
+        "lowStock": "Low stock"
+      }
+    }
+  },
+  "items": {
+    "create": {
+      "title": "Create item",
+      "sku": "Sku",
+      "skuRequired": "Sku is required.",
+      "name": "Name",
+      "nameRequired": "Name is required.",
+      "description": "Description",
+      "unitPrice": "Unit price",
+      "category": "Category",
+      "categoryRequired": "Category is required.",
+      "baseUnit": "Base unit of measure",
+      "baseUnitRequired": "Base unit is required.",
+      "parentItem": "Parent item (optional)",
+      "noParent": "None — standalone item",
+      "barcode": "Barcode",
+      "barcodeRequired": "A first barcode is required.",
+      "barcodeType": "Barcode type",
+      "submit": "Create item"
+    },
+    "list": {
+      "title": "Items",
+      "table": {
+        "sku": "Sku",
+        "name": "Name",
+        "category": "Category",
+        "price": "Price",
+        "baseUnit": "Base unit"
+      },
+      "manage": "Manage",
+      "emptyRow": "No items yet — create one above."
+    },
+    "detail": {
+      "subtitle": "{{category}} · {{price}} · base unit {{baseUnit}}",
+      "barcodesHeading": "Barcodes",
+      "primaryTag": "primary",
+      "newBarcode": "New barcode",
+      "typeLabel": "Type",
+      "makePrimary": "Make primary",
+      "addBarcode": "Add barcode",
+      "unitsHeading": "Alternate units",
+      "unitsTable": {
+        "unit": "Unit",
+        "equals": "1 unit ="
+      },
+      "variantsHeading": "Pack variants",
+      "pricingHeading": "Pricing",
+      "promoActive": "A promotion is active right now:",
+      "listPrice": "List price",
+      "updatePrice": "Update price",
+      "priceHistoryTable": {
+        "changed": "Changed",
+        "oldPrice": "Old price",
+        "newPrice": "New price"
+      },
+      "createPromotionHeading": "Create a promotion",
+      "discountType": "Discount type",
+      "percentOff": "Percent off",
+      "amountOff": "Amount off",
+      "starts": "Starts",
+      "ends": "Ends",
+      "createPromotion": "Create promotion",
+      "promotionsTable": {
+        "discount": "Discount",
+        "starts": "Starts",
+        "ends": "Ends",
+        "status": "Status"
+      },
+      "off": "off",
+      "promotionStatus": {
+        "Cancelled": "Cancelled",
+        "Expired": "Expired",
+        "Upcoming": "Upcoming",
+        "Active": "Active"
+      },
+      "noPromotions": "No promotions yet for this item.",
+      "stockHeading": "Stock on hand",
+      "stockTable": {
+        "location": "Location",
+        "quantity": "Quantity",
+        "reorderThreshold": "Reorder threshold"
+      },
+      "stockEmptyRow": "No stock recorded yet — receive some below.",
+      "receive": {
+        "heading": "Receive stock",
+        "location": "Location",
+        "quantity": "Quantity",
+        "unit": "Unit",
+        "baseUnitOption": "{{code}} (base unit)",
+        "reference": "Reference (optional)",
+        "referencePlaceholder": "e.g. PO number",
+        "submit": "Receive"
+      },
+      "adjust": {
+        "heading": "Adjust stock",
+        "location": "Location",
+        "change": "Change (+/-)",
+        "reference": "Reference (optional)",
+        "referencePlaceholder": "e.g. reason for the correction",
+        "submit": "Adjust"
+      },
+      "transfer": {
+        "heading": "Transfer stock",
+        "fromLocation": "From location",
+        "toLocation": "To location",
+        "quantity": "Quantity",
+        "reference": "Reference (optional)",
+        "referencePlaceholder": "e.g. rebalance reason",
+        "submit": "Transfer",
+        "fromOption": "{{code}} — {{name}} ({{qty}} on hand)"
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-login',
@@ -18,6 +19,7 @@ import { AuthService } from '../../core/auth/auth.service';
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    TranslatePipe,
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',

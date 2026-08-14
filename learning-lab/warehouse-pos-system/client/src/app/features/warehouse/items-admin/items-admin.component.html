@@ -1,80 +1,80 @@
 <div class="items-admin">
   <mat-card class="create-card">
     <mat-card-header>
-      <mat-card-title>Create item</mat-card-title>
+      <mat-card-title>{{ 'items.create.title' | translate }}</mat-card-title>
     </mat-card-header>
     <mat-card-content>
       <form [formGroup]="createForm" (ngSubmit)="submitCreate()" class="form-grid">
         <mat-form-field appearance="outline">
-          <mat-label>Sku</mat-label>
+          <mat-label>{{ 'items.create.sku' | translate }}</mat-label>
           <input matInput formControlName="sku" />
           @if (createForm.controls.sku.touched && createForm.controls.sku.invalid) {
-            <mat-error>Sku is required.</mat-error>
+            <mat-error>{{ 'items.create.skuRequired' | translate }}</mat-error>
           }
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Name</mat-label>
+          <mat-label>{{ 'items.create.name' | translate }}</mat-label>
           <input matInput formControlName="name" />
           @if (createForm.controls.name.touched && createForm.controls.name.invalid) {
-            <mat-error>Name is required.</mat-error>
+            <mat-error>{{ 'items.create.nameRequired' | translate }}</mat-error>
           }
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="span-2">
-          <mat-label>Description</mat-label>
+          <mat-label>{{ 'items.create.description' | translate }}</mat-label>
           <input matInput formControlName="description" />
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Unit price</mat-label>
+          <mat-label>{{ 'items.create.unitPrice' | translate }}</mat-label>
           <input matInput type="number" step="0.01" formControlName="unitPrice" />
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Category</mat-label>
+          <mat-label>{{ 'items.create.category' | translate }}</mat-label>
           <mat-select formControlName="categoryId">
             @for (category of categories(); track category.id) {
               <mat-option [value]="category.id">{{ category.name }}</mat-option>
             }
           </mat-select>
           @if (createForm.controls.categoryId.touched && createForm.controls.categoryId.invalid) {
-            <mat-error>Category is required.</mat-error>
+            <mat-error>{{ 'items.create.categoryRequired' | translate }}</mat-error>
           }
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Base unit of measure</mat-label>
+          <mat-label>{{ 'items.create.baseUnit' | translate }}</mat-label>
           <mat-select formControlName="baseUnitOfMeasureId">
             @for (unit of units(); track unit.id) {
               <mat-option [value]="unit.id">{{ unit.code }} — {{ unit.name }}</mat-option>
             }
           </mat-select>
           @if (createForm.controls.baseUnitOfMeasureId.touched && createForm.controls.baseUnitOfMeasureId.invalid) {
-            <mat-error>Base unit is required.</mat-error>
+            <mat-error>{{ 'items.create.baseUnitRequired' | translate }}</mat-error>
           }
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Parent item (optional)</mat-label>
+          <mat-label>{{ 'items.create.parentItem' | translate }}</mat-label>
           <mat-select formControlName="parentItemId">
-            <mat-option [value]="null">None — standalone item</mat-option>
-            @for (parentCandidate of items(); track parentCandidate.id) {
+            <mat-option [value]="null">{{ 'items.create.noParent' | translate }}</mat-option>
+            @for (parentCandidate of parentCandidates(); track parentCandidate.id) {
               <mat-option [value]="parentCandidate.id">{{ parentCandidate.sku }} — {{ parentCandidate.name }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Barcode</mat-label>
+          <mat-label>{{ 'items.create.barcode' | translate }}</mat-label>
           <input matInput formControlName="barcode" />
           @if (createForm.controls.barcode.touched && createForm.controls.barcode.invalid) {
-            <mat-error>A first barcode is required.</mat-error>
+            <mat-error>{{ 'items.create.barcodeRequired' | translate }}</mat-error>
           }
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Barcode type</mat-label>
+          <mat-label>{{ 'items.create.barcodeType' | translate }}</mat-label>
           <mat-select formControlName="barcodeType">
             @for (type of barcodeTypes; track type) {
               <mat-option [value]="type">{{ type }}</mat-option>
@@ -86,7 +86,7 @@
           @if (creatingItem()) {
             <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
           } @else {
-            Create item
+            {{ 'items.create.submit' | translate }}
           }
         </button>
       </form>
@@ -95,7 +95,7 @@
 
   <mat-card class="list-card">
     <mat-card-header>
-      <mat-card-title>Items</mat-card-title>
+      <mat-card-title>{{ 'items.list.title' | translate }}</mat-card-title>
     </mat-card-header>
     <mat-card-content>
       @if (loadingItems()) {
@@ -104,16 +104,16 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Sku</th>
-              <th>Name</th>
-              <th>Category</th>
-              <th>Price</th>
-              <th>Base unit</th>
+              <th>{{ 'items.list.table.sku' | translate }}</th>
+              <th>{{ 'items.list.table.name' | translate }}</th>
+              <th>{{ 'items.list.table.category' | translate }}</th>
+              <th>{{ 'items.list.table.price' | translate }}</th>
+              <th>{{ 'items.list.table.baseUnit' | translate }}</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            @for (item of items(); track item.id) {
+            @for (item of pagedItems().items; track item.id) {
               <tr [class.selected]="selectedItem()?.id === item.id">
                 <td>{{ item.sku }}</td>
                 <td>{{ item.name }}</td>
@@ -121,16 +121,24 @@
                 <td>{{ item.unitPrice | number: '1.2-2' }}</td>
                 <td>{{ item.baseUnitOfMeasureCode }}</td>
                 <td>
-                  <button mat-stroked-button type="button" (click)="selectItem(item)">Manage</button>
+                  <button mat-stroked-button type="button" (click)="selectItem(item)">{{ 'items.list.manage' | translate }}</button>
                 </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="empty-row">No items yet — create one above.</td>
+                <td colspan="6" class="empty-row">{{ 'items.list.emptyRow' | translate }}</td>
               </tr>
             }
           </tbody>
         </table>
+
+        <mat-paginator
+          [length]="pagedItems().totalCount"
+          [pageSize]="pagedItems().pageSize"
+          [pageIndex]="pagedItems().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onItemsPageChange($event)"
+        ></mat-paginator>
       }
     </mat-card-content>
   </mat-card>
@@ -141,42 +149,42 @@
     <mat-card class="detail-card">
       <mat-card-header>
         <mat-card-title>{{ item.sku }} — {{ item.name }}</mat-card-title>
-        <mat-card-subtitle>{{ item.categoryName }} · {{ item.unitPrice | number: '1.2-2' }} · base unit {{ item.baseUnitOfMeasureCode }}</mat-card-subtitle>
+        <mat-card-subtitle>{{ 'items.detail.subtitle' | translate: { category: item.categoryName, price: (item.unitPrice | number: '1.2-2'), baseUnit: item.baseUnitOfMeasureCode } }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <h3>Barcodes</h3>
+        <h3>{{ 'items.detail.barcodesHeading' | translate }}</h3>
         <mat-chip-set>
           @for (barcode of item.barcodes; track barcode.id) {
             <mat-chip [highlighted]="barcode.isPrimary">
-              {{ barcode.barcode }} ({{ barcode.barcodeType }}){{ barcode.isPrimary ? ' — primary' : '' }}
+              {{ barcode.barcode }} ({{ barcode.barcodeType }})@if (barcode.isPrimary) { — {{ 'items.detail.primaryTag' | translate }} }
             </mat-chip>
           }
         </mat-chip-set>
 
         <form [formGroup]="addBarcodeForm" (ngSubmit)="submitAddBarcode()" class="form-grid inline-form">
           <mat-form-field appearance="outline">
-            <mat-label>New barcode</mat-label>
+            <mat-label>{{ 'items.detail.newBarcode' | translate }}</mat-label>
             <input matInput formControlName="barcode" />
           </mat-form-field>
           <mat-form-field appearance="outline">
-            <mat-label>Type</mat-label>
+            <mat-label>{{ 'items.detail.typeLabel' | translate }}</mat-label>
             <mat-select formControlName="barcodeType">
               @for (type of barcodeTypes; track type) {
                 <mat-option [value]="type">{{ type }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
-          <mat-checkbox formControlName="isPrimary">Make primary</mat-checkbox>
-          <button mat-stroked-button type="submit" [disabled]="addingBarcode()">Add barcode</button>
+          <mat-checkbox formControlName="isPrimary">{{ 'items.detail.makePrimary' | translate }}</mat-checkbox>
+          <button mat-stroked-button type="submit" [disabled]="addingBarcode()">{{ 'items.detail.addBarcode' | translate }}</button>
         </form>
 
         @if (item.units.length > 0) {
-          <h3>Alternate units</h3>
+          <h3>{{ 'items.detail.unitsHeading' | translate }}</h3>
           <table class="data-table">
             <thead>
               <tr>
-                <th>Unit</th>
-                <th>1 unit =</th>
+                <th>{{ 'items.detail.unitsTable.unit' | translate }}</th>
+                <th>{{ 'items.detail.unitsTable.equals' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -191,7 +199,7 @@
         }
 
         @if (item.variants.length > 0) {
-          <h3>Pack variants</h3>
+          <h3>{{ 'items.detail.variantsHeading' | translate }}</h3>
           <ul>
             @for (variant of item.variants; track variant.id) {
               <li>{{ variant.sku }} — {{ variant.name }} ({{ variant.unitPrice | number: '1.2-2' }})</li>
@@ -199,29 +207,29 @@
           </ul>
         }
 
-        <h3>Pricing</h3>
+        <h3>{{ 'items.detail.pricingHeading' | translate }}</h3>
         @if (item.activePromotionId) {
           <p class="promo-active-note">
-            A promotion is active right now: <strong>{{ item.originalUnitPrice | number: '1.2-2' }}</strong> →
+            {{ 'items.detail.promoActive' | translate }} <strong>{{ item.originalUnitPrice | number: '1.2-2' }}</strong> →
             <strong>{{ item.unitPrice | number: '1.2-2' }}</strong>.
           </p>
         }
 
         <form [formGroup]="priceForm" (ngSubmit)="submitUpdatePrice()" class="form-grid inline-form">
           <mat-form-field appearance="outline">
-            <mat-label>List price</mat-label>
+            <mat-label>{{ 'items.detail.listPrice' | translate }}</mat-label>
             <input matInput type="number" step="0.01" formControlName="newPrice" />
           </mat-form-field>
-          <button mat-stroked-button type="submit" [disabled]="updatingPrice()">Update price</button>
+          <button mat-stroked-button type="submit" [disabled]="updatingPrice()">{{ 'items.detail.updatePrice' | translate }}</button>
         </form>
 
         @if (priceHistory().length > 0) {
           <table class="data-table">
             <thead>
               <tr>
-                <th>Changed</th>
-                <th>Old price</th>
-                <th>New price</th>
+                <th>{{ 'items.detail.priceHistoryTable.changed' | translate }}</th>
+                <th>{{ 'items.detail.priceHistoryTable.oldPrice' | translate }}</th>
+                <th>{{ 'items.detail.priceHistoryTable.newPrice' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -236,10 +244,10 @@
           </table>
         }
 
-        <h4>Create a promotion</h4>
+        <h4>{{ 'items.detail.createPromotionHeading' | translate }}</h4>
         <form [formGroup]="promotionForm" (ngSubmit)="submitCreatePromotion()" class="form-grid inline-form">
           <mat-form-field appearance="outline">
-            <mat-label>Discount type</mat-label>
+            <mat-label>{{ 'items.detail.discountType' | translate }}</mat-label>
             <mat-select formControlName="discountType">
               @for (type of discountTypes; track type) {
                 <mat-option [value]="type">{{ type }}</mat-option>
@@ -247,18 +255,18 @@
             </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline">
-            <mat-label>{{ promotionForm.controls.discountType.value === 'PercentageOff' ? 'Percent off' : 'Amount off' }}</mat-label>
+            <mat-label>{{ (promotionForm.controls.discountType.value === 'PercentageOff' ? 'items.detail.percentOff' : 'items.detail.amountOff') | translate }}</mat-label>
             <input matInput type="number" step="0.01" formControlName="discountValue" />
           </mat-form-field>
           <mat-form-field appearance="outline">
-            <mat-label>Starts</mat-label>
+            <mat-label>{{ 'items.detail.starts' | translate }}</mat-label>
             <input matInput type="datetime-local" formControlName="startsAt" />
           </mat-form-field>
           <mat-form-field appearance="outline">
-            <mat-label>Ends</mat-label>
+            <mat-label>{{ 'items.detail.ends' | translate }}</mat-label>
             <input matInput type="datetime-local" formControlName="endsAt" />
           </mat-form-field>
-          <button mat-stroked-button type="submit" [disabled]="creatingPromotion()">Create promotion</button>
+          <button mat-stroked-button type="submit" [disabled]="creatingPromotion()">{{ 'items.detail.createPromotion' | translate }}</button>
         </form>
 
         <!--
@@ -272,10 +280,10 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Discount</th>
-                <th>Starts</th>
-                <th>Ends</th>
-                <th>Status</th>
+                <th>{{ 'items.detail.promotionsTable.discount' | translate }}</th>
+                <th>{{ 'items.detail.promotionsTable.starts' | translate }}</th>
+                <th>{{ 'items.detail.promotionsTable.ends' | translate }}</th>
+                <th>{{ 'items.detail.promotionsTable.status' | translate }}</th>
                 <th></th>
               </tr>
             </thead>
@@ -283,11 +291,11 @@
               @for (promotion of promotions(); track promotion.id) {
                 <tr>
                   <td>
-                    {{ promotion.discountValue }}{{ promotion.discountType === 'PercentageOff' ? '%' : '' }} off
+                    {{ promotion.discountValue }}{{ promotion.discountType === 'PercentageOff' ? '%' : '' }} {{ 'items.detail.off' | translate }}
                   </td>
                   <td>{{ promotion.startsAtUtc | date: 'short' }}</td>
                   <td>{{ promotion.endsAtUtc | date: 'short' }}</td>
-                  <td>{{ promotionStatus(promotion) }}</td>
+                  <td>{{ ('items.detail.promotionStatus.' + promotionStatus(promotion)) | translate }}</td>
                   <td>
                     @if (canCancelPromotion(promotion)) {
                       <button
@@ -297,7 +305,7 @@
                         [disabled]="cancellingPromotionId() === promotion.id"
                         (click)="cancelPromotion(promotion)"
                       >
-                        Cancel
+                        {{ 'common.cancel' | translate }}
                       </button>
                     }
                   </td>
@@ -306,16 +314,16 @@
             </tbody>
           </table>
         } @else {
-          <p class="empty-row">No promotions yet for this item.</p>
+          <p class="empty-row">{{ 'items.detail.noPromotions' | translate }}</p>
         }
 
-        <h3>Stock on hand</h3>
+        <h3>{{ 'items.detail.stockHeading' | translate }}</h3>
         <table class="data-table">
           <thead>
             <tr>
-              <th>Location</th>
-              <th>Quantity</th>
-              <th>Reorder threshold</th>
+              <th>{{ 'items.detail.stockTable.location' | translate }}</th>
+              <th>{{ 'items.detail.stockTable.quantity' | translate }}</th>
+              <th>{{ 'items.detail.stockTable.reorderThreshold' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -327,7 +335,7 @@
               </tr>
             } @empty {
               <tr>
-                <td colspan="3" class="empty-row">No stock recorded yet — receive some below.</td>
+                <td colspan="3" class="empty-row">{{ 'items.detail.stockEmptyRow' | translate }}</td>
               </tr>
             }
           </tbody>
@@ -335,9 +343,9 @@
 
         <div class="stock-forms">
           <form [formGroup]="receiveForm" (ngSubmit)="submitReceive()" class="form-grid inline-form">
-            <h4>Receive stock</h4>
+            <h4>{{ 'items.detail.receive.heading' | translate }}</h4>
             <mat-form-field appearance="outline">
-              <mat-label>Location</mat-label>
+              <mat-label>{{ 'items.detail.receive.location' | translate }}</mat-label>
               <mat-select formControlName="locationId">
                 @for (location of locations(); track location.id) {
                   <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
@@ -345,29 +353,29 @@
               </mat-select>
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Quantity</mat-label>
+              <mat-label>{{ 'items.detail.receive.quantity' | translate }}</mat-label>
               <input matInput type="number" formControlName="quantity" />
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Unit</mat-label>
+              <mat-label>{{ 'items.detail.receive.unit' | translate }}</mat-label>
               <mat-select formControlName="unitOfMeasureId">
-                <mat-option [value]="item.baseUnitOfMeasureId">{{ item.baseUnitOfMeasureCode }} (base unit)</mat-option>
+                <mat-option [value]="item.baseUnitOfMeasureId">{{ 'items.detail.receive.baseUnitOption' | translate: { code: item.baseUnitOfMeasureCode } }}</mat-option>
                 @for (unit of item.units; track unit.id) {
                   <mat-option [value]="unit.unitOfMeasureId">{{ unit.unitOfMeasureCode }} (1 = {{ unit.conversionFactor }} {{ item.baseUnitOfMeasureCode }})</mat-option>
                 }
               </mat-select>
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Reference (optional)</mat-label>
-              <input matInput formControlName="reference" placeholder="e.g. PO number" />
+              <mat-label>{{ 'items.detail.receive.reference' | translate }}</mat-label>
+              <input matInput formControlName="reference" [placeholder]="'items.detail.receive.referencePlaceholder' | translate" />
             </mat-form-field>
-            <button mat-flat-button color="primary" type="submit" [disabled]="receivingStock()">Receive</button>
+            <button mat-flat-button color="primary" type="submit" [disabled]="receivingStock()">{{ 'items.detail.receive.submit' | translate }}</button>
           </form>
 
           <form [formGroup]="adjustForm" (ngSubmit)="submitAdjust()" class="form-grid inline-form">
-            <h4>Adjust stock</h4>
+            <h4>{{ 'items.detail.adjust.heading' | translate }}</h4>
             <mat-form-field appearance="outline">
-              <mat-label>Location</mat-label>
+              <mat-label>{{ 'items.detail.adjust.location' | translate }}</mat-label>
               <mat-select formControlName="locationId">
                 @for (level of stockLevels(); track level.locationId) {
                   <mat-option [value]="level.locationId">{{ level.locationCode }} — {{ level.locationName }}</mat-option>
@@ -375,28 +383,28 @@
               </mat-select>
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Change (+/-)</mat-label>
+              <mat-label>{{ 'items.detail.adjust.change' | translate }}</mat-label>
               <input matInput type="number" formControlName="quantityChange" />
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Reference (optional)</mat-label>
-              <input matInput formControlName="reference" placeholder="e.g. reason for the correction" />
+              <mat-label>{{ 'items.detail.adjust.reference' | translate }}</mat-label>
+              <input matInput formControlName="reference" [placeholder]="'items.detail.adjust.referencePlaceholder' | translate" />
             </mat-form-field>
-            <button mat-stroked-button type="submit" [disabled]="adjustingStock() || stockLevels().length === 0">Adjust</button>
+            <button mat-stroked-button type="submit" [disabled]="adjustingStock() || stockLevels().length === 0">{{ 'items.detail.adjust.submit' | translate }}</button>
           </form>
 
           <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="form-grid inline-form">
-            <h4>Transfer stock</h4>
+            <h4>{{ 'items.detail.transfer.heading' | translate }}</h4>
             <mat-form-field appearance="outline">
-              <mat-label>From location</mat-label>
+              <mat-label>{{ 'items.detail.transfer.fromLocation' | translate }}</mat-label>
               <mat-select formControlName="fromLocationId">
                 @for (level of stockLevels(); track level.locationId) {
-                  <mat-option [value]="level.locationId">{{ level.locationCode }} — {{ level.locationName }} ({{ level.quantityOnHand }} on hand)</mat-option>
+                  <mat-option [value]="level.locationId">{{ 'items.detail.transfer.fromOption' | translate: { code: level.locationCode, name: level.locationName, qty: level.quantityOnHand } }}</mat-option>
                 }
               </mat-select>
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>To location</mat-label>
+              <mat-label>{{ 'items.detail.transfer.toLocation' | translate }}</mat-label>
               <mat-select formControlName="toLocationId">
                 @for (location of locations(); track location.id) {
                   <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
@@ -404,14 +412,14 @@
               </mat-select>
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Quantity</mat-label>
+              <mat-label>{{ 'items.detail.transfer.quantity' | translate }}</mat-label>
               <input matInput type="number" formControlName="quantity" min="1" />
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Reference (optional)</mat-label>
-              <input matInput formControlName="reference" placeholder="e.g. rebalance reason" />
+              <mat-label>{{ 'items.detail.transfer.reference' | translate }}</mat-label>
+              <input matInput formControlName="reference" [placeholder]="'items.detail.transfer.referencePlaceholder' | translate" />
             </mat-form-field>
-            <button mat-stroked-button type="submit" [disabled]="transferringStock() || stockLevels().length === 0">Transfer</button>
+            <button mat-stroked-button type="submit" [disabled]="transferringStock() || stockLevels().length === 0">{{ 'items.detail.transfer.submit' | translate }}</button>
           </form>
         </div>
       </mat-card-content>

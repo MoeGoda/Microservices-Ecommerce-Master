@@ -1,5 +1,5 @@
 <div class="reports-dashboard">
-  <h2>Reports</h2>
+  <h2>{{ 'reports.title' | translate }}</h2>
 
   @if (loading()) {
     <mat-spinner diameter="32"></mat-spinner>
@@ -8,11 +8,11 @@
   <div class="cards-grid">
     <mat-card class="chart-card">
       <mat-card-header>
-        <mat-card-title>Sales by day</mat-card-title>
+        <mat-card-title>{{ 'reports.salesByDay.title' | translate }}</mat-card-title>
       </mat-card-header>
       <mat-card-content>
         @if (salesByDay().length === 0) {
-          <p class="empty-state">No completed sales yet.</p>
+          <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
         } @else {
           <div class="chart-wrap" (mouseleave)="hoveredSalesIndex.set(null)">
             <svg
@@ -20,7 +20,7 @@
               preserveAspectRatio="xMidYMid meet"
               class="sales-chart"
               role="img"
-              aria-label="Bar chart of total sales revenue per day"
+              [attr.aria-label]="'reports.salesByDay.chartAriaLabel' | translate"
             >
               @for (grid of salesChart()!.gridLines; track grid.value) {
                 <line class="gridline" [attr.x1]="leftPad" [attr.x2]="chartWidth - rightPad" [attr.y1]="grid.y" [attr.y2]="grid.y" />
@@ -61,24 +61,24 @@
 
     <mat-card class="chart-card">
       <mat-card-header>
-        <mat-card-title>Top-selling items</mat-card-title>
+        <mat-card-title>{{ 'reports.topSelling.title' | translate }}</mat-card-title>
       </mat-card-header>
       <mat-card-content>
         <mat-form-field appearance="outline" class="take-field">
-          <mat-label>Show</mat-label>
+          <mat-label>{{ 'reports.topSelling.showLabel' | translate }}</mat-label>
           <mat-select [formControl]="takeControl">
-            <mat-option [value]="5">Top 5</mat-option>
-            <mat-option [value]="10">Top 10</mat-option>
-            <mat-option [value]="20">Top 20</mat-option>
+            <mat-option [value]="5">{{ 'reports.topSelling.topN' | translate: { count: 5 } }}</mat-option>
+            <mat-option [value]="10">{{ 'reports.topSelling.topN' | translate: { count: 10 } }}</mat-option>
+            <mat-option [value]="20">{{ 'reports.topSelling.topN' | translate: { count: 20 } }}</mat-option>
           </mat-select>
         </mat-form-field>
 
         @if (topSelling().length === 0) {
-          <p class="empty-state">No completed sales yet.</p>
+          <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
         } @else {
           <div class="top-selling-list">
             @for (row of topSelling(); track row.itemId) {
-              <div class="top-selling-row" [title]="row.sku + ' — ' + row.totalQuantity + ' sold'" tabindex="0">
+              <div class="top-selling-row" [title]="'reports.topSelling.rowTitle' | translate: { sku: row.sku, qty: row.totalQuantity }" tabindex="0">
                 <span class="item-name">{{ row.itemName }}</span>
                 <div class="bar-track">
                   <div class="bar-fill" [style.width.%]="topSellingMax() > 0 ? (row.totalRevenue / topSellingMax()) * 100 : 0"></div>
@@ -93,24 +93,24 @@
 
     <mat-card class="chart-card full-width">
       <mat-card-header>
-        <mat-card-title>Low stock</mat-card-title>
+        <mat-card-title>{{ 'reports.lowStock.title' | translate }}</mat-card-title>
       </mat-card-header>
       <mat-card-content>
         @if (lowStock().length === 0) {
           <p class="empty-state good">
             <mat-icon aria-hidden="true">check_circle</mat-icon>
-            Nothing is at or below its reorder threshold.
+            {{ 'reports.lowStock.allGood' | translate }}
           </p>
         } @else {
           <table class="data-table">
             <thead>
               <tr>
-                <th>Status</th>
-                <th>Sku</th>
-                <th>Item</th>
-                <th>Location</th>
-                <th>On hand</th>
-                <th>Reorder threshold</th>
+                <th>{{ 'reports.lowStock.table.status' | translate }}</th>
+                <th>{{ 'reports.lowStock.table.sku' | translate }}</th>
+                <th>{{ 'reports.lowStock.table.item' | translate }}</th>
+                <th>{{ 'reports.lowStock.table.location' | translate }}</th>
+                <th>{{ 'reports.lowStock.table.onHand' | translate }}</th>
+                <th>{{ 'reports.lowStock.table.reorderThreshold' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -119,7 +119,7 @@
                   <td>
                     <span class="status-badge" [class]="stockSeverity(row)">
                       <mat-icon aria-hidden="true">{{ stockSeverity(row) === 'critical' ? 'error' : 'warning' }}</mat-icon>
-                      {{ stockSeverity(row) === 'critical' ? 'Out of stock' : 'Low stock' }}
+                      {{ (stockSeverity(row) === 'critical' ? 'reports.lowStock.status.outOfStock' : 'reports.lowStock.status.lowStock') | translate }}
                     </span>
                   </td>
                   <td>{{ row.sku }}</td>

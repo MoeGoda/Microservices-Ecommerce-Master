@@ -29,6 +29,18 @@
       }
     },
     {
+      "_comment": "F2 — the Admin-only counterpart to /register. Ocelot only validates that the JWT itself is valid, same as every other AllowedScopes:[] route; the actual Roles=Admin check happens at Identity.API's own [Authorize(Roles=...)], not here — this gateway never enforces roles for any route.",
+      "DownstreamPathTemplate": "/api/v1/Auth/create-user",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5218 }],
+      "UpstreamPathTemplate": "/Identity/Auth/create-user",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      }
+    },
+    {
       "_comment": "Unlike Identity, there is no anonymous route anywhere under /Warehouse — every route below carries AuthenticationOptions.",
       "DownstreamPathTemplate": "/api/v1/Items",
       "DownstreamScheme": "http",

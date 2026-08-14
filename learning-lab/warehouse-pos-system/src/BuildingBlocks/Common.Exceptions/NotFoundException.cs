@@ -1,3 +1,5 @@
+using Common.Localization;
+
 namespace Common.Exceptions
 {
     public class NotFoundException : Exception, IHasStatusCode
@@ -5,7 +7,7 @@ namespace Common.Exceptions
         public int StatusCode => 404;
 
         public NotFoundException(string entityName, object key)
-            : base($"Entity \"{entityName}\" ({key}) was not found.")
+            : base(Messages.EntityNotFound(entityName, key))
         {
         }
     }

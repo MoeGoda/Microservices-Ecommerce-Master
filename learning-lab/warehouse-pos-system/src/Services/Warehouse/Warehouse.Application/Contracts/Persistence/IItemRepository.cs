@@ -7,7 +7,14 @@ namespace Warehouse.Application.Contracts.Persistence
         Task<Item?> GetById(int id);
         Task<Item?> GetBySku(string sku);
         Task<bool> SkuExists(string sku);
-        Task<IEnumerable<Item>> GetAll();
+
+        // F1 — replaces the old unbounded GetAll(): the catalog browse
+        // list is the one place in this system most likely to actually
+        // grow past a screenful, and it had no bound at all before this.
+        // Returns the total row count alongside the page so the caller
+        // (GetAllItemsQueryHandler) doesn't need a second round trip to
+        // compute PagedResult.TotalPages.
+        Task<(IEnumerable<Item> Items, int TotalCount)> GetPaged(int page, int pageSize);
 
         // Every pack/variant Item pointing at this one via ParentItemId —
         // e.g. the base "Water 500ml" Item's variants would include

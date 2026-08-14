@@ -1,3 +1,5 @@
+using Common.Pagination;
+using Common.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,12 +23,26 @@ namespace Warehouse.API.Controllers
     // Unlike Identity.API's /register and /login, there is no anonymous
     // route anywhere in Warehouse — every action here needs a caller who
     // already has a token, so [Authorize] sits once at the controller
-    // level rather than repeated on every action.
+    // level rather than repeated on every action. F2 adds a SECOND,
+    // per-action layer on top of that for the mutation actions only:
+    // [Authorize] and [Authorize(Roles = ...)] on the same target combine
+    // (both must pass), so those actions require BOTH "signed in" (from
+    // here) AND "one of these roles" (from the attribute on the action
+    // itself). Every read action deliberately keeps the bare class-level
+    // check and nothing more — some of them (ResolveBarcode, GetStockLevels
+    // via StockController) are reached by POS's own service-to-service
+    // catalog lookups (C2), whose token carries no Role claim at all (see
+    // ServiceAuthHandler) and would fail ANY Roles requirement outright.
     [ApiController]
     [Route("api/v1/[controller]")]
     [Authorize]
     public class ItemsController : ControllerBase
     {
+        // Who manages the catalog and stock — not Cashier, who only ever
+        // reads Warehouse data (barcode/price lookups during a sale, C2)
+        // and never mutates it.
+        private const string CatalogManagerRoles = $"{RoleNames.Admin},{RoleNames.Manager},{RoleNames.WarehouseStaff}";
+
         private readonly IMediator _mediator;
 
         public ItemsController(IMediator mediator)
@@ -35,10 +51,10 @@ namespace Warehouse.API.Controllers
         }
 
         [HttpGet]
-        [ProducesResponseType(typeof(IEnumerable<ItemSummaryDto>), (int)HttpStatusCode.OK)]
-        public async Task<ActionResult<IEnumerable<ItemSummaryDto>>> GetAll()
+        [ProducesResponseType(typeof(PagedResult<ItemSummaryDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PagedResult<ItemSummaryDto>>> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            return Ok(await _mediator.Send(new GetAllItemsQuery()));
+            return Ok(await _mediator.Send(new GetAllItemsQuery { Page = page, PageSize = pageSize }));
         }
 
         [HttpGet("{id:int}")]
@@ -75,6 +91,7 @@ namespace Warehouse.API.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = CatalogManagerRoles)]
         [ProducesResponseType(typeof(ItemDetailDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<ItemDetailDto>> Create([FromBody] CreateItemCommand command)
         {
@@ -86,6 +103,7 @@ namespace Warehouse.API.Controllers
         // route-says-item-5-but-body-says-item-9 mismatch entirely, rather
         // than validating for it.
         [HttpPost("{id:int}/barcodes")]
+        [Authorize(Roles = CatalogManagerRoles)]
         [ProducesResponseType(typeof(ItemBarcodeDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<ItemBarcodeDto>> AddBarcode(int id, [FromBody] AddItemBarcodeCommand command)
         {
@@ -94,6 +112,7 @@ namespace Warehouse.API.Controllers
         }
 
         [HttpPost("{id:int}/units")]
+        [Authorize(Roles = CatalogManagerRoles)]
         [ProducesResponseType(typeof(ItemUnitDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<ItemUnitDto>> AddUnit(int id, [FromBody] AddItemUnitCommand command)
         {
@@ -102,6 +121,7 @@ namespace Warehouse.API.Controllers
         }
 
         [HttpPut("{id:int}/price")]
+        [Authorize(Roles = CatalogManagerRoles)]
         [ProducesResponseType(typeof(ItemDetailDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<ItemDetailDto>> UpdatePrice(int id, [FromBody] UpdateItemPriceCommand command)
         {
@@ -117,6 +137,7 @@ namespace Warehouse.API.Controllers
         }
 
         [HttpPost("{id:int}/promotions")]
+        [Authorize(Roles = CatalogManagerRoles)]
         [ProducesResponseType(typeof(PromotionDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<PromotionDto>> CreatePromotion(int id, [FromBody] CreatePromotionCommand command)
         {
@@ -134,6 +155,7 @@ namespace Warehouse.API.Controllers
         }
 
         [HttpPost("{id:int}/promotions/{promotionId:int}/cancel")]
+        [Authorize(Roles = CatalogManagerRoles)]
         [ProducesResponseType(typeof(PromotionDto), (int)HttpStatusCode.OK)]
         public async Task<ActionResult<PromotionDto>> CancelPromotion(int id, int promotionId)
         {

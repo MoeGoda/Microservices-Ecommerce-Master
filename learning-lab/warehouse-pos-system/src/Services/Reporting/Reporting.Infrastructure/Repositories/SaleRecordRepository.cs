@@ -26,12 +26,15 @@ namespace Reporting.Infrastructure.Repositories
             return record;
         }
 
-        public async Task<IEnumerable<SaleRecord>> GetAll()
+        public async Task<(IEnumerable<SaleRecord> Records, int TotalCount)> GetPaged(int page, int pageSize)
         {
-            return await _context.SaleRecords
+            var query = _context.SaleRecords
                 .AsNoTracking()
-                .OrderByDescending(r => r.CompletedAtUtc)
-                .ToListAsync();
+                .OrderByDescending(r => r.CompletedAtUtc);
+
+            var totalCount = await query.CountAsync();
+            var records = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            return (records, totalCount);
         }
 
         public async Task<SaleRecord?> GetBySaleId(int saleId)

@@ -1,4 +1,6 @@
 using System.Net;
+using Common.Pagination;
+using Common.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,10 +17,11 @@ namespace Reporting.API.Controllers
     // them. A browser-facing caller (D2's Angular dashboards) routes
     // through the gateway's /Reporting/... upstream; unlike
     // EventsController, that's the whole reason this one IS in
-    // ocelot.json.
+    // ocelot.json. Same F2 role restriction as ReportsController, same
+    // reasoning — nothing calls into this controller service-to-service.
     [ApiController]
     [Route("api/v1/[controller]")]
-    [Authorize]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.Manager}")]
     public class ReadModelsController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -29,10 +32,10 @@ namespace Reporting.API.Controllers
         }
 
         [HttpGet("sales")]
-        [ProducesResponseType(typeof(IEnumerable<SaleRecordDto>), (int)HttpStatusCode.OK)]
-        public async Task<ActionResult<IEnumerable<SaleRecordDto>>> GetSales()
+        [ProducesResponseType(typeof(PagedResult<SaleRecordDto>), (int)HttpStatusCode.OK)]
+        public async Task<ActionResult<PagedResult<SaleRecordDto>>> GetSales([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            return Ok(await _mediator.Send(new GetSalesQuery()));
+            return Ok(await _mediator.Send(new GetSalesQuery { Page = page, PageSize = pageSize }));
         }
 
         [HttpGet("stock-levels")]

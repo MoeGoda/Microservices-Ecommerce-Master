@@ -1,4 +1,5 @@
 using Common.ExceptionHandling;
+using Common.RequestCulture;
 using Common.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -17,10 +18,17 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
 
+// F3 — En/Ar culture negotiation. See Identity.API's Program.cs for why.
+builder.Services.AddSharedRequestLocalization();
+
 // Same shared extension every other service calls, same JwtSettings
 // section. Reporting never issues tokens either — only validates the
 // ones POS/Warehouse's own ServiceAuthHandlers mint (D1).
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// F1 — a real DB-connectivity check, not a bare liveness probe. Same
+// reasoning as Identity.API's own Program.cs.
+builder.Services.AddHealthChecks().AddDbContextCheck<ReportingContext>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -59,6 +67,7 @@ using (var scope = app.Services.CreateScope())
 
 // First in the pipeline — see Identity.API's Program.cs for why.
 app.UseCommonExceptionHandling();
+app.UseSharedRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {
@@ -70,6 +79,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Not routed through Ocelot — same reasoning as Identity.API's own /hc.
+app.MapHealthChecks("/hc");
 
 app.Run();
 

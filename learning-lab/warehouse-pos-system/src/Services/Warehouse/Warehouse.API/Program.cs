@@ -1,4 +1,5 @@
 using Common.ExceptionHandling;
+using Common.RequestCulture;
 using Common.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -18,6 +19,9 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
 
+// F3 — En/Ar culture negotiation. See Identity.API's Program.cs for why.
+builder.Services.AddSharedRequestLocalization();
+
 // Same shared extension Identity.API and Gateway.Ocelot call, with the
 // same JwtSettings:Secret/Issuer/Audience — a token minted by Identity and
 // accepted at the gateway is accepted here identically. Warehouse still
@@ -27,6 +31,10 @@ builder.Services.AddCommonExceptionHandling();
 // call Reporting.API), the same dual-use POS.Infrastructure already had
 // since C2/C3.
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// F1 — a real DB-connectivity check, not a bare liveness probe. Same
+// reasoning as Identity.API's own Program.cs.
+builder.Services.AddHealthChecks().AddDbContextCheck<WarehouseContext>();
 
 // The outbox dispatcher (C3's pattern, generalized in D1) gets its host
 // the moment this class exists — unlike POS's own C3 outbox, which had
@@ -71,6 +79,7 @@ using (var scope = app.Services.CreateScope())
 
 // First in the pipeline — see Identity.API's Program.cs for why.
 app.UseCommonExceptionHandling();
+app.UseSharedRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {
@@ -82,6 +91,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Not routed through Ocelot — same reasoning as Identity.API's own /hc.
+app.MapHealthChecks("/hc");
 
 app.Run();
 

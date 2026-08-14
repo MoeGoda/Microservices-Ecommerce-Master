@@ -1,5 +1,7 @@
 import {
   ApplicationConfig,
+  inject,
+  provideAppInitializer,
   provideBrowserGlobalErrorListeners,
   provideZoneChangeDetection,
 } from '@angular/core';
@@ -10,6 +12,8 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
+import { languageInterceptor } from './core/interceptors/language.interceptor';
+import { I18nService } from './core/i18n/i18n.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -22,11 +26,15 @@ export const appConfig: ApplicationConfig = {
     // request phase and reverse order for the response phase, so
     // errorInterceptor's catchError still sees every request's outcome
     // regardless of this ordering.
-    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, languageInterceptor, errorInterceptor])),
     // Async variant lazy-loads the animations package instead of bundling
     // it into the initial chunk — Angular Material needs *some* animations
     // provider registered or its components (snackbar, form field) throw
     // at runtime.
     provideAnimationsAsync(),
+    // F3 — loads en.json/ar.json and initializes i18next before the app's
+    // first render, so no component or the translate pipe ever sees an
+    // un-initialized i18next instance and renders a flash of raw keys.
+    provideAppInitializer(() => inject(I18nService).init()),
   ],
 };

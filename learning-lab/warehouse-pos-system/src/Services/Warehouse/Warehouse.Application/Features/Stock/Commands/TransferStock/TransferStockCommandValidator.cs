@@ -1,3 +1,4 @@
+using Common.Localization;
 using FluentValidation;
 
 namespace Warehouse.Application.Features.Stock.Commands.TransferStock
@@ -17,7 +18,7 @@ namespace Warehouse.Application.Features.Stock.Commands.TransferStock
             // the SAME (item, location) pair, netting to zero stock change
             // but still writing two meaningless StockTransaction rows.
             RuleFor(c => c).Must(c => c.FromLocationId != c.ToLocationId)
-                .WithMessage("FromLocationId and ToLocationId must be different.");
+                .WithMessage(_ => Messages.StockTransferLocationsMustDiffer);
         }
     }
 }

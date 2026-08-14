@@ -1,7 +1,9 @@
+using System.IO.Compression;
 using System.Threading.RateLimiting;
 using Common.ExceptionHandling;
 using Common.Security;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 
@@ -11,6 +13,17 @@ var builder = WebApplication.CreateBuilder(args);
 // editing ocelot.json while the gateway is running (adding a route, say)
 // takes effect without a restart.
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
+
+// F4 — Ocelot's own documented pattern for per-environment downstream
+// hosts: every route in ocelot.json still says "Host": "localhost" (correct
+// for every dev machine running `dotnet run`), but "localhost" inside a
+// container means the gateway's OWN container, not the sibling containers
+// docker-compose starts each service in. ocelot.Docker.json (present only
+// in the Docker image) overrides just the Host field on every route to the
+// matching compose service name — everything else about each route is
+// unchanged. ASPNETCORE_ENVIRONMENT=Docker is what selects this file (see
+// docker-compose.yml); it's a no-op for every other environment (optional: true).
+builder.Configuration.AddJsonFile($"ocelot.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
 
 // The single shared JwtSettings source — see Identity.API's Program.cs
 // for the full reasoning. Editing SharedSettings/jwt.settings.json is now
@@ -29,6 +42,23 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
 builder.Services.AddHealthChecks();
 
+// F1 — every browser-facing response in this system passes through here
+// (the one carve-out, the Notifications SignalR hub, connects directly and
+// was never gatewayed at all — see the README). Compressing at THIS single
+// point covers every REST response Angular ever receives, without needing
+// to touch five separate downstream services' own Program.cs files.
+// Brotli first (better ratio, and it's what Ocelot's own JSON error bodies
+// and every proxied JSON payload compress well with); Gzip as the fallback
+// for clients that don't advertise Brotli support.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
+
 // Ocelot ships its own RateLimitOptions, but it identifies a "client" via a
 // self-declared request header — an attacker credential-stuffing the login
 // route just omits the header and gets an unlimited budget. That's a real
@@ -37,25 +67,45 @@ builder.Services.AddHealthChecks();
 // client understood it needed to send that header at all. A global
 // ASP.NET Core RateLimiter, partitioned by the caller's IP, is the correct
 // mechanism here — an attacker can't opt out of having an IP address.
+//
+// F2 — the same throttle now also covers /register: it's the ONLY other
+// anonymous, abuse-prone POST route in the system (every non-anonymous
+// route requires a token an attacker doesn't have yet), and it was
+// completely unthrottled before this — an attacker could otherwise mass-
+// create accounts as fast as the network allowed. Partitioned by
+// "route:ip", not just "ip", so hammering /login doesn't also burn an
+// attacker's (or a legitimate user's) separate /register budget — the two
+// anonymous endpoints are rate-limited independently of each other.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
     {
-        var isLoginRoute = HttpMethods.IsPost(httpContext.Request.Method)
-            && httpContext.Request.Path.Equals("/Identity/Auth/login", StringComparison.OrdinalIgnoreCase);
+        string? anonymousAuthRoute = null;
+        if (HttpMethods.IsPost(httpContext.Request.Method))
+        {
+            if (httpContext.Request.Path.Equals("/Identity/Auth/login", StringComparison.OrdinalIgnoreCase))
+            {
+                anonymousAuthRoute = "login";
+            }
+            else if (httpContext.Request.Path.Equals("/Identity/Auth/register", StringComparison.OrdinalIgnoreCase))
+            {
+                anonymousAuthRoute = "register";
+            }
+        }
 
         // Every other route gets an effectively-unlimited partition — this
-        // limiter exists for the login route specifically, not as a
-        // general-purpose throttle on the whole gateway.
-        if (!isLoginRoute)
+        // limiter exists for these two anonymous routes specifically, not
+        // as a general-purpose throttle on the whole gateway.
+        if (anonymousAuthRoute is null)
         {
             return RateLimitPartition.GetNoLimiter("unrestricted");
         }
 
         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        var partitionKey = $"{anonymousAuthRoute}:{ip}";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = 5,
             Window = TimeSpan.FromSeconds(30)
@@ -68,6 +118,36 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddOcelot(builder.Configuration);
 
 var app = builder.Build();
+
+// First in the pipeline — it has to wrap the response stream before
+// anything downstream (including Ocelot's own proxied response) writes to
+// it, or there's nothing left for it to compress by the time it runs.
+app.UseResponseCompression();
+
+// F2 — three cheap, always-safe response headers, set once here rather
+// than in five separate downstream Program.cs files, for the identical
+// "one gateway, every browser-facing response passes through it" reason
+// F1's compression lives here. OnStarting (not a plain header assignment)
+// because Ocelot's own proxied response can start writing before this
+// middleware's own code after `await next()` would otherwise run;
+// OnStarting's callback fires right before the FIRST byte goes out,
+// whichever layer is about to write it. No HSTS/CSP here — HSTS needs
+// HTTPS actually enforced first (not true for local `dotnet run`), and a
+// meaningful CSP needs to know every script/style/connect source the
+// Angular app legitimately uses, which is a real per-app policy decision
+// this project hasn't made yet, not a safe default like the three below.
+app.Use((context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        return Task.CompletedTask;
+    });
+
+    return next();
+});
 
 app.UseCommonExceptionHandling();
 

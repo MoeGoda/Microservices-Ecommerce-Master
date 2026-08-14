@@ -18,6 +18,15 @@ namespace Warehouse.Infrastructure
             services.AddDbContext<WarehouseContext>(options =>
                 options.UseSqlServer(configuration.GetConnectionString("WarehouseConnectionString")));
 
+            // F1 — the concrete IDistributedCache implementation behind
+            // MasterDataCache (Warehouse.Application). A plain connection
+            // string, same idiom as WarehouseConnectionString above,
+            // rather than a dedicated RedisSettings options class: there's
+            // nothing else to configure per-instance beyond where Redis
+            // lives.
+            services.AddStackExchangeRedisCache(options =>
+                options.Configuration = configuration.GetConnectionString("Redis"));
+
             services.AddScoped<ICategoryRepository, CategoryRepository>();
             services.AddScoped<ILocationRepository, LocationRepository>();
             services.AddScoped<IUnitOfMeasureRepository, UnitOfMeasureRepository>();

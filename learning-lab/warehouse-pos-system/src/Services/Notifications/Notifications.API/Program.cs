@@ -1,5 +1,6 @@
 using System.Text;
 using Common.ExceptionHandling;
+using Common.RequestCulture;
 using Common.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,9 @@ builder.Configuration.AddJsonFile(Path.Combine(builder.Environment.ContentRootPa
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
+
+// F3 — En/Ar culture negotiation. See Identity.API's Program.cs for why.
+builder.Services.AddSharedRequestLocalization();
 
 // Hand-rolled rather than a call to Common.Security's shared
 // AddJwtAuthentication — every other service uses that extension
@@ -75,6 +79,10 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+// F1 — a real DB-connectivity check, not a bare liveness probe. Same
+// reasoning as Identity.API's own Program.cs.
+builder.Services.AddHealthChecks().AddDbContextCheck<NotificationsContext>();
 
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationPusher, SignalRNotificationPusher>();
@@ -136,6 +144,7 @@ using (var scope = app.Services.CreateScope())
 
 // First in the pipeline — see Identity.API's Program.cs for why.
 app.UseCommonExceptionHandling();
+app.UseSharedRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {
@@ -153,6 +162,10 @@ app.MapControllers();
 // README's own reasoning. [Authorize] on NotificationsHub itself (not
 // here) is what actually gates it.
 app.MapHub<NotificationsHub>(NotificationsHubPath);
+
+// Also not routed through Ocelot — same reasoning as every other
+// service's own /hc (Identity.API's Program.cs).
+app.MapHealthChecks("/hc");
 
 app.Run();
 
