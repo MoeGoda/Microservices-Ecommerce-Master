@@ -42,6 +42,29 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddCommonExceptionHandling();
 builder.Services.AddHealthChecks();
 
+// Bug fix — this policy never existed, and every browser-facing route in
+// the system goes through this gateway (unlike Notifications.API's own
+// CORS policy, which exists only for its direct-connect SignalR hub).
+// Without it, every request Angular makes — including /Identity/Auth/login
+// itself — fails its CORS preflight before ever reaching Ocelot, and the
+// browser reports it to the app as a bare network failure with no
+// response body at all (surfacing as errorInterceptor's generic
+// "Something went wrong" fallback, not a real 401/500). Same origin
+// Notifications.API's own policy already uses, for the same reason: the
+// Angular dev server's canonical port per the README's "Run it locally"
+// instructions.
+const string GatewayCorsPolicy = "GatewayCors";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(GatewayCorsPolicy, policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 // F1 — every browser-facing response in this system passes through here
 // (the one carve-out, the Notifications SignalR hub, connects directly and
 // was never gatewayed at all — see the README). Compressing at THIS single
@@ -161,6 +184,7 @@ app.UseCommonExceptionHandling();
 // fixes the order: endpoint routing gets first look at every request, and
 // only calls next() (falling through to Ocelot) when nothing matches.
 app.UseRouting();
+app.UseCors(GatewayCorsPolicy);
 app.UseRateLimiter();
 app.UseAuthentication();
 // The ASP0014 analyzer suggests a top-level app.MapHealthChecks(...) call
