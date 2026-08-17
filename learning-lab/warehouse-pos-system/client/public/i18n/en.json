@@ -5,7 +5,13 @@
     "cancel": "Cancel",
     "close": "Close",
     "loading": "Loading...",
-    "actions": "Actions"
+    "actions": "Actions",
+    "dismiss": "Dismiss",
+    "errors": {
+      "sessionExpired": "Your session has expired. Please sign in again.",
+      "tooManyAttempts": "Too many attempts. Please wait a moment and try again.",
+      "somethingWentWrong": "Something went wrong. Please try again."
+    }
   },
   "roles": {
     "Admin": "Admin",
@@ -15,6 +21,8 @@
   },
   "toolbar": {
     "admin": "Admin",
+    "warehouseGroup": "Warehouse",
+    "items": "Items",
     "pos": "POS",
     "reports": "Reports",
     "users": "Users",
@@ -72,6 +80,11 @@
       "returnedNote": "This sale was returned — stock has been restocked at its original location.",
       "returnSale": "Return sale",
       "newSale": "New sale"
+    },
+    "toasts": {
+      "completed": "Sale #{{id}} completed — total {{total}}.",
+      "cancelled": "Sale cancelled.",
+      "returned": "Sale #{{id}} returned."
     }
   },
   "reports": {
@@ -206,6 +219,12 @@
       "emptyRow": "No items yet — create one above."
     },
     "detail": {
+      "backToList": "Back to items",
+      "tabs": {
+        "overview": "Overview",
+        "pricing": "Pricing & promotions",
+        "stock": "Stock"
+      },
       "subtitle": "{{category}} · {{price}} · base unit {{baseUnit}}",
       "barcodesHeading": "Barcodes",
       "primaryTag": "primary",
@@ -284,6 +303,17 @@
         "submit": "Transfer",
         "fromOption": "{{code}} — {{name}} ({{qty}} on hand)"
       }
+    },
+    "toasts": {
+      "created": "Item \"{{name}}\" created.",
+      "barcodeAdded": "Barcode added.",
+      "stockReceived": "Stock received — now {{quantity}} {{unit}} at {{location}}.",
+      "stockAdjusted": "Stock adjusted — now {{quantity}} {{unit}} at {{location}}.",
+      "transferLocationsMustDiffer": "From and to locations must be different.",
+      "transferred": "Transferred {{quantity}} {{unit}} from {{from}} to {{to}}.",
+      "priceUpdated": "Price updated to {{price}}.",
+      "promotionCreated": "Promotion created.",
+      "promotionCancelled": "Promotion cancelled."
     }
   },
   "users": {
@@ -317,6 +347,11 @@
       "deactivate": "Deactivate",
       "cannotDeactivateSelf": "You can't deactivate your own account.",
       "emptyRow": "No users yet."
+    },
+    "toasts": {
+      "created": "User \"{{userName}}\" created.",
+      "activated": "{{userName}} activated.",
+      "deactivated": "{{userName}} deactivated."
     }
   },
   "suppliers": {
@@ -346,6 +381,11 @@
       "activate": "Activate",
       "deactivate": "Deactivate",
       "emptyRow": "No suppliers yet — add one above."
+    },
+    "toasts": {
+      "created": "Supplier \"{{name}}\" created.",
+      "activated": "{{name}} activated.",
+      "deactivated": "{{name}} deactivated."
     }
   },
   "purchaseOrders": {
@@ -401,6 +441,12 @@
       "confirmReceive": "Confirm receipt",
       "submitOrder": "Submit order (mark as Ordered)",
       "cancelOrder": "Cancel order"
+    },
+    "toasts": {
+      "created": "Purchase order \"{{orderNumber}}\" created as Draft.",
+      "submitted": "\"{{orderNumber}}\" submitted — now Ordered.",
+      "cancelled": "\"{{orderNumber}}\" cancelled.",
+      "received": "Received {{quantity}} against {{orderNumber}} — now {{status}}."
     }
   }
 }

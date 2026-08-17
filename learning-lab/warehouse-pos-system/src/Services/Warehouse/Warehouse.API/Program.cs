@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Common.ExceptionHandling;
 using Common.RequestCulture;
 using Common.Security;
@@ -41,7 +42,17 @@ builder.Services.AddHealthChecks().AddDbContextCheck<WarehouseContext>();
 // to wait for POS.API to exist at all, Warehouse.API is already here.
 builder.Services.AddHostedService<OutboxBackgroundService>();
 
-builder.Services.AddControllers();
+// Fix — CreateItemCommand/AddItemBarcodeCommand.BarcodeType and
+// CreatePromotionCommand.DiscountType bind straight to the enum from the
+// request body. Without this converter, System.Text.Json expects the
+// enum's numeric value on the way IN, while every response DTO
+// (ItemBarcodeDto etc.) already emits the enum as a string on the way
+// OUT via manual mapping — so the client's "EAN13"/"PercentageOff" was
+// always rejected as an unparseable JSON value. This only changes
+// deserialization of incoming enums; the manually-mapped outbound DTOs
+// are untouched.
+builder.Services.AddControllers()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

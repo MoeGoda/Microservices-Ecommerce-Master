@@ -1,0 +1,304 @@
+<div class="page item-detail">
+  <a class="back-link" routerLink="/items">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    {{ 'items.detail.backToList' | translate }}
+  </a>
+
+  @if (loadingDetail()) {
+    <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+  } @else if (selectedItem(); as item) {
+    <mat-card class="detail-card">
+      <mat-card-header>
+        <mat-card-title>{{ item.sku }} — {{ item.name }}</mat-card-title>
+        <mat-card-subtitle>{{ 'items.detail.subtitle' | translate: { category: item.categoryName, price: (item.unitPrice | number: '1.2-2'), baseUnit: item.baseUnitOfMeasureCode } }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-tab-group>
+          <mat-tab [label]="'items.detail.tabs.overview' | translate">
+            <div class="tab-panel">
+              <h3>{{ 'items.detail.barcodesHeading' | translate }}</h3>
+              <mat-chip-set>
+                @for (barcode of item.barcodes; track barcode.id) {
+                  <mat-chip [highlighted]="barcode.isPrimary">
+                    {{ barcode.barcode }} ({{ barcode.barcodeType }})@if (barcode.isPrimary) { — {{ 'items.detail.primaryTag' | translate }} }
+                  </mat-chip>
+                }
+              </mat-chip-set>
+
+              <form [formGroup]="addBarcodeForm" (ngSubmit)="submitAddBarcode()" class="form-grid inline-form">
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ 'items.detail.newBarcode' | translate }}</mat-label>
+                  <input matInput formControlName="barcode" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ 'items.detail.typeLabel' | translate }}</mat-label>
+                  <mat-select formControlName="barcodeType">
+                    @for (type of barcodeTypes; track type) {
+                      <mat-option [value]="type">{{ type }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-checkbox formControlName="isPrimary">{{ 'items.detail.makePrimary' | translate }}</mat-checkbox>
+                <button mat-stroked-button type="submit" [disabled]="addingBarcode()">{{ 'items.detail.addBarcode' | translate }}</button>
+              </form>
+
+              @if (item.units.length > 0) {
+                <h3>{{ 'items.detail.unitsHeading' | translate }}</h3>
+                <table class="data-grid">
+                  <thead>
+                    <tr>
+                      <th>{{ 'items.detail.unitsTable.unit' | translate }}</th>
+                      <th>{{ 'items.detail.unitsTable.equals' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (unit of item.units; track unit.id) {
+                      <tr>
+                        <td>{{ unit.unitOfMeasureCode }}</td>
+                        <td>{{ unit.conversionFactor }} {{ item.baseUnitOfMeasureCode }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+
+              @if (item.variants.length > 0) {
+                <h3>{{ 'items.detail.variantsHeading' | translate }}</h3>
+                <ul>
+                  @for (variant of item.variants; track variant.id) {
+                    <li>{{ variant.sku }} — {{ variant.name }} ({{ variant.unitPrice | number: '1.2-2' }})</li>
+                  }
+                </ul>
+              }
+            </div>
+          </mat-tab>
+
+          <mat-tab [label]="'items.detail.tabs.pricing' | translate">
+            <div class="tab-panel">
+              <h3>{{ 'items.detail.pricingHeading' | translate }}</h3>
+              @if (item.activePromotionId) {
+                <p class="promo-active-note">
+                  {{ 'items.detail.promoActive' | translate }} <strong>{{ item.originalUnitPrice | number: '1.2-2' }}</strong> →
+                  <strong>{{ item.unitPrice | number: '1.2-2' }}</strong>.
+                </p>
+              }
+
+              <form [formGroup]="priceForm" (ngSubmit)="submitUpdatePrice()" class="form-grid inline-form">
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ 'items.detail.listPrice' | translate }}</mat-label>
+                  <input matInput type="number" step="0.01" formControlName="newPrice" />
+                </mat-form-field>
+                <button mat-stroked-button type="submit" [disabled]="updatingPrice()">{{ 'items.detail.updatePrice' | translate }}</button>
+              </form>
+
+              @if (priceHistory().length > 0) {
+                <table class="data-grid">
+                  <thead>
+                    <tr>
+                      <th>{{ 'items.detail.priceHistoryTable.changed' | translate }}</th>
+                      <th>{{ 'items.detail.priceHistoryTable.oldPrice' | translate }}</th>
+                      <th>{{ 'items.detail.priceHistoryTable.newPrice' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (change of priceHistory(); track change.id) {
+                      <tr>
+                        <td>{{ change.changedAtUtc | date: 'medium' }}</td>
+                        <td>{{ change.oldPrice | number: '1.2-2' }}</td>
+                        <td>{{ change.newPrice | number: '1.2-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+
+              <h4>{{ 'items.detail.createPromotionHeading' | translate }}</h4>
+              <form [formGroup]="promotionForm" (ngSubmit)="submitCreatePromotion()" class="form-grid inline-form">
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ 'items.detail.discountType' | translate }}</mat-label>
+                  <mat-select formControlName="discountType">
+                    @for (type of discountTypes; track type) {
+                      <mat-option [value]="type">{{ type }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ (promotionForm.controls.discountType.value === 'PercentageOff' ? 'items.detail.percentOff' : 'items.detail.amountOff') | translate }}</mat-label>
+                  <input matInput type="number" step="0.01" formControlName="discountValue" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ 'items.detail.starts' | translate }}</mat-label>
+                  <input matInput type="datetime-local" formControlName="startsAt" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>{{ 'items.detail.ends' | translate }}</mat-label>
+                  <input matInput type="datetime-local" formControlName="endsAt" />
+                </mat-form-field>
+                <button mat-stroked-button type="submit" [disabled]="creatingPromotion()">{{ 'items.detail.createPromotion' | translate }}</button>
+              </form>
+
+              <!--
+                Every promotion this item has ever had — active, upcoming,
+                expired, or cancelled — not just "what's active right now"
+                (the effective-price resolution above). Cancelling doesn't
+                delete the row; it just excludes it from pricing
+                immediately, same reasoning as the backend's own
+                CancelPromotionCommand comment.
+              -->
+              @if (promotions().length > 0) {
+                <table class="data-grid">
+                  <thead>
+                    <tr>
+                      <th>{{ 'items.detail.promotionsTable.discount' | translate }}</th>
+                      <th>{{ 'items.detail.promotionsTable.starts' | translate }}</th>
+                      <th>{{ 'items.detail.promotionsTable.ends' | translate }}</th>
+                      <th>{{ 'items.detail.promotionsTable.status' | translate }}</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (promotion of promotions(); track promotion.id) {
+                      <tr>
+                        <td>
+                          {{ promotion.discountValue }}{{ promotion.discountType === 'PercentageOff' ? '%' : '' }} {{ 'items.detail.off' | translate }}
+                        </td>
+                        <td>{{ promotion.startsAtUtc | date: 'short' }}</td>
+                        <td>{{ promotion.endsAtUtc | date: 'short' }}</td>
+                        <td>{{ ('items.detail.promotionStatus.' + promotionStatus(promotion)) | translate }}</td>
+                        <td>
+                          @if (canCancelPromotion(promotion)) {
+                            <button
+                              mat-button
+                              color="warn"
+                              type="button"
+                              [disabled]="cancellingPromotionId() === promotion.id"
+                              (click)="cancelPromotion(promotion)"
+                            >
+                              {{ 'common.cancel' | translate }}
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              } @else {
+                <p class="empty-row">{{ 'items.detail.noPromotions' | translate }}</p>
+              }
+            </div>
+          </mat-tab>
+
+          <mat-tab [label]="'items.detail.tabs.stock' | translate">
+            <div class="tab-panel">
+              <h3>{{ 'items.detail.stockHeading' | translate }}</h3>
+              <table class="data-grid">
+                <thead>
+                  <tr>
+                    <th>{{ 'items.detail.stockTable.location' | translate }}</th>
+                    <th>{{ 'items.detail.stockTable.quantity' | translate }}</th>
+                    <th>{{ 'items.detail.stockTable.reorderThreshold' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (level of stockLevels(); track level.locationId) {
+                    <tr>
+                      <td>{{ level.locationCode }} — {{ level.locationName }}</td>
+                      <td>{{ level.quantityOnHand }} {{ level.unitOfMeasureCode }}</td>
+                      <td>{{ level.reorderThreshold }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="3" class="empty-row">{{ 'items.detail.stockEmptyRow' | translate }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+
+              <div class="stock-forms">
+                <form [formGroup]="receiveForm" (ngSubmit)="submitReceive()" class="form-grid inline-form">
+                  <h4>{{ 'items.detail.receive.heading' | translate }}</h4>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.receive.location' | translate }}</mat-label>
+                    <mat-select formControlName="locationId">
+                      @for (location of locations(); track location.id) {
+                        <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.receive.quantity' | translate }}</mat-label>
+                    <input matInput type="number" formControlName="quantity" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.receive.unit' | translate }}</mat-label>
+                    <mat-select formControlName="unitOfMeasureId">
+                      <mat-option [value]="item.baseUnitOfMeasureId">{{ 'items.detail.receive.baseUnitOption' | translate: { code: item.baseUnitOfMeasureCode } }}</mat-option>
+                      @for (unit of item.units; track unit.id) {
+                        <mat-option [value]="unit.unitOfMeasureId">{{ unit.unitOfMeasureCode }} (1 = {{ unit.conversionFactor }} {{ item.baseUnitOfMeasureCode }})</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.receive.reference' | translate }}</mat-label>
+                    <input matInput formControlName="reference" [placeholder]="'items.detail.receive.referencePlaceholder' | translate" />
+                  </mat-form-field>
+                  <button mat-flat-button color="primary" type="submit" [disabled]="receivingStock()">{{ 'items.detail.receive.submit' | translate }}</button>
+                </form>
+
+                <form [formGroup]="adjustForm" (ngSubmit)="submitAdjust()" class="form-grid inline-form">
+                  <h4>{{ 'items.detail.adjust.heading' | translate }}</h4>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.adjust.location' | translate }}</mat-label>
+                    <mat-select formControlName="locationId">
+                      @for (level of stockLevels(); track level.locationId) {
+                        <mat-option [value]="level.locationId">{{ level.locationCode }} — {{ level.locationName }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.adjust.change' | translate }}</mat-label>
+                    <input matInput type="number" formControlName="quantityChange" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.adjust.reference' | translate }}</mat-label>
+                    <input matInput formControlName="reference" [placeholder]="'items.detail.adjust.referencePlaceholder' | translate" />
+                  </mat-form-field>
+                  <button mat-stroked-button type="submit" [disabled]="adjustingStock() || stockLevels().length === 0">{{ 'items.detail.adjust.submit' | translate }}</button>
+                </form>
+
+                <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="form-grid inline-form">
+                  <h4>{{ 'items.detail.transfer.heading' | translate }}</h4>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.transfer.fromLocation' | translate }}</mat-label>
+                    <mat-select formControlName="fromLocationId">
+                      @for (level of stockLevels(); track level.locationId) {
+                        <mat-option [value]="level.locationId">{{ 'items.detail.transfer.fromOption' | translate: { code: level.locationCode, name: level.locationName, qty: level.quantityOnHand } }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.transfer.toLocation' | translate }}</mat-label>
+                    <mat-select formControlName="toLocationId">
+                      @for (location of locations(); track location.id) {
+                        <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.transfer.quantity' | translate }}</mat-label>
+                    <input matInput type="number" formControlName="quantity" min="1" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'items.detail.transfer.reference' | translate }}</mat-label>
+                    <input matInput formControlName="reference" [placeholder]="'items.detail.transfer.referencePlaceholder' | translate" />
+                  </mat-form-field>
+                  <button mat-stroked-button type="submit" [disabled]="transferringStock() || stockLevels().length === 0">{{ 'items.detail.transfer.submit' | translate }}</button>
+                </form>
+              </div>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

@@ -2,11 +2,6 @@
   flex: 1 1 auto;
 }
 
-.user-badge {
-  margin-inline-end: 8px;
-  font-size: 0.9rem;
-}
-
 // G — the whole app shell (sidenav + topbar) below the sidenav-container
 // needs a fixed viewport height for mat-sidenav's own scrolling behavior
 // to kick in, instead of the page growing taller than the screen and
@@ -16,11 +11,14 @@
 }
 
 .app-sidenav {
-  width: 240px;
+  width: 260px;
   border-inline-end: 1px solid var(--mat-sys-outline-variant);
 }
 
 .app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font: var(--mat-sys-title-medium);
   padding: 20px 16px 12px;
   color: var(--mat-sys-primary);
@@ -51,6 +49,28 @@
   color: var(--mat-sys-on-secondary-container);
 }
 
+// K — the Warehouse group's own toggle row and its indented children.
+// The chevron rotates rather than swapping icons (expand_more/expand_less)
+// so it's one continuous rotation, not a jump-cut, on open/close.
+.nav-group-chevron {
+  margin-inline-start: auto;
+  transition: transform 0.15s ease-out;
+
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.nav-sub-link {
+  padding-inline-start: 16px;
+
+  ::ng-deep .mdc-list-item__content {
+    padding-inline-start: 12px;
+  }
+}
+
+// --- Notifications dropdown ---
+
 .notification-menu-header {
   display: flex;
   align-items: center;
@@ -61,19 +81,161 @@
 }
 
 .notification-empty {
-  padding: 16px;
-  color: #777;
-  font-style: italic;
-  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--mat-sys-on-surface-variant);
+  min-width: 280px;
+
+  mat-icon {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    opacity: 0.5;
+  }
+}
+
+// K — one row per notification, redesigned to read like a real feed
+// (Facebook-style): an icon badge naming the kind of event, the message,
+// a relative timestamp, and an unread dot — rather than the previous
+// plain text-only button.
+.notification-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  height: auto;
+  min-height: 56px;
+  padding: 10px 16px;
+  white-space: normal;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface-variant);
+
+  &.unread {
+    background: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.notification-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .notification-message {
-  max-width: 320px;
+  max-width: 260px;
   white-space: normal;
   line-height: 1.3;
-  padding: 4px 0;
+  color: var(--mat-sys-on-surface);
 }
 
-button.unread .notification-message {
+.notification-time {
+  font-size: 11px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+button.notification-row.unread .notification-message {
   font-weight: 600;
+}
+
+.notification-unread-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mat-sys-primary);
+  margin-top: 6px;
+}
+
+// --- Profile menu ---
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: 4px;
+  text-transform: none;
+}
+
+.profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+
+  &.large {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
+
+.profile-name {
+  font-size: 0.9rem;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  // The topbar is already crowded on a phone-width viewport (menu toggle,
+  // language switcher, notifications, profile) — the name label is the
+  // one piece the avatar+menu already make redundant.
+  .profile-name {
+    display: none;
+  }
+}
+
+.profile-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: default;
+}
+
+.profile-menu-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-menu-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-menu-role {
+  font-size: 12px;
+  color: var(--mat-sys-on-surface-variant);
 }

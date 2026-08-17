@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize } from 'rxjs';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { LocationDto } from '../../shared/models/warehouse.models';
@@ -70,6 +71,7 @@ export class PosRegisterComponent implements OnInit {
     private readonly pos: PosService,
     private readonly warehouseService: WarehouseService,
     private readonly notification: NotificationService,
+    private readonly i18n: I18nService,
     private readonly injector: Injector,
   ) {}
 
@@ -149,7 +151,7 @@ export class PosRegisterComponent implements OnInit {
       .subscribe({
         next: (completed) => {
           this.sale.set(completed);
-          this.notification.success(`Sale #${completed.id} completed — total ${completed.total.toFixed(2)}.`);
+          this.notification.success(this.i18n.t('pos.toasts.completed', { id: completed.id, total: completed.total.toFixed(2) }));
         },
       });
   }
@@ -167,7 +169,7 @@ export class PosRegisterComponent implements OnInit {
       .subscribe({
         next: () => {
           this.sale.set(null);
-          this.notification.success('Sale cancelled.');
+          this.notification.success(this.i18n.t('pos.toasts.cancelled'));
         },
       });
   }
@@ -185,7 +187,7 @@ export class PosRegisterComponent implements OnInit {
       .subscribe({
         next: (returned) => {
           this.sale.set(returned);
-          this.notification.success(`Sale #${returned.id} returned.`);
+          this.notification.success(this.i18n.t('pos.toasts.returned', { id: returned.id }));
         },
       });
   }

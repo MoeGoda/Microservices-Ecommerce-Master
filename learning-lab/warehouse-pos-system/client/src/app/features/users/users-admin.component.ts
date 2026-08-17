@@ -9,6 +9,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize } from 'rxjs';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { AuthService } from '../../core/auth/auth.service';
 import { NotificationService } from '../../core/notifications/notification.service';
@@ -63,6 +64,7 @@ export class UsersAdminComponent implements OnInit {
     private readonly usersService: UsersService,
     private readonly notification: NotificationService,
     private readonly authService: AuthService,
+    private readonly i18n: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -100,7 +102,7 @@ export class UsersAdminComponent implements OnInit {
         // turned into a toast by errorInterceptor — this only needs the
         // success path.
         next: () => {
-          this.notification.success(`User "${value.userName}" created.`);
+          this.notification.success(this.i18n.t('users.toasts.created', { userName: value.userName }));
           this.createForm.reset({ userName: '', email: '', password: '', firstName: '', lastName: '', role: ROLES.Cashier });
           this.loadUsers();
         },
@@ -126,7 +128,9 @@ export class UsersAdminComponent implements OnInit {
       .pipe(finalize(() => this.togglingUserId.set(null)))
       .subscribe({
         next: (updated) => {
-          this.notification.success(nextActive ? `${updated.userName} activated.` : `${updated.userName} deactivated.`);
+          this.notification.success(
+            this.i18n.t(nextActive ? 'users.toasts.activated' : 'users.toasts.deactivated', { userName: updated.userName }),
+          );
           this.pagedUsers.update((current) => ({
             ...current,
             items: current.items.map((u) => (u.id === updated.id ? updated : u)),

@@ -59,7 +59,7 @@ export class LoginComponent {
         // Errors are already turned into a toast by errorInterceptor — this
         // component only needs to react to success. There's deliberately
         // no .subscribe({ error: ... }) here duplicating that.
-        next: () => this.router.navigateByUrl('/admin'),
+        next: () => this.router.navigateByUrl('/items'),
       });
   }
 }

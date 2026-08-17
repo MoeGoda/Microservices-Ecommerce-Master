@@ -1,0 +1,96 @@
+<div class="page item-create">
+  <div class="page-header">
+    <h1>{{ 'items.create.title' | translate }}</h1>
+  </div>
+
+  <mat-card class="create-card">
+    <mat-card-content>
+      <form [formGroup]="createForm" (ngSubmit)="submitCreate()" class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.sku' | translate }}</mat-label>
+          <input matInput formControlName="sku" />
+          @if (createForm.controls.sku.touched && createForm.controls.sku.invalid) {
+            <mat-error>{{ 'items.create.skuRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.name' | translate }}</mat-label>
+          <input matInput formControlName="name" />
+          @if (createForm.controls.name.touched && createForm.controls.name.invalid) {
+            <mat-error>{{ 'items.create.nameRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="span-2">
+          <mat-label>{{ 'items.create.description' | translate }}</mat-label>
+          <input matInput formControlName="description" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.unitPrice' | translate }}</mat-label>
+          <input matInput type="number" step="0.01" formControlName="unitPrice" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.category' | translate }}</mat-label>
+          <mat-select formControlName="categoryId">
+            @for (category of categories(); track category.id) {
+              <mat-option [value]="category.id">{{ category.name }}</mat-option>
+            }
+          </mat-select>
+          @if (createForm.controls.categoryId.touched && createForm.controls.categoryId.invalid) {
+            <mat-error>{{ 'items.create.categoryRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.baseUnit' | translate }}</mat-label>
+          <mat-select formControlName="baseUnitOfMeasureId">
+            @for (unit of units(); track unit.id) {
+              <mat-option [value]="unit.id">{{ unit.code }} — {{ unit.name }}</mat-option>
+            }
+          </mat-select>
+          @if (createForm.controls.baseUnitOfMeasureId.touched && createForm.controls.baseUnitOfMeasureId.invalid) {
+            <mat-error>{{ 'items.create.baseUnitRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.parentItem' | translate }}</mat-label>
+          <mat-select formControlName="parentItemId">
+            <mat-option [value]="null">{{ 'items.create.noParent' | translate }}</mat-option>
+            @for (parentCandidate of parentCandidates(); track parentCandidate.id) {
+              <mat-option [value]="parentCandidate.id">{{ parentCandidate.sku }} — {{ parentCandidate.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.barcode' | translate }}</mat-label>
+          <input matInput formControlName="barcode" />
+          @if (createForm.controls.barcode.touched && createForm.controls.barcode.invalid) {
+            <mat-error>{{ 'items.create.barcodeRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'items.create.barcodeType' | translate }}</mat-label>
+          <mat-select formControlName="barcodeType">
+            @for (type of barcodeTypes; track type) {
+              <mat-option [value]="type">{{ type }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-flat-button color="primary" type="submit" class="span-2 submit-button" [disabled]="creatingItem()">
+          @if (creatingItem()) {
+            <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+          } @else {
+            {{ 'items.create.submit' | translate }}
+          }
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { finalize } from 'rxjs';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { emptyPage, PagedResult } from '../../shared/models/pagination.models';
@@ -48,6 +49,7 @@ export class SuppliersAdminComponent implements OnInit {
   constructor(
     private readonly purchasingService: PurchasingService,
     private readonly notification: NotificationService,
+    private readonly i18n: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -82,7 +84,7 @@ export class SuppliersAdminComponent implements OnInit {
       .pipe(finalize(() => this.creatingSupplier.set(false)))
       .subscribe({
         next: (created) => {
-          this.notification.success(`Supplier "${created.name}" created.`);
+          this.notification.success(this.i18n.t('suppliers.toasts.created', { name: created.name }));
           this.createForm.reset({ name: '', contactName: '', email: '', phone: '', address: '' });
           this.loadSuppliers();
         },
@@ -101,7 +103,7 @@ export class SuppliersAdminComponent implements OnInit {
       .pipe(finalize(() => this.togglingSupplierId.set(null)))
       .subscribe({
         next: (updated) => {
-          this.notification.success(nextActive ? `${updated.name} activated.` : `${updated.name} deactivated.`);
+          this.notification.success(this.i18n.t(nextActive ? 'suppliers.toasts.activated' : 'suppliers.toasts.deactivated', { name: updated.name }));
           this.pagedSuppliers.update((current) => ({
             ...current,
             items: current.items.map((s) => (s.id === updated.id ? updated : s)),

@@ -10,6 +10,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin } from 'rxjs';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { emptyPage, PagedResult } from '../../shared/models/pagination.models';
@@ -95,6 +96,7 @@ export class PurchaseOrdersAdminComponent implements OnInit {
     private readonly purchasingService: PurchasingService,
     private readonly warehouseService: WarehouseService,
     private readonly notification: NotificationService,
+    private readonly i18n: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -168,7 +170,7 @@ export class PurchaseOrdersAdminComponent implements OnInit {
       .pipe(finalize(() => this.creatingOrder.set(false)))
       .subscribe({
         next: (created) => {
-          this.notification.success(`Purchase order "${created.orderNumber}" created as Draft.`);
+          this.notification.success(this.i18n.t('purchaseOrders.toasts.created', { orderNumber: created.orderNumber }));
           this.createForm.reset({ supplierId: null, notes: '', lines: [] });
           this.lines.clear();
           this.addLine();
@@ -214,7 +216,7 @@ export class PurchaseOrdersAdminComponent implements OnInit {
       .pipe(finalize(() => this.submittingOrder.set(false)))
       .subscribe({
         next: (updated) => {
-          this.notification.success(`"${updated.orderNumber}" submitted — now Ordered.`);
+          this.notification.success(this.i18n.t('purchaseOrders.toasts.submitted', { orderNumber: updated.orderNumber }));
           this.selectedOrder.set(updated);
           this.loadOrders();
         },
@@ -233,7 +235,7 @@ export class PurchaseOrdersAdminComponent implements OnInit {
       .pipe(finalize(() => this.cancellingOrder.set(false)))
       .subscribe({
         next: (updated) => {
-          this.notification.success(`"${updated.orderNumber}" cancelled.`);
+          this.notification.success(this.i18n.t('purchaseOrders.toasts.cancelled', { orderNumber: updated.orderNumber }));
           this.selectedOrder.set(updated);
           this.receivingLine.set(null);
           this.loadOrders();
@@ -265,7 +267,13 @@ export class PurchaseOrdersAdminComponent implements OnInit {
       .pipe(finalize(() => this.receivingStock.set(false)))
       .subscribe({
         next: (updated) => {
-          this.notification.success(`Received ${value.quantity} against ${order.orderNumber} — now ${updated.status}.`);
+          this.notification.success(
+            this.i18n.t('purchaseOrders.toasts.received', {
+              quantity: value.quantity,
+              orderNumber: order.orderNumber,
+              status: this.i18n.t('purchaseOrders.status.' + updated.status),
+            }),
+          );
           this.selectedOrder.set(updated);
           this.receivingLine.set(null);
           this.loadOrders();

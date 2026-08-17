@@ -64,6 +64,9 @@ a distributed transaction.
 - [x] **I — Purchase Orders & Suppliers module**
 - [x] **J — Expanded reporting suite**
 
+**Phase K — Navigation depth, real toasts, and splitting the one screen that outgrew itself**
+- [x] **K — Grouped/nested nav + profile & notifications menus, fully-translated toasts, Items split into three routed screens**
+
 ## A1 — Identity service
 
 **What it does:** issues JWTs after registering/logging in a user, backed by
@@ -3082,9 +3085,106 @@ dashboard.
 # → set a date range at the top of the new reports section — it filters
 #   the payments ledger, cashier performance, and stock movement ledger
 #   together
-# → receive some stock (either a free-text receive on /admin, or a PO
-#   receipt on /purchase-orders) and watch it show up in "Stock movement
-#   ledger" with the correct Received/PurchaseOrderReceived reason
+# → receive some stock (either a free-text receive on an item's own
+#   /items/:id page, or a PO receipt on /purchase-orders) and watch it
+#   show up in "Stock movement ledger" with the correct
+#   Received/PurchaseOrderReceived reason
 # → "Inventory valuation" and "Purchase order status / aging" both
 #   reflect Warehouse's current state immediately, with no event delay
+```
+
+## K — Navigation depth, real toasts, and splitting the one screen that outgrew itself
+
+**What it does:** three related fixes to the same underlying complaint —
+"the UI feels flat, cluttered, and one screen does too much." Every
+remaining hardcoded English toast string is routed through
+`I18nService`; the app shell's top-level nav gets a grouped/collapsible
+"Warehouse" section (Items/Suppliers/Purchase Orders) plus a proper
+profile dropdown and a Facebook-style notifications panel; and the
+single `/admin` screen — a create form, a browsable list, and a full
+item-management panel all stacked on one page — is split into three
+routed screens: `/items` (browse), `/items/new` (create), `/items/:id`
+(manage, its old barcodes/pricing/promotions/stock content now
+organized into tabs instead of one long scroll). Angular Material stays
+the component library throughout — no Bootstrap migration, a deliberate
+call made up front rather than rewriting every screen's styling twice.
+
+**The toast fix is smaller than it sounds, but it's the difference
+between "translated" and "translated except when something happens."**
+F3 translated every static label in every template; it never touched
+the `NotificationService.success()`/`.error()` calls firing from inside
+component *code*, because `| translate` is a template-only pipe with no
+equivalent for a plain TS string. `I18nService.t()` is that equivalent —
+same underlying i18next instance, callable from anywhere — and now
+every toast across POS checkout, Users, Suppliers, Purchase Orders, and
+the shared `errorInterceptor` goes through it. The one deliberately
+skipped spot was the old `items-admin.component.ts`'s own nine toasts —
+fixing them there would have been wasted work with K3's rewrite one
+commit away, so they were written translated from scratch in the new
+`item-create`/`item-detail` components instead.
+
+**The nav redesign only groups sections that actually have somewhere to
+go.** Warehouse groups Items/Suppliers/Purchase Orders because there
+are three destinations under it worth collapsing; POS, Reports, and
+Users stay flat top-level links because grouping a single destination
+just adds a click with no organizational payoff. The notifications
+panel reuses the same `NotificationDto` E1 already streams over
+SignalR — this phase only changes how each row is *presented* (a
+per-type icon, an unread dot, `Intl.RelativeTimeFormat` for the
+timestamp) — deliberately the browser's own API rather than a new
+translation key, since `Intl` already localizes "5 minutes ago" /
+"منذ 5 دقائق" with no key-maintenance cost at all, unlike every other
+user-facing string in this app.
+
+**The old single-page admin screen is now three components, one per
+concern, each with only the state its own job needs.** `items-list`
+only lists (reusing `WarehouseService.getItems()` unchanged);
+`item-create` only creates, and — a deliberate behavior change from the
+old "reset the form and stay put" — now navigates straight to the new
+item's `/items/:id` page on success, since the natural next step after
+creating an item is usually to keep working on it, not to go find it in
+a table row. `item-detail` reads its item id from the route instead of
+receiving an `ItemSummaryDto` from an in-page selection, and reorganizes
+the old detail panel's barcodes/units/variants/pricing/promotions/stock
+into a `mat-tab-group` ("Overview" / "Pricing & promotions" / "Stock")
+so the page is three short screens instead of one very long one — every
+form, validator, and service call underneath is otherwise unchanged
+from the original panel.
+
+**Verifying the split surfaced a real, pre-existing backend defect that
+had nothing to do with the split itself: Create Item, Add Barcode, and
+Create Promotion had never actually worked end-to-end.**
+`CreateItemCommand.BarcodeType`, `AddItemBarcodeCommand.BarcodeType`,
+and `CreatePromotionCommand.DiscountType` all bind straight to a plain
+C# enum from the JSON request body, and Warehouse.API never registered
+a `JsonStringEnumConverter` — so System.Text.Json's default behavior
+kicked in, which expects an enum's *numeric* value on the way in. Every
+response DTO (`ItemBarcodeDto`, etc.) already emits these as strings on
+the way OUT, via manual mapping — so a GET always looked fine,
+"EAN13" and all — while every POST sending that same string back
+("EAN13", "PercentageOff") was silently rejected as an unparseable JSON
+value, `command` and all, before FluentValidation or the handler ever
+ran. `Warehouse.API/Program.cs` now registers that converter on its
+controllers' `JsonSerializerOptions` — a one-line, purely-additive fix
+(nothing about the outbound DTOs changes) — confirmed with a raw
+`curl` POST before and after, then re-verified through the real
+`/items/new` form in a browser.
+
+**Try it:**
+```bash
+# Sign in as the seeded admin, then in the Angular app:
+# → the sidenav's "Warehouse" group expands/collapses; POS, Reports, and
+#   Users stay flat single links
+# → the topbar avatar opens a profile menu (name, role, sign out); the
+#   bell opens a notifications list with per-type icons and relative
+#   timestamps
+# → /items lists the catalog; "Create item" goes to /items/new — on
+#   success it lands on the new item's own /items/:id page
+# → on an item's /items/:id page, the three tabs (Overview / Pricing &
+#   promotions / Stock) hold everything the old single admin screen did
+#   — add a barcode, receive/adjust/transfer stock, update the price,
+#   create a promotion — all against the same endpoints as before
+# → switch to Arabic (the topbar language switcher) and repeat any of
+#   the above — labels, toasts, and the tab titles are all translated,
+#   and the whole shell mirrors to RTL
 ```

@@ -1,13 +1,40 @@
-@if (authService.currentUser()) {
+@if (authService.currentUser(); as currentUser) {
   <mat-sidenav-container class="app-shell">
     <mat-sidenav #sidenav [mode]="sidenavMode()" [opened]="sidenavOpened()" class="app-sidenav">
-      <div class="app-brand">{{ 'common.appName' | translate }}</div>
+      <div class="app-brand">
+        <mat-icon aria-hidden="true">storefront</mat-icon>
+        <span>{{ 'common.appName' | translate }}</span>
+      </div>
       <mat-nav-list>
         @if (canSeeAdmin()) {
-          <a mat-list-item routerLink="/admin" routerLinkActive="active-nav-link">
+          <!-- K — the one nav group with more than one destination
+               (Items/Suppliers/Purchase Orders); a plain toggle button,
+               not routerLink, since this row navigates nowhere itself. -->
+          <button
+            mat-list-item
+            type="button"
+            class="nav-group-toggle"
+            [attr.aria-expanded]="warehouseGroupOpen()"
+            (click)="warehouseGroupOpen.set(!warehouseGroupOpen())"
+          >
             <mat-icon matListItemIcon>inventory_2</mat-icon>
-            <span matListItemTitle>{{ 'toolbar.admin' | translate }}</span>
-          </a>
+            <span matListItemTitle>{{ 'toolbar.warehouseGroup' | translate }}</span>
+            <mat-icon class="nav-group-chevron" [class.open]="warehouseGroupOpen()" aria-hidden="true">expand_more</mat-icon>
+          </button>
+          @if (warehouseGroupOpen()) {
+            <a mat-list-item class="nav-sub-link" routerLink="/items" routerLinkActive="active-nav-link">
+              <mat-icon matListItemIcon>category</mat-icon>
+              <span matListItemTitle>{{ 'toolbar.items' | translate }}</span>
+            </a>
+            <a mat-list-item class="nav-sub-link" routerLink="/suppliers" routerLinkActive="active-nav-link">
+              <mat-icon matListItemIcon>local_shipping</mat-icon>
+              <span matListItemTitle>{{ 'toolbar.suppliers' | translate }}</span>
+            </a>
+            <a mat-list-item class="nav-sub-link" routerLink="/purchase-orders" routerLinkActive="active-nav-link">
+              <mat-icon matListItemIcon>receipt_long</mat-icon>
+              <span matListItemTitle>{{ 'toolbar.purchaseOrders' | translate }}</span>
+            </a>
+          }
         }
         @if (canSeePos()) {
           <a mat-list-item routerLink="/pos" routerLinkActive="active-nav-link">
@@ -27,16 +54,6 @@
             <span matListItemTitle>{{ 'toolbar.users' | translate }}</span>
           </a>
         }
-        @if (canSeeAdmin()) {
-          <a mat-list-item routerLink="/suppliers" routerLinkActive="active-nav-link">
-            <mat-icon matListItemIcon>local_shipping</mat-icon>
-            <span matListItemTitle>{{ 'toolbar.suppliers' | translate }}</span>
-          </a>
-          <a mat-list-item routerLink="/purchase-orders" routerLinkActive="active-nav-link">
-            <mat-icon matListItemIcon>receipt_long</mat-icon>
-            <span matListItemTitle>{{ 'toolbar.purchaseOrders' | translate }}</span>
-          </a>
-        }
       </mat-nav-list>
     </mat-sidenav>
 
@@ -47,41 +64,67 @@
         </button>
         <span class="spacer"></span>
         <app-language-switcher></app-language-switcher>
-        @if (authService.currentUser(); as user) {
-          <button
-            mat-icon-button
-            [matMenuTriggerFor]="notificationMenu"
-            [matBadge]="notificationFeed.unreadCount() || null"
-            matBadgeColor="warn"
-            matBadgeSize="small"
-            [attr.aria-label]="'toolbar.notifications' | translate"
-            [attr.title]="'toolbar.notifications' | translate"
-          >
-            <mat-icon>notifications</mat-icon>
-          </button>
-          <mat-menu #notificationMenu="matMenu" class="notification-menu">
-            <div class="notification-menu-header" (click)="$event.stopPropagation()">
-              <span>{{ 'toolbar.notifications' | translate }}</span>
-              @if (notificationFeed.unreadCount() > 0) {
-                <button mat-button (click)="markAllRead()">{{ 'toolbar.markAllRead' | translate }}</button>
-              }
-            </div>
-            @if (notificationFeed.notifications().length === 0) {
-              <div class="notification-empty">{{ 'toolbar.noNotifications' | translate }}</div>
-            } @else {
-              @for (n of notificationFeed.notifications(); track n.id) {
-                <button mat-menu-item [class.unread]="!n.isRead" (click)="markRead(n)">
-                  <span class="notification-message">{{ n.message }}</span>
-                </button>
-              }
-            }
-          </mat-menu>
 
-          <span class="user-badge">{{ user.userName }} ({{ 'roles.' + user.role | translate }})</span>
-          <button mat-icon-button (click)="logout()" [attr.aria-label]="'toolbar.signOut' | translate" [attr.title]="'toolbar.signOut' | translate">
+        <button
+          mat-icon-button
+          [matMenuTriggerFor]="notificationMenu"
+          [matBadge]="notificationFeed.unreadCount() || null"
+          matBadgeColor="warn"
+          matBadgeSize="small"
+          [attr.aria-label]="'toolbar.notifications' | translate"
+          [attr.title]="'toolbar.notifications' | translate"
+        >
+          <mat-icon>notifications</mat-icon>
+        </button>
+        <mat-menu #notificationMenu="matMenu" class="notification-menu">
+          <div class="notification-menu-header" (click)="$event.stopPropagation()">
+            <span>{{ 'toolbar.notifications' | translate }}</span>
+            @if (notificationFeed.unreadCount() > 0) {
+              <button mat-button (click)="markAllRead()">{{ 'toolbar.markAllRead' | translate }}</button>
+            }
+          </div>
+          @if (notificationFeed.notifications().length === 0) {
+            <div class="notification-empty">
+              <mat-icon aria-hidden="true">notifications_none</mat-icon>
+              <span>{{ 'toolbar.noNotifications' | translate }}</span>
+            </div>
+          } @else {
+            @for (n of notificationFeed.notifications(); track n.id) {
+              <button mat-menu-item class="notification-row" [class.unread]="!n.isRead" (click)="markRead(n)">
+                <span class="notification-icon" [class.unread]="!n.isRead">
+                  <mat-icon aria-hidden="true">{{ notificationIcon(n.type) }}</mat-icon>
+                </span>
+                <span class="notification-text">
+                  <span class="notification-message">{{ n.message }}</span>
+                  <span class="notification-time">{{ relativeTime(n.createdAt) }}</span>
+                </span>
+                @if (!n.isRead) {
+                  <span class="notification-unread-dot" aria-hidden="true"></span>
+                }
+              </button>
+            }
+          }
+        </mat-menu>
+
+        <button mat-button class="profile-trigger" [matMenuTriggerFor]="profileMenu">
+          <span class="profile-avatar">{{ userInitial() }}</span>
+          <span class="profile-name">{{ currentUser.userName }}</span>
+          <mat-icon aria-hidden="true">arrow_drop_down</mat-icon>
+        </button>
+        <mat-menu #profileMenu="matMenu" class="profile-menu">
+          <div class="profile-menu-header" (click)="$event.stopPropagation()">
+            <span class="profile-avatar large">{{ userInitial() }}</span>
+            <div class="profile-menu-details">
+              <span class="profile-menu-name">{{ currentUser.userName }}</span>
+              <span class="profile-menu-role">{{ 'roles.' + currentUser.role | translate }}</span>
+            </div>
+          </div>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="logout()">
             <mat-icon>logout</mat-icon>
+            <span>{{ 'toolbar.signOut' | translate }}</span>
           </button>
-        }
+        </mat-menu>
       </mat-toolbar>
 
       <router-outlet></router-outlet>

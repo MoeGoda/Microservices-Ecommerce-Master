@@ -5,7 +5,13 @@
     "cancel": "إلغاء",
     "close": "إغلاق",
     "loading": "جارٍ التحميل...",
-    "actions": "الإجراءات"
+    "actions": "الإجراءات",
+    "dismiss": "إغلاق",
+    "errors": {
+      "sessionExpired": "انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى.",
+      "tooManyAttempts": "محاولات كثيرة جدًا. يرجى الانتظار لحظة والمحاولة مرة أخرى.",
+      "somethingWentWrong": "حدث خطأ ما. يرجى المحاولة مرة أخرى."
+    }
   },
   "roles": {
     "Admin": "مسؤول",
@@ -15,6 +21,8 @@
   },
   "toolbar": {
     "admin": "الإدارة",
+    "warehouseGroup": "المستودع",
+    "items": "المنتجات",
     "pos": "نقطة البيع",
     "reports": "التقارير",
     "users": "المستخدمون",
@@ -72,6 +80,11 @@
       "returnedNote": "تم إرجاع عملية البيع هذه — تمت إعادة المخزون إلى موقعه الأصلي.",
       "returnSale": "إرجاع البيع",
       "newSale": "عملية بيع جديدة"
+    },
+    "toasts": {
+      "completed": "تم إتمام عملية البيع رقم {{id}} — الإجمالي {{total}}.",
+      "cancelled": "تم إلغاء عملية البيع.",
+      "returned": "تم إرجاع عملية البيع رقم {{id}}."
     }
   },
   "reports": {
@@ -206,6 +219,12 @@
       "emptyRow": "لا توجد منتجات حتى الآن — أنشئ واحدًا أعلاه."
     },
     "detail": {
+      "backToList": "الرجوع إلى المنتجات",
+      "tabs": {
+        "overview": "نظرة عامة",
+        "pricing": "التسعير والعروض",
+        "stock": "المخزون"
+      },
       "subtitle": "{{category}} · {{price}} · الوحدة الأساسية {{baseUnit}}",
       "barcodesHeading": "الباركودات",
       "primaryTag": "أساسي",
@@ -284,6 +303,17 @@
         "submit": "نقل",
         "fromOption": "{{code}} — {{name}} (المتوفر {{qty}})"
       }
+    },
+    "toasts": {
+      "created": "تم إنشاء المنتج \"{{name}}\".",
+      "barcodeAdded": "تمت إضافة الباركود.",
+      "stockReceived": "تم استلام المخزون — الكمية الآن {{quantity}} {{unit}} في {{location}}.",
+      "stockAdjusted": "تم تعديل المخزون — الكمية الآن {{quantity}} {{unit}} في {{location}}.",
+      "transferLocationsMustDiffer": "يجب أن يكون موقع المصدر والوجهة مختلفين.",
+      "transferred": "تم نقل {{quantity}} {{unit}} من {{from}} إلى {{to}}.",
+      "priceUpdated": "تم تحديث السعر إلى {{price}}.",
+      "promotionCreated": "تم إنشاء العرض الترويجي.",
+      "promotionCancelled": "تم إلغاء العرض الترويجي."
     }
   },
   "users": {
@@ -317,6 +347,11 @@
       "deactivate": "إلغاء التفعيل",
       "cannotDeactivateSelf": "لا يمكنك إلغاء تفعيل حسابك الخاص.",
       "emptyRow": "لا يوجد مستخدمون حتى الآن."
+    },
+    "toasts": {
+      "created": "تم إنشاء المستخدم \"{{userName}}\".",
+      "activated": "تم تفعيل {{userName}}.",
+      "deactivated": "تم إلغاء تفعيل {{userName}}."
     }
   },
   "suppliers": {
@@ -346,6 +381,11 @@
       "activate": "تفعيل",
       "deactivate": "إلغاء التفعيل",
       "emptyRow": "لا يوجد موردون حتى الآن — أضف واحدًا أعلاه."
+    },
+    "toasts": {
+      "created": "تم إنشاء المورد \"{{name}}\".",
+      "activated": "تم تفعيل {{name}}.",
+      "deactivated": "تم إلغاء تفعيل {{name}}."
     }
   },
   "purchaseOrders": {
@@ -401,6 +441,12 @@
       "confirmReceive": "تأكيد الاستلام",
       "submitOrder": "إرسال الأمر (تعيينه كـ 'تم الطلب')",
       "cancelOrder": "إلغاء الأمر"
+    },
+    "toasts": {
+      "created": "تم إنشاء أمر الشراء \"{{orderNumber}}\" كمسودة.",
+      "submitted": "تم إرسال \"{{orderNumber}}\" — الحالة الآن تم الطلب.",
+      "cancelled": "تم إلغاء \"{{orderNumber}}\".",
+      "received": "تم استلام {{quantity}} لأمر {{orderNumber}} — الحالة الآن {{status}}."
     }
   }
 }

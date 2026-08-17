@@ -1,7 +1,0 @@
-<div class="signed-in-as">
-  @if (authService.currentUser(); as user) {
-    <p>{{ 'adminShell.signedInAs' | translate: { userName: user.userName, role: ('roles.' + user.role | translate) } }}</p>
-  }
-</div>
-
-<app-items-admin></app-items-admin>

@@ -1,0 +1,14 @@
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  align-items: start;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.submit-button {
+  height: 40px;
+}

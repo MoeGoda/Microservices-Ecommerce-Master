@@ -1,83 +1,72 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { finalize, forkJoin } from 'rxjs';
+import { MatTabsModule } from '@angular/material/tabs';
+import { finalize } from 'rxjs';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
-import { emptyPage, PagedResult } from '../../../shared/models/pagination.models';
 import {
   BARCODE_TYPES,
-  CategoryDto,
   DISCOUNT_TYPES,
   ItemDetailDto,
   ItemPriceHistoryDto,
-  ItemSummaryDto,
   LocationDto,
   PromotionDto,
   StockLevelDto,
   TransferStockRequest,
-  UnitOfMeasureDto,
 } from '../../../shared/models/warehouse.models';
 import { WarehouseService } from '../warehouse.service';
 
-// The B3 Admin Panel screen: create items, browse the catalog, and manage
-// one selected item's barcodes/units/stock. Deliberately one component
-// rather than several routed sub-pages — there's no lazy-loading/nested-
-// routing precedent anywhere else in this app yet (see A4), and a single
-// screen with a selection panel is simple enough not to need one.
+// K — the management half of the former single-page ItemsAdminComponent,
+// now its own route (/items/:id). Reads the id from the route instead of
+// receiving an ItemSummaryDto from an in-page list selection; barcodes,
+// units, variants, pricing, promotions and stock are otherwise unchanged
+// from the original detail panel — just regrouped into tabs so the page
+// isn't one very long scroll.
 @Component({
-  selector: 'app-items-admin',
+  selector: 'app-item-detail',
   imports: [
     DatePipe,
     DecimalPipe,
     ReactiveFormsModule,
+    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatCheckboxModule,
     MatChipsModule,
     MatFormFieldModule,
+    MatIconModule,
     MatInputModule,
-    MatPaginatorModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    MatTabsModule,
     TranslatePipe,
   ],
-  templateUrl: './items-admin.component.html',
-  styleUrl: './items-admin.component.scss',
+  templateUrl: './item-detail.component.html',
+  styleUrl: './item-detail.component.scss',
 })
-export class ItemsAdminComponent implements OnInit {
+export class ItemDetailComponent implements OnInit {
   readonly barcodeTypes = BARCODE_TYPES;
   readonly discountTypes = DISCOUNT_TYPES;
 
-  readonly categories = signal<CategoryDto[]>([]);
   readonly locations = signal<LocationDto[]>([]);
-  readonly units = signal<UnitOfMeasureDto[]>([]);
-  readonly pagedItems = signal<PagedResult<ItemSummaryDto>>(emptyPage());
-  // A separate, unpaged-ish fetch (page size 100 — the max PageSize
-  // GetAllItemsQueryValidator allows) purely to populate the "parent item"
-  // picker in the create form. Reusing pagedItems directly would mean a
-  // create-form dropdown that only ever offers whichever items happen to
-  // be on the CURRENT page of the browsable list below — a real but
-  // pragmatic limitation for catalogs bigger than 100 items, named here
-  // rather than solved with a proper searchable autocomplete (future work).
-  readonly parentCandidates = signal<ItemSummaryDto[]>([]);
   readonly selectedItem = signal<ItemDetailDto | null>(null);
   readonly stockLevels = signal<StockLevelDto[]>([]);
   readonly priceHistory = signal<ItemPriceHistoryDto[]>([]);
   readonly promotions = signal<PromotionDto[]>([]);
 
-  readonly loadingItems = signal(false);
   readonly loadingDetail = signal(false);
-  readonly creatingItem = signal(false);
   readonly addingBarcode = signal(false);
   readonly receivingStock = signal(false);
   readonly adjustingStock = signal(false);
@@ -89,17 +78,7 @@ export class ItemsAdminComponent implements OnInit {
   // request is in flight.
   readonly cancellingPromotionId = signal<number | null>(null);
 
-  readonly createForm = new FormGroup({
-    sku: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    description: new FormControl('', { nonNullable: true }),
-    unitPrice: new FormControl(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
-    categoryId: new FormControl<number | null>(null, { validators: [Validators.required] }),
-    baseUnitOfMeasureId: new FormControl<number | null>(null, { validators: [Validators.required] }),
-    parentItemId: new FormControl<number | null>(null),
-    barcode: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    barcodeType: new FormControl<string>('EAN13', { nonNullable: true, validators: [Validators.required] }),
-  });
+  private itemId = 0;
 
   readonly addBarcodeForm = new FormGroup({
     barcode: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -146,49 +125,20 @@ export class ItemsAdminComponent implements OnInit {
   constructor(
     private readonly warehouseService: WarehouseService,
     private readonly notification: NotificationService,
+    private readonly i18n: I18nService,
+    private readonly route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
-    // All three lookups + the item list load together — none depends on
-    // another, so there's no reason to chain them one after another.
-    forkJoin({
-      categories: this.warehouseService.getCategories(),
-      locations: this.warehouseService.getLocations(),
-      units: this.warehouseService.getUnitsOfMeasure(),
-    }).subscribe(({ categories, locations, units }) => {
-      this.categories.set(categories);
-      this.locations.set(locations);
-      this.units.set(units);
-    });
-
-    this.loadItems();
-    this.loadParentCandidates();
+    this.itemId = Number(this.route.snapshot.paramMap.get('id'));
+    this.warehouseService.getLocations().subscribe({ next: (locations) => this.locations.set(locations) });
+    this.loadItem();
   }
 
-  loadItems(page = 1): void {
-    this.loadingItems.set(true);
-    this.warehouseService
-      .getItems(page, this.pagedItems().pageSize)
-      .pipe(finalize(() => this.loadingItems.set(false)))
-      .subscribe({ next: (result) => this.pagedItems.set(result) });
-  }
-
-  onItemsPageChange(event: PageEvent): void {
-    // MatPaginator's pageIndex is 0-based; the backend's Page is 1-based.
-    if (event.pageSize !== this.pagedItems().pageSize) {
-      this.pagedItems.update((current) => ({ ...current, pageSize: event.pageSize }));
-    }
-    this.loadItems(event.pageIndex + 1);
-  }
-
-  private loadParentCandidates(): void {
-    this.warehouseService.getItems(1, 100).subscribe({ next: (result) => this.parentCandidates.set(result.items) });
-  }
-
-  selectItem(item: ItemSummaryDto): void {
+  private loadItem(): void {
     this.loadingDetail.set(true);
     this.warehouseService
-      .getItem(item.id)
+      .getItem(this.itemId)
       .pipe(finalize(() => this.loadingDetail.set(false)))
       .subscribe({
         next: (detail) => {
@@ -199,28 +149,28 @@ export class ItemsAdminComponent implements OnInit {
           this.receiveForm.reset({ locationId: null, unitOfMeasureId: detail.baseUnitOfMeasureId, quantity: 1, reference: '' });
           this.addBarcodeForm.reset({ barcode: '', barcodeType: 'EAN13', isPrimary: false });
           // originalUnitPrice, not unitPrice — unitPrice on this DTO is
-          // already discounted when a promotion is active (C5), and
-          // editing that would silently overwrite the item's real list
-          // price with whatever the discount happened to compute to.
-          // originalUnitPrice falls back to null only when there's NO
-          // active promotion, in which case unitPrice IS the real price.
+          // already discounted when a promotion is active, and editing
+          // that would silently overwrite the item's real list price with
+          // whatever the discount happened to compute to. originalUnitPrice
+          // falls back to null only when there's NO active promotion, in
+          // which case unitPrice IS the real price.
           this.priceForm.reset({ newPrice: detail.originalUnitPrice ?? detail.unitPrice });
           this.promotionForm.reset({ discountType: 'PercentageOff', discountValue: 0, startsAt: '', endsAt: '' });
-          this.loadStockLevels(item.id);
-          this.loadPriceHistory(item.id);
-          this.loadPromotions(item.id);
+          this.loadStockLevels();
+          this.loadPriceHistory();
+          this.loadPromotions();
         },
       });
   }
 
-  private loadPromotions(itemId: number): void {
-    this.warehouseService.getPromotions(itemId).subscribe({
+  private loadPromotions(): void {
+    this.warehouseService.getPromotions(this.itemId).subscribe({
       next: (promotions) => this.promotions.set(promotions),
     });
   }
 
-  private loadStockLevels(itemId: number): void {
-    this.warehouseService.getStockLevels(itemId).subscribe({
+  private loadStockLevels(): void {
+    this.warehouseService.getStockLevels(this.itemId).subscribe({
       next: (levels) => {
         this.stockLevels.set(levels);
         // Adjusting requires a StockLevel that already exists — default to
@@ -241,42 +191,14 @@ export class ItemsAdminComponent implements OnInit {
     });
   }
 
-  submitCreate(): void {
-    if (this.createForm.invalid || this.creatingItem()) {
-      this.createForm.markAllAsTouched();
-      return;
-    }
-
-    const value = this.createForm.getRawValue();
-    this.creatingItem.set(true);
-    this.warehouseService
-      .createItem({
-        sku: value.sku,
-        name: value.name,
-        description: value.description,
-        unitPrice: value.unitPrice,
-        categoryId: value.categoryId!,
-        baseUnitOfMeasureId: value.baseUnitOfMeasureId!,
-        parentItemId: value.parentItemId,
-        barcode: value.barcode,
-        barcodeType: value.barcodeType,
-      })
-      .pipe(finalize(() => this.creatingItem.set(false)))
-      .subscribe({
-        // A 4xx (duplicate Sku/barcode, bad input) is already turned into
-        // a toast by errorInterceptor — this only needs the success path.
-        next: (created) => {
-          this.notification.success(`Item "${created.name}" created.`);
-          this.createForm.reset({ sku: '', name: '', description: '', unitPrice: 0, categoryId: null, baseUnitOfMeasureId: null, parentItemId: null, barcode: '', barcodeType: 'EAN13' });
-          this.loadItems();
-          this.loadParentCandidates();
-        },
-      });
+  private loadPriceHistory(): void {
+    this.warehouseService.getPriceHistory(this.itemId).subscribe({
+      next: (history) => this.priceHistory.set(history),
+    });
   }
 
   submitAddBarcode(): void {
-    const item = this.selectedItem();
-    if (!item || this.addBarcodeForm.invalid || this.addingBarcode()) {
+    if (this.addBarcodeForm.invalid || this.addingBarcode()) {
       this.addBarcodeForm.markAllAsTouched();
       return;
     }
@@ -284,20 +206,19 @@ export class ItemsAdminComponent implements OnInit {
     const value = this.addBarcodeForm.getRawValue();
     this.addingBarcode.set(true);
     this.warehouseService
-      .addBarcode(item.id, value)
+      .addBarcode(this.itemId, value)
       .pipe(finalize(() => this.addingBarcode.set(false)))
       .subscribe({
         next: () => {
-          this.notification.success('Barcode added.');
+          this.notification.success(this.i18n.t('items.toasts.barcodeAdded'));
           this.addBarcodeForm.reset({ barcode: '', barcodeType: 'EAN13', isPrimary: false });
-          this.selectItem(item);
+          this.loadItem();
         },
       });
   }
 
   submitReceive(): void {
-    const item = this.selectedItem();
-    if (!item || this.receiveForm.invalid || this.receivingStock()) {
+    if (this.receiveForm.invalid || this.receivingStock()) {
       this.receiveForm.markAllAsTouched();
       return;
     }
@@ -306,7 +227,7 @@ export class ItemsAdminComponent implements OnInit {
     this.receivingStock.set(true);
     this.warehouseService
       .receiveStock({
-        itemId: item.id,
+        itemId: this.itemId,
         locationId: value.locationId!,
         quantity: value.quantity,
         unitOfMeasureId: value.unitOfMeasureId!,
@@ -315,15 +236,16 @@ export class ItemsAdminComponent implements OnInit {
       .pipe(finalize(() => this.receivingStock.set(false)))
       .subscribe({
         next: (level) => {
-          this.notification.success(`Stock received — now ${level.quantityOnHand} ${level.unitOfMeasureCode} at ${level.locationName}.`);
-          this.loadStockLevels(item.id);
+          this.notification.success(
+            this.i18n.t('items.toasts.stockReceived', { quantity: level.quantityOnHand, unit: level.unitOfMeasureCode, location: level.locationName }),
+          );
+          this.loadStockLevels();
         },
       });
   }
 
   submitAdjust(): void {
-    const item = this.selectedItem();
-    if (!item || this.adjustForm.invalid || this.adjustingStock()) {
+    if (this.adjustForm.invalid || this.adjustingStock()) {
       this.adjustForm.markAllAsTouched();
       return;
     }
@@ -332,7 +254,7 @@ export class ItemsAdminComponent implements OnInit {
     this.adjustingStock.set(true);
     this.warehouseService
       .adjustStock({
-        itemId: item.id,
+        itemId: this.itemId,
         locationId: value.locationId!,
         quantityChange: value.quantityChange,
         reference: value.reference,
@@ -340,27 +262,28 @@ export class ItemsAdminComponent implements OnInit {
       .pipe(finalize(() => this.adjustingStock.set(false)))
       .subscribe({
         next: (level) => {
-          this.notification.success(`Stock adjusted — now ${level.quantityOnHand} ${level.unitOfMeasureCode} at ${level.locationName}.`);
-          this.loadStockLevels(item.id);
+          this.notification.success(
+            this.i18n.t('items.toasts.stockAdjusted', { quantity: level.quantityOnHand, unit: level.unitOfMeasureCode, location: level.locationName }),
+          );
+          this.loadStockLevels();
         },
       });
   }
 
   submitTransfer(): void {
-    const item = this.selectedItem();
-    if (!item || this.transferForm.invalid || this.transferringStock()) {
+    if (this.transferForm.invalid || this.transferringStock()) {
       this.transferForm.markAllAsTouched();
       return;
     }
 
     const value = this.transferForm.getRawValue();
     if (value.fromLocationId === value.toLocationId) {
-      this.notification.error('From and to locations must be different.');
+      this.notification.error(this.i18n.t('items.toasts.transferLocationsMustDiffer'));
       return;
     }
 
     const request: TransferStockRequest = {
-      itemId: item.id,
+      itemId: this.itemId,
       fromLocationId: value.fromLocationId!,
       toLocationId: value.toLocationId!,
       quantity: value.quantity,
@@ -374,22 +297,20 @@ export class ItemsAdminComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.notification.success(
-            `Transferred ${value.quantity} ${result.from.unitOfMeasureCode} from ${result.from.locationName} to ${result.to.locationName}.`,
+            this.i18n.t('items.toasts.transferred', {
+              quantity: value.quantity,
+              unit: result.from.unitOfMeasureCode,
+              from: result.from.locationName,
+              to: result.to.locationName,
+            }),
           );
-          this.loadStockLevels(item.id);
+          this.loadStockLevels();
         },
       });
   }
 
-  private loadPriceHistory(itemId: number): void {
-    this.warehouseService.getPriceHistory(itemId).subscribe({
-      next: (history) => this.priceHistory.set(history),
-    });
-  }
-
   submitUpdatePrice(): void {
-    const item = this.selectedItem();
-    if (!item || this.priceForm.invalid || this.updatingPrice()) {
+    if (this.priceForm.invalid || this.updatingPrice()) {
       this.priceForm.markAllAsTouched();
       return;
     }
@@ -397,20 +318,18 @@ export class ItemsAdminComponent implements OnInit {
     const { newPrice } = this.priceForm.getRawValue();
     this.updatingPrice.set(true);
     this.warehouseService
-      .updatePrice(item.id, { newPrice })
+      .updatePrice(this.itemId, { newPrice })
       .pipe(finalize(() => this.updatingPrice.set(false)))
       .subscribe({
         next: (updated) => {
-          this.notification.success(`Price updated to ${updated.originalUnitPrice ?? updated.unitPrice}.`);
-          this.selectItem(item);
-          this.loadItems();
+          this.notification.success(this.i18n.t('items.toasts.priceUpdated', { price: updated.originalUnitPrice ?? updated.unitPrice }));
+          this.loadItem();
         },
       });
   }
 
   submitCreatePromotion(): void {
-    const item = this.selectedItem();
-    if (!item || this.promotionForm.invalid || this.creatingPromotion()) {
+    if (this.promotionForm.invalid || this.creatingPromotion()) {
       this.promotionForm.markAllAsTouched();
       return;
     }
@@ -418,7 +337,7 @@ export class ItemsAdminComponent implements OnInit {
     const value = this.promotionForm.getRawValue();
     this.creatingPromotion.set(true);
     this.warehouseService
-      .createPromotion(item.id, {
+      .createPromotion(this.itemId, {
         discountType: value.discountType,
         discountValue: value.discountValue,
         // datetime-local gives local-time strings with no timezone
@@ -431,11 +350,11 @@ export class ItemsAdminComponent implements OnInit {
       .pipe(finalize(() => this.creatingPromotion.set(false)))
       .subscribe({
         next: () => {
-          this.notification.success('Promotion created.');
+          this.notification.success(this.i18n.t('items.toasts.promotionCreated'));
           this.promotionForm.reset({ discountType: 'PercentageOff', discountValue: 0, startsAt: '', endsAt: '' });
           // Re-fetching the item picks up the discounted price immediately
           // if the new promotion is already active (StartsAtUtc <= now).
-          this.selectItem(item);
+          this.loadItem();
         },
       });
   }
@@ -464,21 +383,20 @@ export class ItemsAdminComponent implements OnInit {
   }
 
   cancelPromotion(promotion: PromotionDto): void {
-    const item = this.selectedItem();
-    if (!item || this.cancellingPromotionId()) {
+    if (this.cancellingPromotionId()) {
       return;
     }
 
     this.cancellingPromotionId.set(promotion.id);
     this.warehouseService
-      .cancelPromotion(item.id, promotion.id)
+      .cancelPromotion(this.itemId, promotion.id)
       .pipe(finalize(() => this.cancellingPromotionId.set(null)))
       .subscribe({
         next: () => {
-          this.notification.success('Promotion cancelled.');
+          this.notification.success(this.i18n.t('items.toasts.promotionCancelled'));
           // Re-fetching the item picks up the base price immediately if
           // the cancelled promotion was the one currently discounting it.
-          this.selectItem(item);
+          this.loadItem();
         },
       });
   }

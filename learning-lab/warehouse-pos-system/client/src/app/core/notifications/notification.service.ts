@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { I18nService } from '../i18n/i18n.service';
 
 // One place that knows how to show a toast — components and the HTTP error
 // interceptor both call this instead of each rolling their own MatSnackBar
@@ -8,10 +9,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 // the "Toaster Success and Error Messages" requirement directly.
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
-  constructor(private readonly snackBar: MatSnackBar) {}
+  constructor(
+    private readonly snackBar: MatSnackBar,
+    private readonly i18n: I18nService,
+  ) {}
 
   success(message: string): void {
-    this.snackBar.open(message, 'Dismiss', {
+    this.snackBar.open(message, this.i18n.t('common.dismiss'), {
       duration: 4000,
       panelClass: ['toast-success'],
       horizontalPosition: 'right',
@@ -20,7 +24,7 @@ export class NotificationService {
   }
 
   error(message: string): void {
-    this.snackBar.open(message, 'Dismiss', {
+    this.snackBar.open(message, this.i18n.t('common.dismiss'), {
       duration: 6000,
       panelClass: ['toast-error'],
       horizontalPosition: 'right',

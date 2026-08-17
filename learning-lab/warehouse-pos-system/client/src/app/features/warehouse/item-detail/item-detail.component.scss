@@ -1,16 +1,30 @@
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mat-sys-primary, #1565c0);
+  text-decoration: none;
+  font-weight: 500;
+  width: fit-content;
+
+  mat-icon {
+    font-size: 20px;
+    height: 20px;
+    width: 20px;
+  }
+}
+
+.tab-panel {
+  padding: 16px 4px 8px;
+  display: flex;
+  flex-direction: column;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 16px;
   align-items: start;
-}
-
-.span-2 {
-  grid-column: span 2;
-}
-
-.submit-button {
-  height: 40px;
 }
 
 .inline-form {
@@ -27,14 +41,10 @@
 
 .data-grid {
   margin-bottom: 8px;
-
-  tr.selected td {
-    background-color: var(--mat-sys-secondary-container);
-  }
 }
 
 .empty-row {
-  color: #777;
+  color: var(--mat-sys-on-surface-variant);
   font-style: italic;
   text-align: center;
 }
