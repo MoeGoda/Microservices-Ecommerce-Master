@@ -11,6 +11,7 @@ namespace Warehouse.Application.Features.PurchaseOrders.Commands.CreatePurchaseO
         private readonly ISupplierRepository _supplierRepository;
         private readonly IItemRepository _itemRepository;
         private readonly IUnitOfMeasureRepository _unitOfMeasureRepository;
+        private readonly IItemUnitRepository _itemUnitRepository;
         private readonly IPurchaseOrderRepository _purchaseOrderRepository;
         private readonly IUnitOfWork _unitOfWork;
 
@@ -18,12 +19,14 @@ namespace Warehouse.Application.Features.PurchaseOrders.Commands.CreatePurchaseO
             ISupplierRepository supplierRepository,
             IItemRepository itemRepository,
             IUnitOfMeasureRepository unitOfMeasureRepository,
+            IItemUnitRepository itemUnitRepository,
             IPurchaseOrderRepository purchaseOrderRepository,
             IUnitOfWork unitOfWork)
         {
             _supplierRepository = supplierRepository;
             _itemRepository = itemRepository;
             _unitOfMeasureRepository = unitOfMeasureRepository;
+            _itemUnitRepository = itemUnitRepository;
             _purchaseOrderRepository = purchaseOrderRepository;
             _unitOfWork = unitOfWork;
         }
@@ -60,6 +63,20 @@ namespace Warehouse.Application.Features.PurchaseOrders.Commands.CreatePurchaseO
 
                 var unitOfMeasure = await _unitOfMeasureRepository.GetById(lineRequest.UnitOfMeasureId)
                     ?? throw new NotFoundException(nameof(UnitOfMeasure), lineRequest.UnitOfMeasureId);
+
+                // Fail here, not weeks later at receiving time.
+                // ReceivePurchaseOrderLineCommandHandler.ConvertToBaseUnit
+                // needs either the item's own base unit or an existing
+                // ItemUnit conversion to turn a received quantity into a
+                // stock movement — a line ordered in a unit the item has
+                // no conversion for would create a PO that can never
+                // actually be received.
+                if (unitOfMeasure.Id != item.BaseUnitOfMeasureId
+                    && await _itemUnitRepository.GetByItemAndUnit(item.Id, unitOfMeasure.Id) is null)
+                {
+                    throw new ConflictException(
+                        $"'{item.Sku}' has no unit conversion set up for '{unitOfMeasure.Code}' — add that unit to the item first, or order it in its base unit ('{item.BaseUnitOfMeasure.Code}').");
+                }
 
                 order.Lines.Add(new PurchaseOrderLine
                 {

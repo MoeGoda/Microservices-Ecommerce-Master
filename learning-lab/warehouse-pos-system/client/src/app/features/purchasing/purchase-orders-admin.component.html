@@ -34,7 +34,7 @@
             <div [formGroupName]="$index" class="line-row">
               <mat-form-field appearance="outline">
                 <mat-label>{{ 'purchaseOrders.create.item' | translate }}</mat-label>
-                <mat-select formControlName="itemId">
+                <mat-select formControlName="itemId" (selectionChange)="onLineItemChange(line)">
                   @for (item of items(); track item.id) {
                     <mat-option [value]="item.id">{{ item.sku }} — {{ item.name }}</mat-option>
                   }
@@ -43,8 +43,8 @@
 
               <mat-form-field appearance="outline">
                 <mat-label>{{ 'purchaseOrders.create.unit' | translate }}</mat-label>
-                <mat-select formControlName="unitOfMeasureId">
-                  @for (unit of units(); track unit.id) {
+                <mat-select formControlName="unitOfMeasureId" [disabled]="!line.controls.itemId.value">
+                  @for (unit of validUnitsForLine(line); track unit.id) {
                     <mat-option [value]="unit.id">{{ unit.code }}</mat-option>
                   }
                 </mat-select>

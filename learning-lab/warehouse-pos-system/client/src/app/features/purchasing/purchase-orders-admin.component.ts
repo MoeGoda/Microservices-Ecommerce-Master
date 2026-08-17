@@ -20,7 +20,7 @@ import {
   PurchaseOrderSummaryDto,
   SupplierDto,
 } from '../../shared/models/purchasing.models';
-import { ItemSummaryDto, LocationDto, UnitOfMeasureDto } from '../../shared/models/warehouse.models';
+import { ItemDetailDto, ItemSummaryDto, LocationDto } from '../../shared/models/warehouse.models';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { PurchasingService } from './purchasing.service';
 
@@ -62,8 +62,18 @@ type PurchaseOrderLineFormGroup = FormGroup<{
 export class PurchaseOrdersAdminComponent implements OnInit {
   readonly suppliers = signal<SupplierDto[]>([]);
   readonly items = signal<ItemSummaryDto[]>([]);
-  readonly units = signal<UnitOfMeasureDto[]>([]);
   readonly locations = signal<LocationDto[]>([]);
+
+  // Bug fix — a line's unit picker used to list every UnitOfMeasure in
+  // the system, unconstrained by the line's own item. Ordering an item
+  // in a unit it has no ItemUnit conversion for created a Purchase Order
+  // that could never actually be received: ReceivePurchaseOrderLineCommand
+  // needs that conversion to turn a received quantity into a stock
+  // movement, and fails with "Entity 'ItemUnit' ... was not found" the
+  // moment someone tries. Fetched lazily per item (a summary's own
+  // ItemSummaryDto has no units list) and cached — several lines
+  // ordering the same item share one fetch.
+  private readonly itemDetailCache = new Map<number, ItemDetailDto>();
 
   readonly pagedOrders = signal<PagedResult<PurchaseOrderSummaryDto>>(emptyPage());
   readonly selectedOrder = signal<PurchaseOrderDetailDto | null>(null);
@@ -103,12 +113,10 @@ export class PurchaseOrdersAdminComponent implements OnInit {
     forkJoin({
       suppliers: this.purchasingService.getSuppliers(1, 100),
       items: this.warehouseService.getItems(1, 100),
-      units: this.warehouseService.getUnitsOfMeasure(),
       locations: this.warehouseService.getLocations(),
-    }).subscribe(({ suppliers, items, units, locations }) => {
+    }).subscribe(({ suppliers, items, locations }) => {
       this.suppliers.set(suppliers.items);
       this.items.set(items.items);
-      this.units.set(units);
       this.locations.set(locations);
     });
 
@@ -146,6 +154,51 @@ export class PurchaseOrdersAdminComponent implements OnInit {
     if (this.lines.length > 1) {
       this.lines.removeAt(index);
     }
+  }
+
+  // Fetches (once, then cached) the units the line's newly-picked item
+  // actually supports, and snaps the unit field to that item's base unit
+  // if the previously-selected unit isn't one of them — the same
+  // "reset what's no longer valid" idea item-detail's own selectItem()
+  // already applies to its forms when the selected item changes.
+  onLineItemChange(line: PurchaseOrderLineFormGroup): void {
+    const itemId = line.controls.itemId.value;
+    if (itemId == null) {
+      return;
+    }
+
+    const cached = this.itemDetailCache.get(itemId);
+    if (cached) {
+      this.reconcileLineUnit(line, cached);
+      return;
+    }
+
+    this.warehouseService.getItem(itemId).subscribe({
+      next: (detail) => {
+        this.itemDetailCache.set(itemId, detail);
+        this.reconcileLineUnit(line, detail);
+      },
+    });
+  }
+
+  private reconcileLineUnit(line: PurchaseOrderLineFormGroup, item: ItemDetailDto): void {
+    const validIds = new Set([item.baseUnitOfMeasureId, ...item.units.map((u) => u.unitOfMeasureId)]);
+    const current = line.controls.unitOfMeasureId.value;
+    if (current == null || !validIds.has(current)) {
+      line.controls.unitOfMeasureId.setValue(item.baseUnitOfMeasureId);
+    }
+  }
+
+  // Base unit first, then any alternates — same order item-detail's own
+  // receive form lists an item's units in.
+  validUnitsForLine(line: PurchaseOrderLineFormGroup): { id: number; code: string }[] {
+    const itemId = line.controls.itemId.value;
+    const detail = itemId == null ? undefined : this.itemDetailCache.get(itemId);
+    if (!detail) {
+      return [];
+    }
+
+    return [{ id: detail.baseUnitOfMeasureId, code: detail.baseUnitOfMeasureCode }, ...detail.units.map((u) => ({ id: u.unitOfMeasureId, code: u.unitOfMeasureCode }))];
   }
 
   submitCreate(): void {
