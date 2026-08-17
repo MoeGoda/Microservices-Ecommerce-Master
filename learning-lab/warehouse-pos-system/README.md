@@ -67,6 +67,9 @@ a distributed transaction.
 **Phase K — Navigation depth, real toasts, and splitting the one screen that outgrew itself**
 - [x] **K — Grouped/nested nav + profile & notifications menus, fully-translated toasts, Items split into three routed screens**
 
+**Phase L — A real PO bug, and a grid + dialog pattern for Suppliers/Purchase Orders/Users**
+- [x] **L — Fixed a PO line unit-conversion bug found in testing; Suppliers, Purchase Orders, and Users rebuilt as grid + create/detail dialogs**
+
 ## A1 — Identity service
 
 **What it does:** issues JWTs after registering/logging in a user, backed by
@@ -3187,4 +3190,88 @@ controllers' `JsonSerializerOptions` — a one-line, purely-additive fix
 # → switch to Arabic (the topbar language switcher) and repeat any of
 #   the above — labels, toasts, and the tab titles are all translated,
 #   and the whole shell mirrors to RTL
+```
+
+## L — A real Purchase Order bug, and a grid + dialog pattern for Suppliers/POs/Users
+
+**What it does:** two things, found and asked for while actually testing
+the cycle K just finished. First, a real, pre-existing bug: a Purchase
+Order line could be ordered in a unit the item has no conversion for,
+producing an order that could never actually be received. Second, a UI
+pattern change for the three screens that were still a single page with
+an inline create-form and an inline detail panel (Suppliers, Purchase
+Orders, Users) — each is now a plain grid with a "+ New" button and a
+per-row action button, both opening a `MatDialog` instead of navigating
+or expanding inline. Items stays exactly as K left it (separate routed
+pages) — that split was a deliberate, explicit choice made one phase
+ago and this isn't reopening it.
+
+**The bug: `ReceivePurchaseOrderLineCommand` needs a unit conversion
+that creating the order never checked existed.** The create form's
+line-level unit picker listed every `UnitOfMeasure` in the system,
+completely unconstrained by the line's own item — so ordering, say,
+"BOX" for an item that only has "PCS" (its base unit) and no `ItemUnit`
+row for "BOX" sailed through Create and Submit with no error at all.
+The failure only showed up later, at Receive, when
+`ReceivePurchaseOrderLineCommandHandler.ConvertToBaseUnit` looked up
+that conversion and found nothing:
+`NotFoundException(nameof(ItemUnit), "item X, unit Y")` — by which
+point the order might already be Ordered, sent to the supplier, days
+old. Fixed in two places, matching each other:
+- `CreatePurchaseOrderCommandHandler` now validates each line's unit
+  against the item's base unit or an existing `ItemUnit` conversion,
+  rejecting with a clear 409 **at creation time** instead of failing
+  later at receiving time.
+- The create dialog's line-level unit picker is now scoped **per
+  line, per item** — fetched (and cached) via a `getItem()` call the
+  moment a line's item is chosen, offering only that item's base unit
+  and its actual alternates, mirroring the exact same scoping
+  item-detail's own "Receive stock" form has always used. Picking a
+  different item that doesn't support the currently-selected unit
+  snaps the unit field back to that item's base unit automatically.
+
+**The grid + dialog pattern is the same shape three times, on purpose.**
+Each of Suppliers/Purchase Orders/Users now has exactly two dialogs: a
+create dialog (the old inline create-form, unchanged internally, just
+relocated) and a detail dialog (the old inline detail/action panel,
+same relocation). The list component itself shrank down to owning
+nothing but the paged grid — `openCreateDialog()`/`openDetailDialog()`
+and a page-header "+ New" button are the only additions. Suppliers and
+Users close their detail dialog with the updated row (a single
+activate/deactivate call, one round trip, cheap to patch in place);
+Purchase Orders' detail dialog can submit, cancel, AND receive several
+lines all before closing, so it always triggers a full grid reload on
+close instead — tracking exactly which of three possible actions ran
+isn't worth avoiding one cheap re-fetch.
+
+**Why dialogs, and why now:** the same "grid with icon actions that
+open a popup with the full record" pattern common to most admin
+templates, applied only where the page was still doing "form above,
+table below, detail panel further below" — the one layout style this
+app hadn't already moved away from. Items didn't need this treatment
+twice: K already gave it three focused, routed screens instead of one
+long page, which is the deeper fix a modal can't provide for a screen
+with that much going on (barcodes, pricing, promotions, stock, in one
+detail view). A modal is the right container for a *shorter* record —
+a supplier, a user, a single PO with a few lines — not a replacement
+for giving a genuinely complex screen its own URL.
+
+**Try it:**
+```bash
+# Sign in as the seeded admin, then in the Angular app:
+# → /suppliers, /purchase-orders, /users are now grids only — no more
+#   form-above-table; "+ New ..." in the page header opens a create
+#   dialog, and the eye icon on any row opens a detail dialog
+# → in the Purchase Order create dialog, pick an item that has an
+#   alternate unit (e.g. Cola, which has a Box conversion) — the unit
+#   picker shows Box; pick an item with none — it only offers PCS
+# → try to force the old bug: there's no way to via the UI anymore, but
+#   POSTing a line with a unit the item has no ItemUnit row for now
+#   gets rejected immediately with a 409, not a 200 that fails later
+# → open a Purchase Order's detail dialog and Submit/Receive/Cancel —
+#   same endpoints, same forms, just in a dialog; closing it always
+#   shows the grid's freshly-reloaded row
+# → switch to Arabic — grid headers, dialog titles, and every button
+#   label are translated, RTL mirrors the dialogs the same as every
+#   other screen
 ```

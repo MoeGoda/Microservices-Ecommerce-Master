@@ -1,3 +1,20 @@
+:host {
+  display: block;
+  min-width: 560px;
+}
+
+.loading-content {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5,44 +22,16 @@
   align-items: start;
 }
 
-.span-2 {
-  grid-column: span 2;
-}
-
-.submit-button {
-  height: 40px;
-  margin-inline-start: 8px;
-}
-
-.lines-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.line-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr auto;
-  gap: 8px;
-  align-items: start;
-}
-
 .data-grid {
   margin-bottom: 8px;
-
-  tr.selected td {
-    background-color: var(--mat-sys-secondary-container);
-  }
+  width: 100%;
 }
 
-.empty-row {
-  color: var(--mat-sys-on-surface-variant);
-  font-style: italic;
-  text-align: center;
-}
-
-h4 {
-  margin: 16px 0 8px;
+.receive-form {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-low);
 }
 
 .status-chip {
@@ -75,17 +64,4 @@ h4 {
     background: var(--mat-sys-error-container);
     color: var(--mat-sys-on-error-container);
   }
-}
-
-.receive-form {
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: 12px;
-  background: var(--mat-sys-surface-container-low);
-}
-
-.detail-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
 }

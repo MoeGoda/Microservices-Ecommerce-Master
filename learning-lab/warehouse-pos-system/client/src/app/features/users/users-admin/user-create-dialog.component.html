@@ -1,0 +1,61 @@
+<h2 mat-dialog-title>{{ 'users.create.title' | translate }}</h2>
+
+<form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+  <mat-dialog-content>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.create.userName' | translate }}</mat-label>
+        <input matInput formControlName="userName" />
+        @if (createForm.controls.userName.touched && createForm.controls.userName.invalid) {
+          <mat-error>{{ 'users.create.userNameRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.create.email' | translate }}</mat-label>
+        <input matInput type="email" formControlName="email" />
+        @if (createForm.controls.email.touched && createForm.controls.email.invalid) {
+          <mat-error>{{ 'users.create.emailInvalid' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.create.firstName' | translate }}</mat-label>
+        <input matInput formControlName="firstName" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.create.lastName' | translate }}</mat-label>
+        <input matInput formControlName="lastName" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.create.password' | translate }}</mat-label>
+        <input matInput type="password" formControlName="password" />
+        @if (createForm.controls.password.touched && createForm.controls.password.invalid) {
+          <mat-error>{{ 'users.create.passwordRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.create.role' | translate }}</mat-label>
+        <mat-select formControlName="role">
+          @for (role of roles; track role) {
+            <mat-option [value]="role">{{ 'roles.' + role | translate }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ 'common.cancel' | translate }}</button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="creatingUser()">
+      @if (creatingUser()) {
+        <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        {{ 'users.create.submit' | translate }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

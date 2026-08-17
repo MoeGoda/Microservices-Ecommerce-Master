@@ -1,0 +1,49 @@
+<h2 mat-dialog-title>{{ 'suppliers.create.title' | translate }}</h2>
+
+<form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+  <mat-dialog-content>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'suppliers.create.name' | translate }}</mat-label>
+        <input matInput formControlName="name" />
+        @if (createForm.controls.name.touched && createForm.controls.name.invalid) {
+          <mat-error>{{ 'suppliers.create.nameRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'suppliers.create.contactName' | translate }}</mat-label>
+        <input matInput formControlName="contactName" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'suppliers.create.email' | translate }}</mat-label>
+        <input matInput type="email" formControlName="email" />
+        @if (createForm.controls.email.touched && createForm.controls.email.invalid) {
+          <mat-error>{{ 'suppliers.create.emailInvalid' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'suppliers.create.phone' | translate }}</mat-label>
+        <input matInput formControlName="phone" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="span-2">
+        <mat-label>{{ 'suppliers.create.address' | translate }}</mat-label>
+        <input matInput formControlName="address" />
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ 'common.cancel' | translate }}</button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="creatingSupplier()">
+      @if (creatingSupplier()) {
+        <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        {{ 'suppliers.create.submit' | translate }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -1,0 +1,64 @@
+<div class="page suppliers-admin">
+  <div class="page-header">
+    <h1>{{ 'suppliers.title' | translate }}</h1>
+    <div class="page-header-actions">
+      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        {{ 'suppliers.create.title' | translate }}
+      </button>
+    </div>
+  </div>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loadingSuppliers()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'suppliers.list.table.name' | translate }}</th>
+              <th>{{ 'suppliers.list.table.contactName' | translate }}</th>
+              <th>{{ 'suppliers.list.table.email' | translate }}</th>
+              <th>{{ 'suppliers.list.table.phone' | translate }}</th>
+              <th>{{ 'suppliers.list.table.status' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (supplier of pagedSuppliers().items; track supplier.id) {
+              <tr>
+                <td>{{ supplier.name }}</td>
+                <td>{{ supplier.contactName }}</td>
+                <td>{{ supplier.email }}</td>
+                <td>{{ supplier.phone }}</td>
+                <td>
+                  <span class="status-chip" [class.active]="supplier.isActive" [class.inactive]="!supplier.isActive">
+                    {{ (supplier.isActive ? 'suppliers.list.active' : 'suppliers.list.inactive') | translate }}
+                  </span>
+                </td>
+                <td>
+                  <button mat-icon-button type="button" [attr.aria-label]="'common.actions' | translate" (click)="openDetailDialog(supplier)">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty-row">{{ 'suppliers.list.emptyRow' | translate }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="pagedSuppliers().totalCount"
+          [pageSize]="pagedSuppliers().pageSize"
+          [pageIndex]="pagedSuppliers().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onSuppliersPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

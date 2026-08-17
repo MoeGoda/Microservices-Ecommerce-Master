@@ -1,0 +1,62 @@
+<div class="page purchase-orders-admin">
+  <div class="page-header">
+    <h1>{{ 'purchaseOrders.title' | translate }}</h1>
+    <div class="page-header-actions">
+      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        {{ 'purchaseOrders.create.title' | translate }}
+      </button>
+    </div>
+  </div>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loadingOrders()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'purchaseOrders.list.table.orderNumber' | translate }}</th>
+              <th>{{ 'purchaseOrders.list.table.supplier' | translate }}</th>
+              <th>{{ 'purchaseOrders.list.table.status' | translate }}</th>
+              <th>{{ 'purchaseOrders.list.table.lines' | translate }}</th>
+              <th>{{ 'purchaseOrders.list.table.totalCost' | translate }}</th>
+              <th>{{ 'purchaseOrders.list.table.createdAt' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (order of pagedOrders().items; track order.id) {
+              <tr>
+                <td>{{ order.orderNumber }}</td>
+                <td>{{ order.supplierName }}</td>
+                <td><span class="status-chip" [class]="'status-' + order.status">{{ 'purchaseOrders.status.' + order.status | translate }}</span></td>
+                <td>{{ order.lineCount }}</td>
+                <td>{{ order.totalCost | number: '1.2-2' }}</td>
+                <td>{{ order.createdAt | date: 'short' }}</td>
+                <td>
+                  <button mat-icon-button type="button" [attr.aria-label]="'common.actions' | translate" (click)="openDetailDialog(order)">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-row">{{ 'purchaseOrders.list.emptyRow' | translate }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="pagedOrders().totalCount"
+          [pageSize]="pagedOrders().pageSize"
+          [pageIndex]="pagedOrders().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onOrdersPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

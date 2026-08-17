@@ -1,0 +1,31 @@
+<h2 mat-dialog-title>{{ supplier().name }}</h2>
+
+<mat-dialog-content>
+  <dl class="detail-list">
+    <dt>{{ 'suppliers.list.table.status' | translate }}</dt>
+    <dd>
+      <span class="status-chip" [class.active]="supplier().isActive" [class.inactive]="!supplier().isActive">
+        {{ (supplier().isActive ? 'suppliers.list.active' : 'suppliers.list.inactive') | translate }}
+      </span>
+    </dd>
+
+    <dt>{{ 'suppliers.list.table.contactName' | translate }}</dt>
+    <dd>{{ supplier().contactName || '—' }}</dd>
+
+    <dt>{{ 'suppliers.list.table.email' | translate }}</dt>
+    <dd>{{ supplier().email || '—' }}</dd>
+
+    <dt>{{ 'suppliers.list.table.phone' | translate }}</dt>
+    <dd>{{ supplier().phone || '—' }}</dd>
+
+    <dt>{{ 'suppliers.create.address' | translate }}</dt>
+    <dd>{{ supplier().address || '—' }}</dd>
+  </dl>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>{{ 'common.close' | translate }}</button>
+  <button mat-flat-button color="primary" type="button" [disabled]="togglingActive()" (click)="toggleActive()">
+    {{ (supplier().isActive ? 'suppliers.list.deactivate' : 'suppliers.list.activate') | translate }}
+  </button>
+</mat-dialog-actions>

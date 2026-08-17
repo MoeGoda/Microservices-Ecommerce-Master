@@ -1,0 +1,84 @@
+<h2 mat-dialog-title>{{ 'purchaseOrders.create.title' | translate }}</h2>
+
+<form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+  <mat-dialog-content>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'purchaseOrders.create.supplier' | translate }}</mat-label>
+        <mat-select formControlName="supplierId">
+          @for (supplier of suppliers(); track supplier.id) {
+            <mat-option [value]="supplier.id" [disabled]="!supplier.isActive">
+              {{ supplier.name }}{{ !supplier.isActive ? ' (' + ('purchaseOrders.create.inactiveSupplier' | translate) + ')' : '' }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (createForm.controls.supplierId.touched && createForm.controls.supplierId.invalid) {
+          <mat-error>{{ 'purchaseOrders.create.supplierRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="span-2">
+        <mat-label>{{ 'purchaseOrders.create.notes' | translate }}</mat-label>
+        <input matInput formControlName="notes" />
+      </mat-form-field>
+    </div>
+
+    <h4>{{ 'purchaseOrders.create.linesHeading' | translate }}</h4>
+    <div formArrayName="lines" class="lines-list">
+      @for (line of lines.controls; track $index) {
+        <div [formGroupName]="$index" class="line-row">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'purchaseOrders.create.item' | translate }}</mat-label>
+            <mat-select formControlName="itemId" (selectionChange)="onLineItemChange(line)">
+              @for (item of items(); track item.id) {
+                <mat-option [value]="item.id">{{ item.sku }} — {{ item.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'purchaseOrders.create.unit' | translate }}</mat-label>
+            <mat-select formControlName="unitOfMeasureId" [disabled]="!line.controls.itemId.value">
+              @for (unit of validUnitsForLine(line); track unit.id) {
+                <mat-option [value]="unit.id">{{ unit.code }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'purchaseOrders.create.quantity' | translate }}</mat-label>
+            <input matInput type="number" step="0.0001" formControlName="orderedQuantity" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'purchaseOrders.create.unitCost' | translate }}</mat-label>
+            <input matInput type="number" step="0.01" formControlName="unitCost" />
+          </mat-form-field>
+
+          <button
+            mat-icon-button
+            type="button"
+            [disabled]="lines.length <= 1"
+            [attr.aria-label]="'purchaseOrders.create.removeLine' | translate"
+            (click)="removeLine($index)"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      }
+    </div>
+
+    <button mat-stroked-button type="button" (click)="addLine()">{{ 'purchaseOrders.create.addLine' | translate }}</button>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ 'common.cancel' | translate }}</button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="creatingOrder()">
+      @if (creatingOrder()) {
+        <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        {{ 'purchaseOrders.create.submit' | translate }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

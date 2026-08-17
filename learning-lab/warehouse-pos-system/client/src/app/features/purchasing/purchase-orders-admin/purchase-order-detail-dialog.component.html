@@ -1,0 +1,90 @@
+@if (loadingDetail()) {
+  <mat-dialog-content class="loading-content">
+    <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+  </mat-dialog-content>
+} @else if (order(); as order) {
+  <h2 mat-dialog-title>
+    {{ order.orderNumber }} — {{ order.supplierName }}
+    <span class="status-chip" [class]="'status-' + order.status">{{ 'purchaseOrders.status.' + order.status | translate }}</span>
+  </h2>
+
+  <mat-dialog-content>
+    @if (order.notes) {
+      <p>{{ order.notes }}</p>
+    }
+
+    <table class="data-grid">
+      <thead>
+        <tr>
+          <th>{{ 'purchaseOrders.detail.table.item' | translate }}</th>
+          <th>{{ 'purchaseOrders.detail.table.unit' | translate }}</th>
+          <th>{{ 'purchaseOrders.detail.table.ordered' | translate }}</th>
+          <th>{{ 'purchaseOrders.detail.table.received' | translate }}</th>
+          <th>{{ 'purchaseOrders.detail.table.unitCost' | translate }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (line of order.lines; track line.id) {
+          <tr>
+            <td>{{ line.itemSku }} — {{ line.itemName }}</td>
+            <td>{{ line.unitOfMeasureCode }}</td>
+            <td>{{ line.orderedQuantity }}</td>
+            <td>{{ line.receivedQuantity }}</td>
+            <td>{{ line.unitCost | number: '1.2-2' }}</td>
+            <td>
+              @if (canReceive(order) && remaining(line) > 0) {
+                <button mat-stroked-button type="button" (click)="startReceive(line)">{{ 'purchaseOrders.detail.receive' | translate }}</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    @if (receivingLine(); as line) {
+      <form [formGroup]="receiveForm" (ngSubmit)="submitReceive()" class="receive-form">
+        <h4>{{ 'purchaseOrders.detail.receiveHeading' | translate: { sku: line.itemSku } }}</h4>
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'purchaseOrders.detail.location' | translate }}</mat-label>
+            <mat-select formControlName="locationId">
+              @for (location of locations(); track location.id) {
+                <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'purchaseOrders.detail.quantity' | translate: { unit: line.unitOfMeasureCode, remaining: remaining(line) } }}</mat-label>
+            <input matInput type="number" step="0.0001" formControlName="quantity" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'purchaseOrders.detail.reference' | translate }}</mat-label>
+            <input matInput formControlName="reference" />
+          </mat-form-field>
+        </div>
+
+        <button mat-flat-button color="primary" type="submit" [disabled]="receivingStock()">
+          {{ 'purchaseOrders.detail.confirmReceive' | translate }}
+        </button>
+        <button mat-button type="button" (click)="cancelReceive()">{{ 'common.cancel' | translate }}</button>
+      </form>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    @if (canSubmit(order)) {
+      <button mat-stroked-button type="button" [disabled]="submittingOrder()" (click)="submitSubmit()">
+        {{ 'purchaseOrders.detail.submitOrder' | translate }}
+      </button>
+    }
+    @if (canCancel(order)) {
+      <button mat-stroked-button type="button" [disabled]="cancellingOrder()" (click)="submitCancel()">
+        {{ 'purchaseOrders.detail.cancelOrder' | translate }}
+      </button>
+    }
+    <button mat-button mat-dialog-close>{{ 'common.close' | translate }}</button>
+  </mat-dialog-actions>
+}

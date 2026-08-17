@@ -1,0 +1,38 @@
+<h2 mat-dialog-title>{{ user().firstName }} {{ user().lastName }}</h2>
+
+<mat-dialog-content>
+  <dl class="detail-list">
+    <dt>{{ 'users.list.table.userName' | translate }}</dt>
+    <dd>{{ user().userName }}</dd>
+
+    <dt>{{ 'users.list.table.email' | translate }}</dt>
+    <dd>{{ user().email }}</dd>
+
+    <dt>{{ 'users.list.table.role' | translate }}</dt>
+    <dd>{{ 'roles.' + user().role | translate }}</dd>
+
+    <dt>{{ 'users.list.table.status' | translate }}</dt>
+    <dd>
+      <span class="status-chip" [class.active]="user().isActive" [class.inactive]="!user().isActive">
+        {{ (user().isActive ? 'users.list.active' : 'users.list.inactive') | translate }}
+      </span>
+    </dd>
+
+    <dt>{{ 'users.list.table.createdAt' | translate }}</dt>
+    <dd>{{ user().createdAt | date: 'medium' }}</dd>
+  </dl>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>{{ 'common.close' | translate }}</button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    [disabled]="togglingActive() || (user().isActive && isSelf())"
+    [attr.title]="user().isActive && isSelf() ? ('users.list.cannotDeactivateSelf' | translate) : null"
+    (click)="toggleActive()"
+  >
+    {{ (user().isActive ? 'users.list.deactivate' : 'users.list.activate') | translate }}
+  </button>
+</mat-dialog-actions>

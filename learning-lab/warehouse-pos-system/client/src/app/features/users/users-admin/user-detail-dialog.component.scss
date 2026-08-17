@@ -1,26 +1,18 @@
-.form-grid {
+.detail-list {
+  min-width: 360px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: auto 1fr;
   gap: 8px 16px;
-  align-items: start;
-}
+  margin: 0;
 
-.span-2 {
-  grid-column: span 2;
-}
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+    font: var(--mat-sys-label-medium);
+  }
 
-.submit-button {
-  height: 40px;
-}
-
-.data-grid {
-  margin-bottom: 8px;
-}
-
-.empty-row {
-  color: var(--mat-sys-on-surface-variant);
-  font-style: italic;
-  text-align: center;
+  dd {
+    margin: 0;
+  }
 }
 
 .status-chip {

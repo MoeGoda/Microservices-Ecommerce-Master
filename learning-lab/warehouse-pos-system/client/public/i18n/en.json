@@ -380,7 +380,7 @@
       "inactive": "Inactive",
       "activate": "Activate",
       "deactivate": "Deactivate",
-      "emptyRow": "No suppliers yet — add one above."
+      "emptyRow": "No suppliers yet — create one to get started."
     },
     "toasts": {
       "created": "Supplier \"{{name}}\" created.",

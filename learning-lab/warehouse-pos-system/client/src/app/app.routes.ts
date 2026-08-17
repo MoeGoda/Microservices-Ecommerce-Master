@@ -7,9 +7,9 @@ import { ItemCreateComponent } from './features/warehouse/item-create/item-creat
 import { ItemDetailComponent } from './features/warehouse/item-detail/item-detail.component';
 import { PosRegisterComponent } from './features/pos/pos-register.component';
 import { ReportsDashboardComponent } from './features/reporting/reports-dashboard/reports-dashboard.component';
-import { UsersAdminComponent } from './features/users/users-admin.component';
-import { PurchaseOrdersAdminComponent } from './features/purchasing/purchase-orders-admin.component';
-import { SuppliersAdminComponent } from './features/purchasing/suppliers-admin.component';
+import { UsersAdminComponent } from './features/users/users-admin/users-admin.component';
+import { PurchaseOrdersAdminComponent } from './features/purchasing/purchase-orders-admin/purchase-orders-admin.component';
+import { SuppliersAdminComponent } from './features/purchasing/suppliers-admin/suppliers-admin.component';
 import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from './shared/models/roles';
 
 export const routes: Routes = [

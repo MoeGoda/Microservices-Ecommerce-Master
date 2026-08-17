@@ -1,0 +1,28 @@
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  align-items: start;
+  min-width: 560px;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.lines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.line-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+
+h4 {
+  margin: 16px 0 8px;
+}
