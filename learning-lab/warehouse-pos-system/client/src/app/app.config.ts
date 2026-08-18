@@ -8,6 +8,7 @@ import {
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { provideNativeDateAdapter } from '@angular/material/core';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
@@ -32,6 +33,11 @@ export const appConfig: ApplicationConfig = {
     // provider registered or its components (snackbar, form field) throw
     // at runtime.
     provideAnimationsAsync(),
+    // M — MatDatepickerModule needs a date adapter registered somewhere;
+    // provided once here rather than per-component now that the new
+    // Warehouse filter panels (Receipts/Transfers/Adjustments/Issues) all
+    // use a from/to date range picker.
+    provideNativeDateAdapter(),
     // F3 — loads en.json/ar.json and initializes i18next before the app's
     // first render, so no component or the translate pipe ever sees an
     // un-initialized i18next instance and renders a flash of raw keys.

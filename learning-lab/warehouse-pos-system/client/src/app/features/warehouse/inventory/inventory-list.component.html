@@ -1,0 +1,69 @@
+<div class="page inventory-list">
+  <app-page-header [title]="'inventory.title' | translate"></app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'inventory.filters.search' | translate }}</mat-label>
+        <input matInput formControlName="search" (keyup.enter)="onSearch()" />
+      </mat-form-field>
+
+      <app-searchable-select
+        [label]="'inventory.filters.category' | translate"
+        formControlName="categoryName"
+        [options]="categories()"
+        [optionLabel]="categoryLabel"
+        [optionValue]="categoryValue"
+      ></app-searchable-select>
+    </form>
+  </app-filter-panel>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (pagedLines().items.length === 0) {
+        <app-empty-state icon="inventory" [message]="'inventory.emptyRow' | translate"></app-empty-state>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'inventory.table.sku' | translate }}</th>
+              <th>{{ 'inventory.table.item' | translate }}</th>
+              <th>{{ 'inventory.table.category' | translate }}</th>
+              <th>{{ 'inventory.table.quantity' | translate }}</th>
+              <th>{{ 'inventory.table.unitPrice' | translate }}</th>
+              <th>{{ 'inventory.table.totalValue' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of pagedLines().items; track line.itemId) {
+              <tr>
+                <td>{{ line.sku }}</td>
+                <td>{{ line.itemName }}</td>
+                <td>{{ line.categoryName }}</td>
+                <td>{{ line.totalQuantityOnHand | number: '1.0-4' }}</td>
+                <td>{{ line.unitPrice | number: '1.2-2' }}</td>
+                <td>{{ line.totalValue | number: '1.2-2' }}</td>
+                <td>
+                  <button mat-icon-button type="button" [attr.aria-label]="'common.view' | translate" [matTooltip]="'common.view' | translate" (click)="viewItem(line)">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="pagedLines().totalCount"
+          [pageSize]="pagedLines().pageSize"
+          [pageIndex]="pagedLines().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

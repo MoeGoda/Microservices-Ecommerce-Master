@@ -1,0 +1,54 @@
+<h2 mat-dialog-title>{{ 'receipts.create.title' | translate }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content>
+    <div class="form-grid">
+      <app-searchable-select
+        [label]="'receipts.create.item' | translate"
+        formControlName="itemId"
+        [options]="items()"
+        [optionLabel]="itemLabel"
+        [optionValue]="itemValue"
+        (selectionChange)="onItemSelected($event)"
+      ></app-searchable-select>
+
+      <app-searchable-select
+        [label]="'receipts.create.location' | translate"
+        formControlName="locationId"
+        [options]="locations()"
+        [optionLabel]="locationLabel"
+        [optionValue]="locationValue"
+      ></app-searchable-select>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'receipts.create.unit' | translate }}</mat-label>
+        <mat-select formControlName="unitOfMeasureId" [disabled]="!form.controls.itemId.value">
+          @for (unit of validUnits(); track unit.id) {
+            <mat-option [value]="unit.id">{{ unit.code }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'receipts.create.quantity' | translate }}</mat-label>
+        <input matInput type="number" step="0.0001" formControlName="quantity" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="span-2">
+        <mat-label>{{ 'receipts.create.reference' | translate }}</mat-label>
+        <input matInput formControlName="reference" />
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ 'common.cancel' | translate }}</button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        {{ 'receipts.create.submit' | translate }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

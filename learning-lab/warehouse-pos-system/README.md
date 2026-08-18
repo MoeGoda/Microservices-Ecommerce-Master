@@ -70,6 +70,9 @@ a distributed transaction.
 **Phase L — A real PO bug, and a grid + dialog pattern for Suppliers/Purchase Orders/Users**
 - [x] **L — Fixed a PO line unit-conversion bug found in testing; Suppliers, Purchase Orders, and Users rebuilt as grid + create/detail dialogs**
 
+**Phase M — Gradus-style shell rebuild, a real Warehouse navigation group, and app-wide UI consistency**
+- [x] **M — Data-driven sidebar (Warehouse + Purchasing accordion groups), 6 new Warehouse screens + 1 placeholder, and a reusable component set (page header, status badge, filter panel, searchable select, confirm dialog, empty state) applied across every list screen**
+
 ## A1 — Identity service
 
 **What it does:** issues JWTs after registering/logging in a user, backed by
@@ -3274,4 +3277,117 @@ for giving a genuinely complex screen its own URL.
 # → switch to Arabic — grid headers, dialog titles, and every button
 #   label are translated, RTL mirrors the dialogs the same as every
 #   other screen
+```
+
+## M — Gradus-style shell rebuild, a real Warehouse navigation group, and app-wide UI consistency
+
+**What it does:** a full frontend layout/navigation redesign requested against
+this specific admin template
+(themeforest.net/item/gradus-angular-5-material-design-admin-template) —
+adapted, not copied: the sidebar/toolbar structure and interaction model
+came from that reference, but every color, font, and spacing value still
+comes from this app's own Material 3 token system
+(`mat.theme()`'s blue/cyan palette in `styles.scss`), so it reads as one
+consistent app, not a second design language pasted on top. No existing
+API, service, model, guard, or route was touched — every backend contract
+from A–L is exactly as it was.
+
+**Shell:** `app.ts`/`app.html`/`app.scss` were refactored in place (not
+replaced with a parallel component) to keep the existing auth-gated
+bootstrap, `BreakpointObserver` responsive logic, language switcher, and
+notifications/profile menus untouched. The one thing that changed
+structurally: K's single hardcoded "Warehouse" toggle became a data-driven
+`NAV_ENTRIES` config (`core/layout/nav-config.ts`) — any number of
+accordion groups, each role-gated by the exact same arrays
+`roleGuard()` already checks. Two groups exist now:
+
+```
+Warehouse                          Purchasing
+├── Items (existing)               ├── Suppliers (existing)
+├── Dashboard                      └── Purchase Orders (existing)
+├── Receipts
+├── Transfers
+├── Issues
+├── Inventory
+├── Adjustments
+└── Stock Counts
+```
+
+Purchasing got its own group instead of staying folded into Warehouse —
+the new Warehouse spec didn't include Suppliers/POs, and splitting them
+out gives both groups a clean, single meaning.
+
+**Two real gaps, resolved deliberately, not invented around:**
+Investigating what "Issues" and "Stock Counts" should even mean surfaced
+that neither has any backing entity, command, or query anywhere in the
+domain — confirmed by reading every `Warehouse.Application` command and
+the full `StockTransactionReason` enum. Per your explicit call:
+- **Issues** is the negative half of the existing, real
+  `AdjustStockCommand` (which already accepts a signed quantity) — the
+  "New Issue" dialog collects a positive "quantity to issue" and negates
+  it before calling the exact same `WarehouseService.adjustStock()`
+  item-detail's Stock tab already used. Zero backend change, just a
+  UI-level framing of a capability that was always there.
+- **Stock Counts** has no primitive to reuse at all — no entity, no
+  command, nothing. Its route renders a page header and a plain "not
+  available yet" empty state. No fabricated data, no backend change.
+
+**Six real screens, one honest placeholder — all built on data that
+already existed:**
+
+| Screen | Backed by (unchanged) |
+|---|---|
+| Dashboard | `getInventoryValuation()`, `getPurchaseOrderAging()`, Reporting's `getLowStock()`/`getStockMovements()` — the same four calls `/reports` already made, scoped to warehouse-only content |
+| Receipts | Reporting's `stock-movements` ledger filtered to `Received`/`PurchaseOrderReceived`; "+ New Receipt" wraps `WarehouseService.receiveStock()` |
+| Transfers | same ledger filtered to `TransferIn`/`TransferOut`; "+ New Transfer" wraps `transferStock()` |
+| Adjustments | same ledger, `Adjustment` reason, positive quantity only; wraps `adjustStock()` |
+| Issues | same ledger, `Adjustment` reason, negative quantity only; wraps `adjustStock()` with a negated quantity |
+| Inventory | `getInventoryValuation()` — a per-item, cross-location on-hand view; "View" navigates to the item's own `/items/:id`, not a new detail screen |
+| Stock Counts | placeholder only |
+
+None of the backend list queries (`GetStockMovementsQuery`,
+`GetAllItemsQuery`, `GetSuppliersQuery`, `GetPurchaseOrdersQuery`,
+`GetUsersQuery`) support server-side text search — every one of them caps
+`pageSize` at 100 with no search param. Every filter panel (new and
+retrofitted) therefore fetches up to that cap and searches/paginates
+**client-side** (`shared/utils/paginate-client-side.ts`), the same
+pattern used consistently across all of them rather than half server-side
+and half not.
+
+**A reusable component set, used everywhere, not just in Warehouse**
+(`shared/components/`): `page-header`, `status-badge` (one five-tone
+system replacing ~6 independently-duplicated `.status-chip` blocks),
+`filter-panel` (card chrome + Search/Reset, collapsible), `searchable-select`
+(a `ControlValueAccessor` built on `MatAutocompleteModule` — already
+ships with `@angular/material`, no new dependency — dropped in as a
+straight `<mat-select>` replacement wherever the list is real master data:
+items, suppliers, locations, categories, units), `confirm-dialog`, and
+`empty-state`. Suppliers, Purchase Orders, Users, and Items all got the
+same retrofit: a filter panel, status badges, and searchable pickers where
+the option list was master data — the redesign explicitly wasn't scoped
+to "make Warehouse pretty," it was scoped to make the whole app consistent.
+
+**Try it:**
+```bash
+# Sign in as the seeded admin, then in the Angular app:
+# → the sidebar now shows two accordion groups: Warehouse (8 children,
+#   including the pre-existing Items) and Purchasing (Suppliers,
+#   Purchase Orders) — both expand/collapse independently
+# → /warehouse is a dashboard with four cards (low stock, inventory
+#   value, oldest open POs, recent activity) built entirely from
+#   existing report queries
+# → /warehouse/receipts, /transfers, /adjustments, /issues each have a
+#   filter panel (text search + location/date-range where relevant) and
+#   a "+ New ..." dialog; every dropdown in those dialogs (item,
+#   location) is searchable — type to filter instead of scrolling
+# → /warehouse/inventory lists on-hand quantity/value per item; its
+#   "View" action goes straight to /items/:id
+# → /warehouse/stock-counts is a plain "not available yet" page — no
+#   fake data
+# → /items, /suppliers, /purchase-orders, /users all gained the same
+#   filter panel + status badge + searchable-select treatment; nothing
+#   about their underlying create/detail dialogs from K/L changed
+# → switch to Arabic — the two new sidebar groups, every new screen, and
+#   every retrofitted filter panel are fully translated, RTL mirrors the
+#   layout the same as every other screen
 ```

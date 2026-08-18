@@ -1,18 +1,45 @@
 <div class="page users-admin">
-  <div class="page-header">
-    <h1>{{ 'users.title' | translate }}</h1>
-    <div class="page-header-actions">
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        <mat-icon aria-hidden="true">add</mat-icon>
-        {{ 'users.create.title' | translate }}
-      </button>
-    </div>
-  </div>
+  <app-page-header [title]="'users.title' | translate">
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      {{ 'users.create.title' | translate }}
+    </button>
+  </app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.list.filters.search' | translate }}</mat-label>
+        <input matInput formControlName="search" (keyup.enter)="onSearch()" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.list.filters.role' | translate }}</mat-label>
+        <mat-select formControlName="role">
+          <mat-option [value]="null">{{ 'common.any' | translate }}</mat-option>
+          @for (role of roles; track role) {
+            <mat-option [value]="role">{{ 'roles.' + role | translate }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'users.list.filters.status' | translate }}</mat-label>
+        <mat-select formControlName="status">
+          <mat-option [value]="null">{{ 'common.any' | translate }}</mat-option>
+          <mat-option value="active">{{ 'users.list.active' | translate }}</mat-option>
+          <mat-option value="inactive">{{ 'users.list.inactive' | translate }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
 
   <mat-card class="list-card">
     <mat-card-content>
       @if (loadingUsers()) {
         <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (pagedUsers().items.length === 0) {
+        <app-empty-state icon="group" [message]="'users.list.emptyRow' | translate"></app-empty-state>
       } @else {
         <table class="data-grid">
           <thead>
@@ -34,20 +61,23 @@
                 <td>{{ user.email }}</td>
                 <td>{{ 'roles.' + user.role | translate }}</td>
                 <td>
-                  <span class="status-chip" [class.active]="user.isActive" [class.inactive]="!user.isActive">
-                    {{ (user.isActive ? 'users.list.active' : 'users.list.inactive') | translate }}
-                  </span>
+                  <app-status-badge
+                    [status]="user.isActive ? 'active' : 'inactive'"
+                    [label]="(user.isActive ? 'users.list.active' : 'users.list.inactive') | translate"
+                  ></app-status-badge>
                 </td>
                 <td>{{ user.createdAt | date: 'short' }}</td>
                 <td>
-                  <button mat-icon-button type="button" [attr.aria-label]="'common.actions' | translate" (click)="openDetailDialog(user)">
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="'common.view' | translate"
+                    [matTooltip]="'common.view' | translate"
+                    (click)="openDetailDialog(user)"
+                  >
                     <mat-icon>visibility</mat-icon>
                   </button>
                 </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="7" class="empty-row">{{ 'users.list.emptyRow' | translate }}</td>
               </tr>
             }
           </tbody>

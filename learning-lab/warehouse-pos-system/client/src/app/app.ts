@@ -10,9 +10,9 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { AuthService } from './core/auth/auth.service';
+import { NAV_ENTRIES, NavEntry } from './core/layout/nav-config';
 import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
 import { NotificationDto } from './shared/models/notification.models';
-import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from './shared/models/roles';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import { LanguageSwitcherComponent } from './shared/components/language-switcher/language-switcher.component';
 
@@ -60,13 +60,14 @@ export class App {
   readonly sidenavMode = signal<'side' | 'over'>('side');
   readonly sidenavOpened = signal(true);
 
-  // K — the sidenav's one genuinely multi-screen group (Items/Suppliers/
-  // Purchase Orders). POS/Reports/Users each stay a single flat link —
-  // grouping a section with exactly one destination would just add a
-  // click for no organizational benefit. Opens by default so a reload
-  // while already on one of its own pages doesn't look collapsed/broken;
-  // the constructor below re-opens it on navigation into the group too.
-  readonly warehouseGroupOpen = signal(true);
+  // M — generalized from K's single hardcoded warehouseGroupOpen signal:
+  // any number of NAV_ENTRIES groups can now exist, each tracked by id in
+  // one Set. Both groups start open (same "don't look collapsed/broken
+  // on reload" reasoning K used for the one group it had) — POS/Reports/
+  // Users stay flat single links since they have only one destination
+  // each, same as before.
+  readonly navEntries: readonly NavEntry[] = NAV_ENTRIES;
+  readonly openGroups = signal<ReadonlySet<string>>(new Set(['warehouse', 'purchasing']));
 
   readonly userInitial = computed(() => {
     const name = this.authService.currentUser()?.userName;
@@ -105,26 +106,28 @@ export class App {
 
   // Mirrors roleGuard's own check — the toolbar shouldn't even offer a
   // link the user's role can't actually use, same "don't show a door
-  // that leads to a 403" reasoning as the route guard itself.
-  canSeeAdmin(): boolean {
-    return this.hasAnyRole(ADMIN_ROLES);
-  }
-
-  canSeePos(): boolean {
-    return this.hasAnyRole(POS_ROLES);
-  }
-
-  canSeeReports(): boolean {
-    return this.hasAnyRole(REPORTS_ROLES);
-  }
-
-  canSeeUsers(): boolean {
-    return this.hasAnyRole(USER_MANAGEMENT_ROLES);
-  }
-
-  private hasAnyRole(roles: readonly string[]): boolean {
+  // that leads to a 403" reasoning as the route guard itself. Generalized
+  // from four one-off canSeeX() methods (K) into one taking any
+  // NAV_ENTRIES roles array, since groups are now data, not template.
+  canSee(roles: readonly string[]): boolean {
     const user = this.authService.currentUser();
     return !!user && roles.includes(user.role);
+  }
+
+  isGroupOpen(id: string): boolean {
+    return this.openGroups().has(id);
+  }
+
+  toggleGroup(id: string): void {
+    this.openGroups.update((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }
 
   logout(): void {

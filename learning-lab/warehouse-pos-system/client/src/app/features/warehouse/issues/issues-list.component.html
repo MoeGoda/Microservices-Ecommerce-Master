@@ -1,0 +1,86 @@
+<div class="page issues-list">
+  <app-page-header [title]="'issues.title' | translate">
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      {{ 'issues.create.title' | translate }}
+    </button>
+  </app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'issues.filters.search' | translate }}</mat-label>
+        <input matInput formControlName="search" (keyup.enter)="onSearch()" />
+      </mat-form-field>
+
+      <app-searchable-select
+        [label]="'issues.filters.location' | translate"
+        formControlName="locationId"
+        [options]="locations()"
+        [optionLabel]="locationLabel"
+        [optionValue]="locationValue"
+      ></app-searchable-select>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'issues.filters.from' | translate }}</mat-label>
+        <input matInput [matDatepicker]="fromPicker" formControlName="fromUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'issues.filters.to' | translate }}</mat-label>
+        <input matInput [matDatepicker]="toPicker" formControlName="toUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+        <mat-datepicker #toPicker></mat-datepicker>
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (pagedMovements().items.length === 0) {
+        <app-empty-state icon="outbox" [message]="'issues.emptyRow' | translate"></app-empty-state>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'stockMovements.table.date' | translate }}</th>
+              <th>{{ 'stockMovements.table.item' | translate }}</th>
+              <th>{{ 'stockMovements.table.location' | translate }}</th>
+              <th>{{ 'stockMovements.table.quantity' | translate }}</th>
+              <th>{{ 'stockMovements.table.reference' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (movement of pagedMovements().items; track movement.itemId + '-' + movement.transactionAtUtc + '-' + movement.locationId) {
+              <tr>
+                <td>{{ movement.transactionAtUtc | date: 'short' }}</td>
+                <td>{{ movement.sku }} — {{ movement.itemName }}</td>
+                <td>{{ movement.locationCode }}</td>
+                <td class="negative">{{ movement.quantityChange | number: '1.0-4' }}</td>
+                <td>{{ movement.reference || '—' }}</td>
+                <td>
+                  <button mat-icon-button type="button" [attr.aria-label]="'common.view' | translate" [matTooltip]="'common.view' | translate" (click)="openDetailDialog(movement)">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="pagedMovements().totalCount"
+          [pageSize]="pagedMovements().pageSize"
+          [pageIndex]="pagedMovements().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

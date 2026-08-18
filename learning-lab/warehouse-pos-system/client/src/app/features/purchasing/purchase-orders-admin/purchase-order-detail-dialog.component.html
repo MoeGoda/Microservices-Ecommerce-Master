@@ -5,7 +5,7 @@
 } @else if (order(); as order) {
   <h2 mat-dialog-title>
     {{ order.orderNumber }} — {{ order.supplierName }}
-    <span class="status-chip" [class]="'status-' + order.status">{{ 'purchaseOrders.status.' + order.status | translate }}</span>
+    <app-status-badge [status]="order.status" [label]="'purchaseOrders.status.' + order.status | translate"></app-status-badge>
   </h2>
 
   <mat-dialog-content>
@@ -46,14 +46,13 @@
       <form [formGroup]="receiveForm" (ngSubmit)="submitReceive()" class="receive-form">
         <h4>{{ 'purchaseOrders.detail.receiveHeading' | translate: { sku: line.itemSku } }}</h4>
         <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>{{ 'purchaseOrders.detail.location' | translate }}</mat-label>
-            <mat-select formControlName="locationId">
-              @for (location of locations(); track location.id) {
-                <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
+          <app-searchable-select
+            [label]="'purchaseOrders.detail.location' | translate"
+            formControlName="locationId"
+            [options]="locations()"
+            [optionLabel]="locationLabel"
+            [optionValue]="locationValue"
+          ></app-searchable-select>
 
           <mat-form-field appearance="outline">
             <mat-label>{{ 'purchaseOrders.detail.quantity' | translate: { unit: line.unitOfMeasureCode, remaining: remaining(line) } }}</mat-label>

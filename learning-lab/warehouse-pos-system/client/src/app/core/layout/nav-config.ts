@@ -1,0 +1,75 @@
+import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from '../../shared/models/roles';
+
+// M — the sidenav used to hardcode one hand-rolled accordion group
+// (Warehouse: Items/Suppliers/Purchase Orders) directly in app.html.
+// This config generalizes that into N groups so a real "Warehouse"
+// section (Items, Dashboard, Receipts, Transfers, Issues, Inventory,
+// Adjustments, Stock Counts) and a new "Purchasing" section (Suppliers,
+// Purchase Orders) can both exist without hand-writing a second toggle
+// signal per group. Every route/role pairing here matches what
+// app.routes.ts already guards — this config only changes how they're
+// presented in the sidebar, not what's reachable or by whom.
+export interface NavLinkEntry {
+  readonly kind: 'link';
+  readonly labelKey: string;
+  readonly route: string;
+  readonly icon: string;
+  readonly roles: readonly string[];
+}
+
+export interface NavChildLink {
+  readonly labelKey: string;
+  readonly route: string;
+  readonly icon: string;
+  // Only the Warehouse group's own "Dashboard" child needs this: its
+  // route (/warehouse) is a literal prefix of every sibling's route
+  // (/warehouse/receipts, etc.), so routerLinkActive's default
+  // non-exact matching would keep it highlighted on every other child's
+  // page too unless it opts into exact matching.
+  readonly exact?: boolean;
+}
+
+export interface NavGroupEntry {
+  readonly kind: 'group';
+  readonly id: string;
+  readonly labelKey: string;
+  readonly icon: string;
+  readonly roles: readonly string[];
+  readonly children: readonly NavChildLink[];
+}
+
+export type NavEntry = NavLinkEntry | NavGroupEntry;
+
+export const NAV_ENTRIES: readonly NavEntry[] = [
+  {
+    kind: 'group',
+    id: 'warehouse',
+    labelKey: 'toolbar.warehouseGroup',
+    icon: 'inventory_2',
+    roles: ADMIN_ROLES,
+    children: [
+      { labelKey: 'toolbar.items', route: '/items', icon: 'category' },
+      { labelKey: 'toolbar.warehouseDashboard', route: '/warehouse', icon: 'dashboard', exact: true },
+      { labelKey: 'toolbar.receipts', route: '/warehouse/receipts', icon: 'move_to_inbox' },
+      { labelKey: 'toolbar.transfers', route: '/warehouse/transfers', icon: 'compare_arrows' },
+      { labelKey: 'toolbar.issues', route: '/warehouse/issues', icon: 'outbox' },
+      { labelKey: 'toolbar.inventory', route: '/warehouse/inventory', icon: 'inventory' },
+      { labelKey: 'toolbar.adjustments', route: '/warehouse/adjustments', icon: 'tune' },
+      { labelKey: 'toolbar.stockCounts', route: '/warehouse/stock-counts', icon: 'fact_check' },
+    ],
+  },
+  {
+    kind: 'group',
+    id: 'purchasing',
+    labelKey: 'toolbar.purchasingGroup',
+    icon: 'storefront',
+    roles: ADMIN_ROLES,
+    children: [
+      { labelKey: 'toolbar.suppliers', route: '/suppliers', icon: 'local_shipping' },
+      { labelKey: 'toolbar.purchaseOrders', route: '/purchase-orders', icon: 'receipt_long' },
+    ],
+  },
+  { kind: 'link', labelKey: 'toolbar.pos', route: '/pos', icon: 'point_of_sale', roles: POS_ROLES },
+  { kind: 'link', labelKey: 'toolbar.reports', route: '/reports', icon: 'bar_chart', roles: REPORTS_ROLES },
+  { kind: 'link', labelKey: 'toolbar.users', route: '/users', icon: 'group', roles: USER_MANAGEMENT_ROLES },
+];

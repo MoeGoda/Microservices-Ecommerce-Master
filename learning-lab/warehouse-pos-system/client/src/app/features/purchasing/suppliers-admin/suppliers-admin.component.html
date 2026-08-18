@@ -1,18 +1,35 @@
 <div class="page suppliers-admin">
-  <div class="page-header">
-    <h1>{{ 'suppliers.title' | translate }}</h1>
-    <div class="page-header-actions">
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        <mat-icon aria-hidden="true">add</mat-icon>
-        {{ 'suppliers.create.title' | translate }}
-      </button>
-    </div>
-  </div>
+  <app-page-header [title]="'suppliers.title' | translate">
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      {{ 'suppliers.create.title' | translate }}
+    </button>
+  </app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'suppliers.list.filters.search' | translate }}</mat-label>
+        <input matInput formControlName="search" (keyup.enter)="onSearch()" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'suppliers.list.filters.status' | translate }}</mat-label>
+        <mat-select formControlName="status">
+          <mat-option [value]="null">{{ 'common.any' | translate }}</mat-option>
+          <mat-option value="active">{{ 'suppliers.list.active' | translate }}</mat-option>
+          <mat-option value="inactive">{{ 'suppliers.list.inactive' | translate }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
 
   <mat-card class="list-card">
     <mat-card-content>
       @if (loadingSuppliers()) {
         <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (pagedSuppliers().items.length === 0) {
+        <app-empty-state icon="local_shipping" [message]="'suppliers.list.emptyRow' | translate"></app-empty-state>
       } @else {
         <table class="data-grid">
           <thead>
@@ -33,19 +50,22 @@
                 <td>{{ supplier.email }}</td>
                 <td>{{ supplier.phone }}</td>
                 <td>
-                  <span class="status-chip" [class.active]="supplier.isActive" [class.inactive]="!supplier.isActive">
-                    {{ (supplier.isActive ? 'suppliers.list.active' : 'suppliers.list.inactive') | translate }}
-                  </span>
+                  <app-status-badge
+                    [status]="supplier.isActive ? 'active' : 'inactive'"
+                    [label]="(supplier.isActive ? 'suppliers.list.active' : 'suppliers.list.inactive') | translate"
+                  ></app-status-badge>
                 </td>
                 <td>
-                  <button mat-icon-button type="button" [attr.aria-label]="'common.actions' | translate" (click)="openDetailDialog(supplier)">
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="'common.view' | translate"
+                    [matTooltip]="'common.view' | translate"
+                    (click)="openDetailDialog(supplier)"
+                  >
                     <mat-icon>visibility</mat-icon>
                   </button>
                 </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="6" class="empty-row">{{ 'suppliers.list.emptyRow' | translate }}</td>
               </tr>
             }
           </tbody>

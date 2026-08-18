@@ -1,0 +1,44 @@
+<h2 mat-dialog-title>{{ 'adjustments.create.title' | translate }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content>
+    <div class="form-grid">
+      <app-searchable-select
+        [label]="'adjustments.create.item' | translate"
+        formControlName="itemId"
+        [options]="items()"
+        [optionLabel]="itemLabel"
+        [optionValue]="itemValue"
+      ></app-searchable-select>
+
+      <app-searchable-select
+        [label]="'adjustments.create.location' | translate"
+        formControlName="locationId"
+        [options]="locations()"
+        [optionLabel]="locationLabel"
+        [optionValue]="locationValue"
+      ></app-searchable-select>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'adjustments.create.quantity' | translate }}</mat-label>
+        <input matInput type="number" step="0.0001" formControlName="quantity" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'adjustments.create.reference' | translate }}</mat-label>
+        <input matInput formControlName="reference" />
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ 'common.cancel' | translate }}</button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        {{ 'adjustments.create.submit' | translate }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

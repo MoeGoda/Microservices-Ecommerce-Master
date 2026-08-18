@@ -6,53 +6,48 @@
         <span>{{ 'common.appName' | translate }}</span>
       </div>
       <mat-nav-list>
-        @if (canSeeAdmin()) {
-          <!-- K — the one nav group with more than one destination
-               (Items/Suppliers/Purchase Orders); a plain toggle button,
-               not routerLink, since this row navigates nowhere itself. -->
-          <button
-            mat-list-item
-            type="button"
-            class="nav-group-toggle"
-            [attr.aria-expanded]="warehouseGroupOpen()"
-            (click)="warehouseGroupOpen.set(!warehouseGroupOpen())"
-          >
-            <mat-icon matListItemIcon>inventory_2</mat-icon>
-            <span matListItemTitle>{{ 'toolbar.warehouseGroup' | translate }}</span>
-            <mat-icon class="nav-group-chevron" [class.open]="warehouseGroupOpen()" aria-hidden="true">expand_more</mat-icon>
-          </button>
-          @if (warehouseGroupOpen()) {
-            <a mat-list-item class="nav-sub-link" routerLink="/items" routerLinkActive="active-nav-link">
-              <mat-icon matListItemIcon>category</mat-icon>
-              <span matListItemTitle>{{ 'toolbar.items' | translate }}</span>
-            </a>
-            <a mat-list-item class="nav-sub-link" routerLink="/suppliers" routerLinkActive="active-nav-link">
-              <mat-icon matListItemIcon>local_shipping</mat-icon>
-              <span matListItemTitle>{{ 'toolbar.suppliers' | translate }}</span>
-            </a>
-            <a mat-list-item class="nav-sub-link" routerLink="/purchase-orders" routerLinkActive="active-nav-link">
-              <mat-icon matListItemIcon>receipt_long</mat-icon>
-              <span matListItemTitle>{{ 'toolbar.purchaseOrders' | translate }}</span>
-            </a>
+        <!-- M — generalized from K's one hardcoded Warehouse toggle into a
+             loop over NAV_ENTRIES, so any number of groups (Warehouse,
+             Purchasing, ...) can exist without a hand-written signal per
+             group. Behavior is identical to before: a group is a plain
+             toggle button (navigates nowhere itself), a link is a
+             routerLink, both gated by the same role-array check the
+             route guards themselves use. -->
+        @for (entry of navEntries; track entry.labelKey) {
+          @if (canSee(entry.roles)) {
+            @if (entry.kind === 'group') {
+              <button
+                mat-list-item
+                type="button"
+                class="nav-group-toggle"
+                [attr.aria-expanded]="isGroupOpen(entry.id)"
+                (click)="toggleGroup(entry.id)"
+              >
+                <mat-icon matListItemIcon>{{ entry.icon }}</mat-icon>
+                <span matListItemTitle>{{ entry.labelKey | translate }}</span>
+                <mat-icon class="nav-group-chevron" [class.open]="isGroupOpen(entry.id)" aria-hidden="true">expand_more</mat-icon>
+              </button>
+              @if (isGroupOpen(entry.id)) {
+                @for (child of entry.children; track child.route) {
+                  <a
+                    mat-list-item
+                    class="nav-sub-link"
+                    [routerLink]="child.route"
+                    routerLinkActive="active-nav-link"
+                    [routerLinkActiveOptions]="{ exact: !!child.exact }"
+                  >
+                    <mat-icon matListItemIcon>{{ child.icon }}</mat-icon>
+                    <span matListItemTitle>{{ child.labelKey | translate }}</span>
+                  </a>
+                }
+              }
+            } @else {
+              <a mat-list-item [routerLink]="entry.route" routerLinkActive="active-nav-link">
+                <mat-icon matListItemIcon>{{ entry.icon }}</mat-icon>
+                <span matListItemTitle>{{ entry.labelKey | translate }}</span>
+              </a>
+            }
           }
-        }
-        @if (canSeePos()) {
-          <a mat-list-item routerLink="/pos" routerLinkActive="active-nav-link">
-            <mat-icon matListItemIcon>point_of_sale</mat-icon>
-            <span matListItemTitle>{{ 'toolbar.pos' | translate }}</span>
-          </a>
-        }
-        @if (canSeeReports()) {
-          <a mat-list-item routerLink="/reports" routerLinkActive="active-nav-link">
-            <mat-icon matListItemIcon>bar_chart</mat-icon>
-            <span matListItemTitle>{{ 'toolbar.reports' | translate }}</span>
-          </a>
-        }
-        @if (canSeeUsers()) {
-          <a mat-list-item routerLink="/users" routerLinkActive="active-nav-link">
-            <mat-icon matListItemIcon>group</mat-icon>
-            <span matListItemTitle>{{ 'toolbar.users' | translate }}</span>
-          </a>
         }
       </mat-nav-list>
     </mat-sidenav>

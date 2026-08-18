@@ -1,0 +1,13 @@
+// .page-header / .page-header-actions come from the global styles.scss
+// convention every screen already used before this component existed —
+// kept there (not duplicated here) so screens that haven't been
+// retrofitted yet keep looking consistent with ones that have.
+.page-header-text {
+  min-width: 0;
+}
+
+.page-header-subtitle {
+  margin: 2px 0 0;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-on-surface-variant);
+}

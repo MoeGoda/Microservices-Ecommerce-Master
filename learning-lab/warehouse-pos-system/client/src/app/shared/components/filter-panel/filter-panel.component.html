@@ -1,0 +1,26 @@
+<mat-card class="filter-panel">
+  <mat-card-content>
+    @if (collapsible) {
+      <button mat-button type="button" class="filter-panel-toggle" (click)="toggle()">
+        <mat-icon aria-hidden="true">filter_alt</mat-icon>
+        {{ 'common.filters' | translate }}
+        <mat-icon class="filter-panel-chevron" [class.open]="expanded()" aria-hidden="true">expand_more</mat-icon>
+      </button>
+    }
+    @if (!collapsible || expanded()) {
+      <div class="filter-panel-fields">
+        <ng-content></ng-content>
+      </div>
+      <div class="filter-panel-actions">
+        <button mat-button type="button" (click)="reset.emit()">
+          <mat-icon aria-hidden="true">restart_alt</mat-icon>
+          {{ 'common.reset' | translate }}
+        </button>
+        <button mat-flat-button color="primary" type="button" (click)="search.emit()">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          {{ 'common.search' | translate }}
+        </button>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

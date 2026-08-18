@@ -217,14 +217,13 @@
               <div class="stock-forms">
                 <form [formGroup]="receiveForm" (ngSubmit)="submitReceive()" class="form-grid inline-form">
                   <h4>{{ 'items.detail.receive.heading' | translate }}</h4>
-                  <mat-form-field appearance="outline">
-                    <mat-label>{{ 'items.detail.receive.location' | translate }}</mat-label>
-                    <mat-select formControlName="locationId">
-                      @for (location of locations(); track location.id) {
-                        <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
+                  <app-searchable-select
+                    [label]="'items.detail.receive.location' | translate"
+                    formControlName="locationId"
+                    [options]="locations()"
+                    [optionLabel]="locationLabel"
+                    [optionValue]="locationValue"
+                  ></app-searchable-select>
                   <mat-form-field appearance="outline">
                     <mat-label>{{ 'items.detail.receive.quantity' | translate }}</mat-label>
                     <input matInput type="number" formControlName="quantity" />
@@ -276,14 +275,13 @@
                       }
                     </mat-select>
                   </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>{{ 'items.detail.transfer.toLocation' | translate }}</mat-label>
-                    <mat-select formControlName="toLocationId">
-                      @for (location of locations(); track location.id) {
-                        <mat-option [value]="location.id">{{ location.code }} — {{ location.name }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
+                  <app-searchable-select
+                    [label]="'items.detail.transfer.toLocation' | translate"
+                    formControlName="toLocationId"
+                    [options]="locations()"
+                    [optionLabel]="locationLabel"
+                    [optionValue]="locationValue"
+                  ></app-searchable-select>
                   <mat-form-field appearance="outline">
                     <mat-label>{{ 'items.detail.transfer.quantity' | translate }}</mat-label>
                     <input matInput type="number" formControlName="quantity" min="1" />

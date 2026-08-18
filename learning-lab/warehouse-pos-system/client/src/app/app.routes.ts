@@ -10,6 +10,13 @@ import { ReportsDashboardComponent } from './features/reporting/reports-dashboar
 import { UsersAdminComponent } from './features/users/users-admin/users-admin.component';
 import { PurchaseOrdersAdminComponent } from './features/purchasing/purchase-orders-admin/purchase-orders-admin.component';
 import { SuppliersAdminComponent } from './features/purchasing/suppliers-admin/suppliers-admin.component';
+import { WarehouseDashboardComponent } from './features/warehouse/warehouse-dashboard/warehouse-dashboard.component';
+import { ReceiptsListComponent } from './features/warehouse/receipts/receipts-list.component';
+import { TransfersListComponent } from './features/warehouse/transfers/transfers-list.component';
+import { IssuesListComponent } from './features/warehouse/issues/issues-list.component';
+import { InventoryListComponent } from './features/warehouse/inventory/inventory-list.component';
+import { AdjustmentsListComponent } from './features/warehouse/adjustments/adjustments-list.component';
+import { StockCountsPlaceholderComponent } from './features/warehouse/stock-counts/stock-counts-placeholder.component';
 import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from './shared/models/roles';
 
 export const routes: Routes = [
@@ -30,5 +37,15 @@ export const routes: Routes = [
   // same [Authorize(Roles = CatalogManagerRoles)] set Items/Stock use.
   { path: 'suppliers', component: SuppliersAdminComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
   { path: 'purchase-orders', component: PurchaseOrdersAdminComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  // M — the new Warehouse group's own screens (Dashboard/Receipts/
+  // Transfers/Issues/Inventory/Adjustments/Stock Counts), same guard set
+  // as /items since these are the same warehouse-management data.
+  { path: 'warehouse', component: WarehouseDashboardComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  { path: 'warehouse/receipts', component: ReceiptsListComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  { path: 'warehouse/transfers', component: TransfersListComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  { path: 'warehouse/issues', component: IssuesListComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  { path: 'warehouse/inventory', component: InventoryListComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  { path: 'warehouse/adjustments', component: AdjustmentsListComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
+  { path: 'warehouse/stock-counts', component: StockCountsPlaceholderComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
   { path: '**', redirectTo: 'login' },
 ];

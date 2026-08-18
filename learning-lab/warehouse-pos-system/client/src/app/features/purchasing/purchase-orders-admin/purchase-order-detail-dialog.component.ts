@@ -6,11 +6,12 @@ import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin } from 'rxjs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
+import { SearchableSelectComponent } from '../../../shared/components/searchable-select/searchable-select.component';
+import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { PurchaseOrderDetailDto, PurchaseOrderLineDto } from '../../../shared/models/purchasing.models';
 import { LocationDto } from '../../../shared/models/warehouse.models';
 import { WarehouseService } from '../../warehouse/warehouse.service';
@@ -29,7 +30,18 @@ export interface PurchaseOrderDetailDialogData {
 // "detail is its own fetch" reasoning the original selectOrder() used.
 @Component({
   selector: 'app-purchase-order-detail-dialog',
-  imports: [DecimalPipe, ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatProgressSpinnerModule, MatSelectModule, TranslatePipe],
+  imports: [
+    DecimalPipe,
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatProgressSpinnerModule,
+    SearchableSelectComponent,
+    StatusBadgeComponent,
+    TranslatePipe,
+  ],
   templateUrl: './purchase-order-detail-dialog.component.html',
   styleUrl: './purchase-order-detail-dialog.component.scss',
 })
@@ -48,6 +60,9 @@ export class PurchaseOrderDetailDialogComponent implements OnInit {
     quantity: new FormControl(1, { nonNullable: true, validators: [Validators.required, Validators.min(0.0001)] }),
     reference: new FormControl('', { nonNullable: true }),
   });
+
+  readonly locationLabel = (location: LocationDto): string => `${location.code} — ${location.name}`;
+  readonly locationValue = (location: LocationDto): number => location.id;
 
   constructor(
     @Inject(MAT_DIALOG_DATA) private readonly data: PurchaseOrderDetailDialogData,

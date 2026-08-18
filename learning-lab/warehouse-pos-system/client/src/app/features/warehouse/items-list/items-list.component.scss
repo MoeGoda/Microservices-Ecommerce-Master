@@ -1,3 +1,16 @@
+.filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  width: 100%;
+
+  mat-form-field,
+  app-searchable-select {
+    flex: 1 1 200px;
+    min-width: 180px;
+  }
+}
+
 .data-grid {
   margin-bottom: 8px;
 }

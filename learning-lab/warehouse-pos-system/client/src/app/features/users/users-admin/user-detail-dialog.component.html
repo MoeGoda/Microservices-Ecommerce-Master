@@ -13,9 +13,10 @@
 
     <dt>{{ 'users.list.table.status' | translate }}</dt>
     <dd>
-      <span class="status-chip" [class.active]="user().isActive" [class.inactive]="!user().isActive">
-        {{ (user().isActive ? 'users.list.active' : 'users.list.inactive') | translate }}
-      </span>
+      <app-status-badge
+        [status]="user().isActive ? 'active' : 'inactive'"
+        [label]="(user().isActive ? 'users.list.active' : 'users.list.inactive') | translate"
+      ></app-status-badge>
     </dd>
 
     <dt>{{ 'users.list.table.createdAt' | translate }}</dt>

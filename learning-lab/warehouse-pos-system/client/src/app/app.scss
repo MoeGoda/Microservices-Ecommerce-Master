@@ -11,8 +11,9 @@
 }
 
 .app-sidenav {
-  width: 260px;
+  width: 268px;
   border-inline-end: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-low);
 }
 
 .app-brand {
@@ -20,14 +21,29 @@
   align-items: center;
   gap: 10px;
   font: var(--mat-sys-title-medium);
-  padding: 20px 16px 12px;
+  padding: 22px 20px 16px;
   color: var(--mat-sys-primary);
+
+  mat-icon {
+    font-size: 26px;
+    width: 26px;
+    height: 26px;
+  }
 }
 
 .app-topbar {
   position: sticky;
   top: 0;
   z-index: 10;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+}
+
+// M — the group toggle row visually matches a plain nav link (same icon
+// slot, same title styling) so the only structural cue that it's a
+// section header rather than a destination is the trailing chevron —
+// the same visual language Gradus-style admin templates use.
+.nav-group-toggle {
+  font-weight: 500;
 }
 
 // The sidenav toggle only matters below the responsive breakpoint where

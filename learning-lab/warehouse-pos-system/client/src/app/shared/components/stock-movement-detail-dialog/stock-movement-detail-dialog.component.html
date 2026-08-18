@@ -1,0 +1,26 @@
+<h2 mat-dialog-title>{{ movement.sku }} — {{ movement.itemName }}</h2>
+
+<mat-dialog-content>
+  <dl class="detail-list">
+    <dt>{{ 'stockMovements.table.reason' | translate }}</dt>
+    <dd><app-status-badge [status]="movement.reason" [label]="reasonLabel"></app-status-badge></dd>
+
+    <dt>{{ 'stockMovements.table.quantity' | translate }}</dt>
+    <dd [class.positive]="movement.quantityChange > 0" [class.negative]="movement.quantityChange < 0">
+      {{ movement.quantityChange > 0 ? '+' : '' }}{{ movement.quantityChange | number: '1.0-4' }}
+    </dd>
+
+    <dt>{{ 'stockMovements.table.location' | translate }}</dt>
+    <dd>{{ movement.locationCode }} — {{ movement.locationName }}</dd>
+
+    <dt>{{ 'stockMovements.table.reference' | translate }}</dt>
+    <dd>{{ movement.reference || '—' }}</dd>
+
+    <dt>{{ 'stockMovements.table.date' | translate }}</dt>
+    <dd>{{ movement.transactionAtUtc | date: 'medium' }}</dd>
+  </dl>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>{{ 'common.close' | translate }}</button>
+</mat-dialog-actions>

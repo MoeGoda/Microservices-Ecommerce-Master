@@ -7,6 +7,15 @@
     "loading": "جارٍ التحميل...",
     "actions": "الإجراءات",
     "dismiss": "إغلاق",
+    "search": "بحث",
+    "reset": "إعادة تعيين",
+    "filters": "عوامل التصفية",
+    "view": "عرض",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "noResults": "لا توجد نتائج مطابقة",
+    "any": "أي",
+    "comingSoon": "هذه الميزة غير متوفرة بعد.",
     "errors": {
       "sessionExpired": "انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى.",
       "tooManyAttempts": "محاولات كثيرة جدًا. يرجى الانتظار لحظة والمحاولة مرة أخرى.",
@@ -22,6 +31,14 @@
   "toolbar": {
     "admin": "الإدارة",
     "warehouseGroup": "المستودع",
+    "purchasingGroup": "المشتريات",
+    "warehouseDashboard": "لوحة التحكم",
+    "receipts": "سندات الاستلام",
+    "transfers": "التحويلات",
+    "issues": "الإصدارات",
+    "inventory": "المخزون",
+    "adjustments": "التسويات",
+    "stockCounts": "جرد المخزون",
     "items": "المنتجات",
     "pos": "نقطة البيع",
     "reports": "التقارير",
@@ -215,6 +232,10 @@
         "price": "السعر",
         "baseUnit": "الوحدة الأساسية"
       },
+      "filters": {
+        "search": "البحث برمز المنتج أو الاسم",
+        "category": "الفئة"
+      },
       "manage": "إدارة",
       "emptyRow": "لا توجد منتجات حتى الآن — أنشئ واحدًا أعلاه."
     },
@@ -346,6 +367,11 @@
       "activate": "تفعيل",
       "deactivate": "إلغاء التفعيل",
       "cannotDeactivateSelf": "لا يمكنك إلغاء تفعيل حسابك الخاص.",
+      "filters": {
+        "search": "البحث باسم المستخدم أو البريد الإلكتروني أو الاسم",
+        "role": "الدور",
+        "status": "الحالة"
+      },
       "emptyRow": "لا يوجد مستخدمون حتى الآن."
     },
     "toasts": {
@@ -380,6 +406,10 @@
       "inactive": "غير نشط",
       "activate": "تفعيل",
       "deactivate": "إلغاء التفعيل",
+      "filters": {
+        "search": "البحث بالاسم أو جهة الاتصال",
+        "status": "الحالة"
+      },
       "emptyRow": "لا يوجد موردون حتى الآن — أنشئ واحدًا للبدء."
     },
     "toasts": {
@@ -416,6 +446,13 @@
         "createdAt": "تاريخ الإنشاء"
       },
       "view": "عرض",
+      "filters": {
+        "search": "البحث برقم الأمر أو المورد",
+        "supplier": "المورد",
+        "status": "الحالة",
+        "from": "من تاريخ",
+        "to": "إلى تاريخ"
+      },
       "emptyRow": "لا توجد أوامر شراء حتى الآن."
     },
     "status": {
@@ -448,5 +485,153 @@
       "cancelled": "تم إلغاء \"{{orderNumber}}\".",
       "received": "تم استلام {{quantity}} لأمر {{orderNumber}} — الحالة الآن {{status}}."
     }
+  },
+  "stockMovements": {
+    "table": {
+      "date": "التاريخ",
+      "item": "المنتج",
+      "location": "الموقع",
+      "quantity": "الكمية",
+      "reason": "السبب",
+      "reference": "المرجع"
+    },
+    "reason": {
+      "Received": "استلام",
+      "PurchaseOrderReceived": "استلام أمر شراء",
+      "TransferIn": "تحويل وارد",
+      "TransferOut": "تحويل صادر",
+      "Adjustment": "تسوية",
+      "Issue": "إصدار"
+    }
+  },
+  "receipts": {
+    "title": "سندات الاستلام",
+    "filters": {
+      "search": "البحث عن منتج",
+      "location": "الموقع",
+      "from": "من تاريخ",
+      "to": "إلى تاريخ"
+    },
+    "emptyRow": "لا توجد سندات استلام مطابقة لعوامل التصفية الحالية.",
+    "create": {
+      "title": "سند استلام جديد",
+      "item": "المنتج",
+      "location": "الموقع",
+      "unit": "الوحدة",
+      "quantity": "الكمية",
+      "reference": "المرجع (اختياري)",
+      "submit": "تسجيل الاستلام"
+    },
+    "toasts": {
+      "created": "تم استلام {{quantity}} وحدة."
+    }
+  },
+  "transfers": {
+    "title": "التحويلات",
+    "filters": {
+      "search": "البحث عن منتج",
+      "location": "الموقع",
+      "from": "من تاريخ",
+      "to": "إلى تاريخ"
+    },
+    "emptyRow": "لا توجد تحويلات مطابقة لعوامل التصفية الحالية.",
+    "create": {
+      "title": "تحويل جديد",
+      "item": "المنتج",
+      "fromLocation": "من موقع",
+      "toLocation": "إلى موقع",
+      "sameLocation": "يجب أن يختلف موقع الوجهة عن موقع المصدر.",
+      "quantity": "الكمية",
+      "reference": "المرجع (اختياري)",
+      "submit": "تسجيل التحويل"
+    },
+    "toasts": {
+      "created": "تم تحويل {{quantity}} وحدة."
+    }
+  },
+  "adjustments": {
+    "title": "التسويات",
+    "filters": {
+      "search": "البحث عن منتج",
+      "location": "الموقع",
+      "from": "من تاريخ",
+      "to": "إلى تاريخ"
+    },
+    "emptyRow": "لا توجد تسويات مطابقة لعوامل التصفية الحالية.",
+    "create": {
+      "title": "تسوية جديدة",
+      "item": "المنتج",
+      "location": "الموقع",
+      "quantity": "الكمية المضافة",
+      "reference": "السبب / المرجع (اختياري)",
+      "submit": "تسجيل التسوية"
+    },
+    "toasts": {
+      "created": "تمت زيادة المخزون بمقدار {{quantity}} وحدة."
+    }
+  },
+  "issues": {
+    "title": "الإصدارات",
+    "filters": {
+      "search": "البحث عن منتج",
+      "location": "الموقع",
+      "from": "من تاريخ",
+      "to": "إلى تاريخ"
+    },
+    "emptyRow": "لا توجد إصدارات مطابقة لعوامل التصفية الحالية.",
+    "create": {
+      "title": "إصدار جديد",
+      "item": "المنتج",
+      "location": "الموقع",
+      "quantity": "الكمية المصدرة",
+      "reference": "السبب / المرجع (اختياري)",
+      "submit": "تسجيل الإصدار"
+    },
+    "toasts": {
+      "created": "تم إصدار {{quantity}} وحدة من المخزون."
+    }
+  },
+  "inventory": {
+    "title": "المخزون",
+    "filters": {
+      "search": "البحث عن منتج",
+      "category": "الفئة"
+    },
+    "table": {
+      "sku": "رمز المنتج",
+      "item": "المنتج",
+      "category": "الفئة",
+      "quantity": "الكمية المتوفرة",
+      "unitPrice": "سعر الوحدة",
+      "totalValue": "القيمة الإجمالية"
+    },
+    "emptyRow": "لا توجد منتجات مطابقة لعوامل التصفية الحالية."
+  },
+  "warehouseDashboard": {
+    "title": "لوحة تحكم المستودع",
+    "viewFullReport": "عرض التقرير الكامل",
+    "viewInventory": "عرض المخزون",
+    "viewPurchaseOrders": "عرض أوامر الشراء",
+    "lowStock": {
+      "title": "المخزون المنخفض",
+      "empty": "لا يوجد ما هو أقل من حد إعادة الطلب."
+    },
+    "inventoryValue": {
+      "title": "قيمة المخزون",
+      "itemCount": "عبر {{count}} منتج"
+    },
+    "aging": {
+      "title": "أقدم أوامر الشراء المفتوحة",
+      "empty": "لا توجد أوامر شراء مفتوحة.",
+      "daysAgo": "{{days}} يوم منذ الطلب"
+    },
+    "recentActivity": {
+      "title": "أحدث حركات المخزون",
+      "empty": "لا توجد حركات مخزون حديثة."
+    }
+  },
+  "stockCounts": {
+    "title": "جرد المخزون",
+    "comingSoon": "جرد المخزون الفعلي غير متوفر بعد."
   }
 }

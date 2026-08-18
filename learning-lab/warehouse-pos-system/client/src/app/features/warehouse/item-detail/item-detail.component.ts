@@ -16,6 +16,7 @@ import { finalize } from 'rxjs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
+import { SearchableSelectComponent } from '../../../shared/components/searchable-select/searchable-select.component';
 import {
   BARCODE_TYPES,
   DISCOUNT_TYPES,
@@ -51,6 +52,7 @@ import { WarehouseService } from '../warehouse.service';
     MatProgressSpinnerModule,
     MatSelectModule,
     MatTabsModule,
+    SearchableSelectComponent,
     TranslatePipe,
   ],
   templateUrl: './item-detail.component.html',
@@ -59,6 +61,9 @@ import { WarehouseService } from '../warehouse.service';
 export class ItemDetailComponent implements OnInit {
   readonly barcodeTypes = BARCODE_TYPES;
   readonly discountTypes = DISCOUNT_TYPES;
+
+  readonly locationLabel = (location: LocationDto): string => `${location.code} — ${location.name}`;
+  readonly locationValue = (location: LocationDto): number => location.id;
 
   readonly locations = signal<LocationDto[]>([]);
   readonly selectedItem = signal<ItemDetailDto | null>(null);

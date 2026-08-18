@@ -3,19 +3,17 @@
 <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
   <mat-dialog-content>
     <div class="form-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>{{ 'purchaseOrders.create.supplier' | translate }}</mat-label>
-        <mat-select formControlName="supplierId">
-          @for (supplier of suppliers(); track supplier.id) {
-            <mat-option [value]="supplier.id" [disabled]="!supplier.isActive">
-              {{ supplier.name }}{{ !supplier.isActive ? ' (' + ('purchaseOrders.create.inactiveSupplier' | translate) + ')' : '' }}
-            </mat-option>
-          }
-        </mat-select>
+      <app-searchable-select
+        [label]="'purchaseOrders.create.supplier' | translate"
+        formControlName="supplierId"
+        [options]="suppliers()"
+        [optionLabel]="supplierLabel"
+        [optionValue]="supplierValue"
+      >
         @if (createForm.controls.supplierId.touched && createForm.controls.supplierId.invalid) {
           <mat-error>{{ 'purchaseOrders.create.supplierRequired' | translate }}</mat-error>
         }
-      </mat-form-field>
+      </app-searchable-select>
 
       <mat-form-field appearance="outline" class="span-2">
         <mat-label>{{ 'purchaseOrders.create.notes' | translate }}</mat-label>
@@ -27,14 +25,14 @@
     <div formArrayName="lines" class="lines-list">
       @for (line of lines.controls; track $index) {
         <div [formGroupName]="$index" class="line-row">
-          <mat-form-field appearance="outline">
-            <mat-label>{{ 'purchaseOrders.create.item' | translate }}</mat-label>
-            <mat-select formControlName="itemId" (selectionChange)="onLineItemChange(line)">
-              @for (item of items(); track item.id) {
-                <mat-option [value]="item.id">{{ item.sku }} — {{ item.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
+          <app-searchable-select
+            [label]="'purchaseOrders.create.item' | translate"
+            formControlName="itemId"
+            [options]="items()"
+            [optionLabel]="itemLabel"
+            [optionValue]="itemValue"
+            (selectionChange)="onLineItemChange(line)"
+          ></app-searchable-select>
 
           <mat-form-field appearance="outline">
             <mat-label>{{ 'purchaseOrders.create.unit' | translate }}</mat-label>

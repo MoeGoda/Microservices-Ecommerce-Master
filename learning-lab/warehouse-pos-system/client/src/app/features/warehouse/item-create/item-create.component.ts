@@ -11,6 +11,7 @@ import { finalize, forkJoin } from 'rxjs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
+import { SearchableSelectComponent } from '../../../shared/components/searchable-select/searchable-select.component';
 import { BARCODE_TYPES, CategoryDto, ItemSummaryDto, UnitOfMeasureDto } from '../../../shared/models/warehouse.models';
 import { WarehouseService } from '../warehouse.service';
 
@@ -22,7 +23,17 @@ import { WarehouseService } from '../warehouse.service';
 // table row.
 @Component({
   selector: 'app-item-create',
-  imports: [ReactiveFormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, MatProgressSpinnerModule, MatSelectModule, TranslatePipe],
+  imports: [
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatProgressSpinnerModule,
+    MatSelectModule,
+    SearchableSelectComponent,
+    TranslatePipe,
+  ],
   templateUrl: './item-create.component.html',
   styleUrl: './item-create.component.scss',
 })
@@ -36,6 +47,11 @@ export class ItemCreateComponent implements OnInit {
   // (now here, since this is the only place that still needs the picker).
   readonly parentCandidates = signal<ItemSummaryDto[]>([]);
   readonly creatingItem = signal(false);
+
+  readonly categoryLabel = (category: CategoryDto): string => category.name;
+  readonly categoryValue = (category: CategoryDto): number => category.id;
+  readonly unitLabel = (unit: UnitOfMeasureDto): string => `${unit.code} — ${unit.name}`;
+  readonly unitValue = (unit: UnitOfMeasureDto): number => unit.id;
 
   readonly createForm = new FormGroup({
     sku: new FormControl('', { nonNullable: true, validators: [Validators.required] }),

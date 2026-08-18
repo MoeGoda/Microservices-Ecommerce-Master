@@ -4,9 +4,10 @@
   <dl class="detail-list">
     <dt>{{ 'suppliers.list.table.status' | translate }}</dt>
     <dd>
-      <span class="status-chip" [class.active]="supplier().isActive" [class.inactive]="!supplier().isActive">
-        {{ (supplier().isActive ? 'suppliers.list.active' : 'suppliers.list.inactive') | translate }}
-      </span>
+      <app-status-badge
+        [status]="supplier().isActive ? 'active' : 'inactive'"
+        [label]="(supplier().isActive ? 'suppliers.list.active' : 'suppliers.list.inactive') | translate"
+      ></app-status-badge>
     </dd>
 
     <dt>{{ 'suppliers.list.table.contactName' | translate }}</dt>

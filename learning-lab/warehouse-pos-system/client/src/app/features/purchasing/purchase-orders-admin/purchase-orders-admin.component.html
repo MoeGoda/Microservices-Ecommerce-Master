@@ -1,18 +1,58 @@
 <div class="page purchase-orders-admin">
-  <div class="page-header">
-    <h1>{{ 'purchaseOrders.title' | translate }}</h1>
-    <div class="page-header-actions">
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        <mat-icon aria-hidden="true">add</mat-icon>
-        {{ 'purchaseOrders.create.title' | translate }}
-      </button>
-    </div>
-  </div>
+  <app-page-header [title]="'purchaseOrders.title' | translate">
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      {{ 'purchaseOrders.create.title' | translate }}
+    </button>
+  </app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'purchaseOrders.list.filters.search' | translate }}</mat-label>
+        <input matInput formControlName="search" (keyup.enter)="onSearch()" />
+      </mat-form-field>
+
+      <app-searchable-select
+        [label]="'purchaseOrders.list.filters.supplier' | translate"
+        formControlName="supplierId"
+        [options]="suppliers()"
+        [optionLabel]="supplierLabel"
+        [optionValue]="supplierValue"
+      ></app-searchable-select>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'purchaseOrders.list.filters.status' | translate }}</mat-label>
+        <mat-select formControlName="status">
+          <mat-option [value]="null">{{ 'common.any' | translate }}</mat-option>
+          @for (status of statuses; track status) {
+            <mat-option [value]="status">{{ statusLabel(status) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'purchaseOrders.list.filters.from' | translate }}</mat-label>
+        <input matInput [matDatepicker]="fromPicker" formControlName="fromUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'purchaseOrders.list.filters.to' | translate }}</mat-label>
+        <input matInput [matDatepicker]="toPicker" formControlName="toUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+        <mat-datepicker #toPicker></mat-datepicker>
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
 
   <mat-card class="list-card">
     <mat-card-content>
       @if (loadingOrders()) {
         <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (pagedOrders().items.length === 0) {
+        <app-empty-state icon="receipt_long" [message]="'purchaseOrders.list.emptyRow' | translate"></app-empty-state>
       } @else {
         <table class="data-grid">
           <thead>
@@ -31,19 +71,21 @@
               <tr>
                 <td>{{ order.orderNumber }}</td>
                 <td>{{ order.supplierName }}</td>
-                <td><span class="status-chip" [class]="'status-' + order.status">{{ 'purchaseOrders.status.' + order.status | translate }}</span></td>
+                <td><app-status-badge [status]="order.status" [label]="statusLabel(order.status)"></app-status-badge></td>
                 <td>{{ order.lineCount }}</td>
                 <td>{{ order.totalCost | number: '1.2-2' }}</td>
                 <td>{{ order.createdAt | date: 'short' }}</td>
                 <td>
-                  <button mat-icon-button type="button" [attr.aria-label]="'common.actions' | translate" (click)="openDetailDialog(order)">
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="'common.view' | translate"
+                    [matTooltip]="'common.view' | translate"
+                    (click)="openDetailDialog(order)"
+                  >
                     <mat-icon>visibility</mat-icon>
                   </button>
                 </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="7" class="empty-row">{{ 'purchaseOrders.list.emptyRow' | translate }}</td>
               </tr>
             }
           </tbody>

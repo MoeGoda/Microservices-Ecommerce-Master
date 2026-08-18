@@ -11,6 +11,7 @@ import { finalize, forkJoin } from 'rxjs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
+import { SearchableSelectComponent } from '../../../shared/components/searchable-select/searchable-select.component';
 import { PurchaseOrderDetailDto, SupplierDto } from '../../../shared/models/purchasing.models';
 import { ItemDetailDto, ItemSummaryDto } from '../../../shared/models/warehouse.models';
 import { WarehouseService } from '../../warehouse/warehouse.service';
@@ -44,6 +45,7 @@ type PurchaseOrderLineFormGroup = FormGroup<{
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    SearchableSelectComponent,
     TranslatePipe,
   ],
   templateUrl: './purchase-order-create-dialog.component.html',
@@ -66,6 +68,11 @@ export class PurchaseOrderCreateDialogComponent implements OnInit {
     return this.createForm.controls.lines;
   }
 
+  readonly supplierLabel = (supplier: SupplierDto): string => supplier.name;
+  readonly supplierValue = (supplier: SupplierDto): number => supplier.id;
+  readonly itemLabel = (item: ItemSummaryDto): string => `${item.sku} — ${item.name}`;
+  readonly itemValue = (item: ItemSummaryDto): number => item.id;
+
   constructor(
     private readonly dialogRef: MatDialogRef<PurchaseOrderCreateDialogComponent, PurchaseOrderDetailDto>,
     private readonly purchasingService: PurchasingService,
@@ -79,7 +86,12 @@ export class PurchaseOrderCreateDialogComponent implements OnInit {
       suppliers: this.purchasingService.getSuppliers(1, 100),
       items: this.warehouseService.getItems(1, 100),
     }).subscribe(({ suppliers, items }) => {
-      this.suppliers.set(suppliers.items);
+      // M — inactive suppliers used to appear as disabled options with an
+      // "(inactive)" suffix in a plain mat-select; the searchable-select
+      // replacing it has no notion of a disabled option, so they're
+      // filtered out entirely instead — cleaner for a search list, and a
+      // new PO shouldn't be placed against an inactive supplier anyway.
+      this.suppliers.set(suppliers.items.filter((s) => s.isActive));
       this.items.set(items.items);
     });
 

@@ -33,35 +33,3 @@ h2[mat-dialog-title] {
   border-radius: 12px;
   background: var(--mat-sys-surface-container-low);
 }
-
-.status-chip {
-  padding: 2px 10px;
-  border-radius: 999px;
-  font: var(--mat-sys-label-small);
-  background: var(--mat-sys-surface-container-highest);
-  color: var(--mat-sys-on-surface-variant);
-
-  &.status-Draft {
-    background: var(--mat-sys-surface-container-highest);
-  }
-
-  &.status-Ordered {
-    background: var(--mat-sys-primary-container);
-    color: var(--mat-sys-on-primary-container);
-  }
-
-  &.status-PartiallyReceived {
-    background: var(--mat-sys-tertiary-container);
-    color: var(--mat-sys-on-tertiary-container);
-  }
-
-  &.status-Received {
-    background: var(--mat-sys-tertiary-container);
-    color: var(--mat-sys-on-tertiary-container);
-  }
-
-  &.status-Cancelled {
-    background: var(--mat-sys-error-container);
-    color: var(--mat-sys-on-error-container);
-  }
-}

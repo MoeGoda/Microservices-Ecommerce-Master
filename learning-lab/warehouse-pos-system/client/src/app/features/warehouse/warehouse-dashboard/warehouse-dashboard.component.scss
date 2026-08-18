@@ -1,0 +1,48 @@
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.dashboard-card {
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+
+  mat-card-content {
+    flex: 1 1 auto;
+  }
+}
+
+.mini-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mini-list-primary {
+  display: block;
+  font: var(--mat-sys-body-medium);
+}
+
+.mini-list-secondary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.stat-figure {
+  font: var(--mat-sys-headline-medium);
+  margin: 0;
+}
+
+.stat-caption {
+  margin: 4px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+}

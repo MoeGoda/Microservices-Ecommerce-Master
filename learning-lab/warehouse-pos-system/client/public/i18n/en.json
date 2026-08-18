@@ -7,6 +7,15 @@
     "loading": "Loading...",
     "actions": "Actions",
     "dismiss": "Dismiss",
+    "search": "Search",
+    "reset": "Reset",
+    "filters": "Filters",
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "noResults": "No matching results",
+    "any": "Any",
+    "comingSoon": "This feature isn't available yet.",
     "errors": {
       "sessionExpired": "Your session has expired. Please sign in again.",
       "tooManyAttempts": "Too many attempts. Please wait a moment and try again.",
@@ -22,6 +31,14 @@
   "toolbar": {
     "admin": "Admin",
     "warehouseGroup": "Warehouse",
+    "purchasingGroup": "Purchasing",
+    "warehouseDashboard": "Dashboard",
+    "receipts": "Receipts",
+    "transfers": "Transfers",
+    "issues": "Issues",
+    "inventory": "Inventory",
+    "adjustments": "Adjustments",
+    "stockCounts": "Stock Counts",
     "items": "Items",
     "pos": "POS",
     "reports": "Reports",
@@ -215,6 +232,10 @@
         "price": "Price",
         "baseUnit": "Base unit"
       },
+      "filters": {
+        "search": "Search SKU or name",
+        "category": "Category"
+      },
       "manage": "Manage",
       "emptyRow": "No items yet — create one above."
     },
@@ -346,6 +367,11 @@
       "activate": "Activate",
       "deactivate": "Deactivate",
       "cannotDeactivateSelf": "You can't deactivate your own account.",
+      "filters": {
+        "search": "Search username, email, or name",
+        "role": "Role",
+        "status": "Status"
+      },
       "emptyRow": "No users yet."
     },
     "toasts": {
@@ -380,6 +406,10 @@
       "inactive": "Inactive",
       "activate": "Activate",
       "deactivate": "Deactivate",
+      "filters": {
+        "search": "Search name or contact",
+        "status": "Status"
+      },
       "emptyRow": "No suppliers yet — create one to get started."
     },
     "toasts": {
@@ -416,6 +446,13 @@
         "createdAt": "Created"
       },
       "view": "View",
+      "filters": {
+        "search": "Search order # or supplier",
+        "supplier": "Supplier",
+        "status": "Status",
+        "from": "From date",
+        "to": "To date"
+      },
       "emptyRow": "No purchase orders yet."
     },
     "status": {
@@ -448,5 +485,153 @@
       "cancelled": "\"{{orderNumber}}\" cancelled.",
       "received": "Received {{quantity}} against {{orderNumber}} — now {{status}}."
     }
+  },
+  "stockMovements": {
+    "table": {
+      "date": "Date",
+      "item": "Item",
+      "location": "Location",
+      "quantity": "Quantity",
+      "reason": "Reason",
+      "reference": "Reference"
+    },
+    "reason": {
+      "Received": "Received",
+      "PurchaseOrderReceived": "PO receipt",
+      "TransferIn": "Transfer in",
+      "TransferOut": "Transfer out",
+      "Adjustment": "Adjustment",
+      "Issue": "Issue"
+    }
+  },
+  "receipts": {
+    "title": "Receipts",
+    "filters": {
+      "search": "Search item",
+      "location": "Location",
+      "from": "From date",
+      "to": "To date"
+    },
+    "emptyRow": "No receipts found for the current filters.",
+    "create": {
+      "title": "New receipt",
+      "item": "Item",
+      "location": "Location",
+      "unit": "Unit",
+      "quantity": "Quantity",
+      "reference": "Reference (optional)",
+      "submit": "Record receipt"
+    },
+    "toasts": {
+      "created": "Received {{quantity}} unit(s)."
+    }
+  },
+  "transfers": {
+    "title": "Transfers",
+    "filters": {
+      "search": "Search item",
+      "location": "Location",
+      "from": "From date",
+      "to": "To date"
+    },
+    "emptyRow": "No transfers found for the current filters.",
+    "create": {
+      "title": "New transfer",
+      "item": "Item",
+      "fromLocation": "From location",
+      "toLocation": "To location",
+      "sameLocation": "The destination location must be different from the source.",
+      "quantity": "Quantity",
+      "reference": "Reference (optional)",
+      "submit": "Record transfer"
+    },
+    "toasts": {
+      "created": "Transferred {{quantity}} unit(s)."
+    }
+  },
+  "adjustments": {
+    "title": "Adjustments",
+    "filters": {
+      "search": "Search item",
+      "location": "Location",
+      "from": "From date",
+      "to": "To date"
+    },
+    "emptyRow": "No adjustments found for the current filters.",
+    "create": {
+      "title": "New adjustment",
+      "item": "Item",
+      "location": "Location",
+      "quantity": "Quantity to add",
+      "reference": "Reason / reference (optional)",
+      "submit": "Record adjustment"
+    },
+    "toasts": {
+      "created": "Adjusted stock up by {{quantity}} unit(s)."
+    }
+  },
+  "issues": {
+    "title": "Issues",
+    "filters": {
+      "search": "Search item",
+      "location": "Location",
+      "from": "From date",
+      "to": "To date"
+    },
+    "emptyRow": "No issues found for the current filters.",
+    "create": {
+      "title": "New issue",
+      "item": "Item",
+      "location": "Location",
+      "quantity": "Quantity to issue",
+      "reference": "Reason / reference (optional)",
+      "submit": "Record issue"
+    },
+    "toasts": {
+      "created": "Issued {{quantity}} unit(s) out of stock."
+    }
+  },
+  "inventory": {
+    "title": "Inventory",
+    "filters": {
+      "search": "Search item",
+      "category": "Category"
+    },
+    "table": {
+      "sku": "SKU",
+      "item": "Item",
+      "category": "Category",
+      "quantity": "Quantity on hand",
+      "unitPrice": "Unit price",
+      "totalValue": "Total value"
+    },
+    "emptyRow": "No items found for the current filters."
+  },
+  "warehouseDashboard": {
+    "title": "Warehouse dashboard",
+    "viewFullReport": "View full report",
+    "viewInventory": "View inventory",
+    "viewPurchaseOrders": "View purchase orders",
+    "lowStock": {
+      "title": "Low stock",
+      "empty": "Nothing is below its reorder threshold."
+    },
+    "inventoryValue": {
+      "title": "Inventory value",
+      "itemCount": "across {{count}} item(s)"
+    },
+    "aging": {
+      "title": "Oldest open purchase orders",
+      "empty": "No open purchase orders.",
+      "daysAgo": "{{days}} day(s) since ordered"
+    },
+    "recentActivity": {
+      "title": "Recent stock activity",
+      "empty": "No recent stock activity."
+    }
+  },
+  "stockCounts": {
+    "title": "Stock Counts",
+    "comingSoon": "Physical stock counts aren't available yet."
   }
 }

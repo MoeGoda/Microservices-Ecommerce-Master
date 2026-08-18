@@ -7,6 +7,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
+import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { UserDto } from '../../../shared/models/users.models';
 import { UsersService } from '../users.service';
 
@@ -22,7 +23,7 @@ export interface UserDetailDialogData {
 // nicety, now living here instead.
 @Component({
   selector: 'app-user-detail-dialog',
-  imports: [DatePipe, MatButtonModule, MatDialogModule, TranslatePipe],
+  imports: [DatePipe, MatButtonModule, MatDialogModule, StatusBadgeComponent, TranslatePipe],
   templateUrl: './user-detail-dialog.component.html',
   styleUrl: './user-detail-dialog.component.scss',
 })

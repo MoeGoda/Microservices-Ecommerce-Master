@@ -5,6 +5,7 @@ import { finalize } from 'rxjs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { NotificationService } from '../../../core/notifications/notification.service';
+import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { SupplierDto } from '../../../shared/models/purchasing.models';
 import { PurchasingService } from '../purchasing.service';
 
@@ -19,7 +20,7 @@ export interface SupplierDetailDialogData {
 // second fetch.
 @Component({
   selector: 'app-supplier-detail-dialog',
-  imports: [MatButtonModule, MatDialogModule, TranslatePipe],
+  imports: [MatButtonModule, MatDialogModule, StatusBadgeComponent, TranslatePipe],
   templateUrl: './supplier-detail-dialog.component.html',
   styleUrl: './supplier-detail-dialog.component.scss',
 })

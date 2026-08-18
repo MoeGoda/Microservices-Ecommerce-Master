@@ -1,0 +1,23 @@
+<mat-form-field appearance="outline" class="searchable-select-field">
+  @if (label) {
+    <mat-label>{{ label }}</mat-label>
+  }
+  <input
+    matInput
+    type="text"
+    [formControl]="searchControl"
+    [matAutocomplete]="auto"
+    [placeholder]="placeholder"
+    (input)="onInput($any($event.target).value)"
+    (blur)="onBlur()"
+  />
+  <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+  <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onOptionSelected($event)">
+    @for (option of filteredOptions(); track optionValue(option)) {
+      <mat-option [value]="option">{{ optionLabel(option) }}</mat-option>
+    } @empty {
+      <mat-option disabled>{{ 'common.noResults' | translate }}</mat-option>
+    }
+  </mat-autocomplete>
+  <ng-content select="mat-error"></ng-content>
+</mat-form-field>
