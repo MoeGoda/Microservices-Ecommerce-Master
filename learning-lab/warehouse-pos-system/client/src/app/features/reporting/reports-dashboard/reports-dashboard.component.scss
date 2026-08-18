@@ -1,244 +1,32 @@
-// Chart tokens from the dataviz skill's reference palette. Light-only,
-// fixed hex — same precedent as styles.scss's own `color-scheme: light`
-// (this app has no dark-mode toggle), so there's no themed variant to wire.
-:host {
-  --chart-surface: #fcfcfb;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --baseline: #c3c2b7;
-  --series-1: #2a78d6;
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-critical: #d03b3b;
-}
-
-.reports-dashboard {
-  max-width: 1100px;
-}
-
-.cards-grid {
+.dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
 }
 
-.chart-card.full-width {
-  grid-column: span 2;
-}
-
-.empty-state {
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.empty-state.good {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--status-good);
-  font-style: normal;
-}
-
-// --- Sales-by-day (SVG) ---
-
-.chart-wrap {
-  position: relative;
-}
-
-.sales-chart {
-  width: 100%;
-  height: auto;
-  overflow: visible;
-}
-
-.gridline {
-  stroke: var(--gridline);
-  stroke-width: 1;
-}
-
-.baseline {
-  stroke: var(--baseline);
-  stroke-width: 1;
-}
-
-.grid-label,
-.axis-label {
-  font-size: 9px;
-  fill: var(--text-muted);
-}
-
-.bar-label {
-  font-size: 10px;
-  fill: var(--text-secondary);
-}
-
-.bar {
-  fill: var(--series-1);
-  transition: filter 0.1s ease-out;
-}
-
-.bar-group {
-  outline: none;
-  cursor: pointer;
-}
-
-// The hover "lift": a touch brighter, never a border — marks-and-anatomy.md
-// treats a drawn outline as ink that isn't data.
-.bar-group.hovered .bar,
-.bar-group:focus-visible .bar {
-  filter: brightness(1.15);
-}
-
-.tooltip {
-  position: absolute;
-  transform: translate(-50%, -100%);
-  background: var(--text-primary);
-  color: #fff;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-  pointer-events: none;
+.dashboard-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-
-  strong {
-    font-weight: 600;
-  }
-
-  span {
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 10px;
-  }
 }
 
-// --- Top-selling items (HTML bar list) ---
-
-.take-field {
-  width: 140px;
-  margin-bottom: 8px;
+.dashboard-card-body {
+  flex: 1 1 auto;
+  padding: 16px 20px;
 }
 
-.top-selling-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.dashboard-card-actions {
+  padding: 4px 12px 12px;
+  border-top: 1px solid var(--sba-border);
 }
 
-.top-selling-row {
-  display: grid;
-  grid-template-columns: 140px 1fr 72px;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  border-radius: 4px;
-  outline: none;
-
-  &:hover,
-  &:focus-visible {
-    background: color-mix(in srgb, var(--series-1) 8%, transparent);
-  }
-
-  &:hover .bar-fill,
-  &:focus-visible .bar-fill {
-    filter: brightness(1.15);
-  }
+.stat-figure {
+  font: var(--mat-sys-headline-medium);
+  margin: 0;
 }
 
-.item-name {
-  color: var(--text-primary);
-  font-size: 13px;
+.stat-figure.text-figure {
+  font: var(--mat-sys-title-large);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.bar-track {
-  height: 24px;
-  display: flex;
-  align-items: center;
-}
-
-.bar-fill {
-  height: 20px;
-  min-width: 2px;
-  background: var(--series-1);
-  border-radius: 0 4px 4px 0;
-  transition: filter 0.1s ease-out;
-}
-
-.bar-value {
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-// --- Low stock table ---
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-
-  mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-  }
-
-  &.critical {
-    color: var(--status-critical);
-  }
-
-  &.warning {
-    color: color-mix(in srgb, var(--status-warning) 70%, black);
-  }
-
-  &.good {
-    color: var(--status-good);
-  }
-}
-
-// --- J: date-range filter, sales/stock ledgers, valuation, PO aging ---
-
-.date-range-form {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.date-range-hint {
-  color: var(--text-muted);
-  font-size: 12px;
-  margin: 4px 0 0;
-}
-
-.grand-total {
-  font-weight: 600;
-  margin: 0 0 8px;
-}
-
-.positive {
-  color: var(--status-good);
-}
-
-.negative {
-  color: var(--status-critical);
-}
-
-@media (max-width: 800px) {
-  .cards-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-card.full-width {
-    grid-column: span 1;
-  }
 }

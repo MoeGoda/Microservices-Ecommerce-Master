@@ -1,0 +1,34 @@
+<div class="page top-selling-page">
+  <app-page-header [title]="'reports.topSelling.title' | translate"></app-page-header>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      <mat-form-field appearance="outline" class="take-field">
+        <mat-label>{{ 'reports.topSelling.showLabel' | translate }}</mat-label>
+        <mat-select [formControl]="takeControl">
+          <mat-option [value]="5">{{ 'reports.topSelling.topN' | translate: { count: 5 } }}</mat-option>
+          <mat-option [value]="10">{{ 'reports.topSelling.topN' | translate: { count: 10 } }}</mat-option>
+          <mat-option [value]="20">{{ 'reports.topSelling.topN' | translate: { count: 20 } }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (topSelling().length === 0) {
+        <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
+      } @else {
+        <div class="top-selling-list">
+          @for (row of topSelling(); track row.itemId) {
+            <div class="top-selling-row" [title]="'reports.topSelling.rowTitle' | translate: { sku: row.sku, qty: row.totalQuantity }" tabindex="0">
+              <span class="item-name">{{ row.itemName }}</span>
+              <div class="bar-track">
+                <div class="bar-fill" [style.width.%]="topSellingMax() > 0 ? (row.totalRevenue / topSellingMax()) * 100 : 0"></div>
+              </div>
+              <span class="bar-value">{{ row.totalRevenue | number: '1.2-2' }}</span>
+            </div>
+          }
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

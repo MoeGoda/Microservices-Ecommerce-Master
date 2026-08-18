@@ -101,16 +101,36 @@ html, body { height: 100%; }
   }
 }
 
+// P — every existing screen's table/detail wrapper is a real `<mat-card
+// class="list-card">`, not the `.surface-card` div below (that class
+// turned out to be defined but never actually referenced in any
+// template) — so the SB Admin 2 white/bordered/shadowed look needs to
+// land on Material's own card host class to actually reach every
+// screen that already exists, not just future ones written against
+// `.surface-card`. `.mat-mdc-card` is Angular Material's real DOM host
+// class for `<mat-card>` (same "target the actual MDC class" approach
+// already proven for `.mdc-list-item__content` in app.scss).
+.mat-mdc-card {
+  background: #fff;
+  border: 1px solid var(--sba-border);
+  box-shadow: var(--sba-shadow) !important;
+}
+
 .surface-card {
   // P — SB Admin 2's `.card`: white, a hairline border, and a soft
   // wide-spread shadow instead of Material's flat tonal fill — this is
   // the single change that makes every list/detail screen's content
   // read as "a card sitting on a gray page" the way the reference does.
+  // No padding here (unlike the old version of this rule) — a card that
+  // opens with an <app-section-header> needs that header flush against
+  // all four edges, the same way SB Admin 2's own `.card-header` sits
+  // flush inside `.card`; padding belongs on whatever wraps the body
+  // content underneath the header instead.
   background: #fff;
   border: 1px solid var(--sba-border);
   border-radius: 0.35rem;
   box-shadow: var(--sba-shadow);
-  padding: 20px;
+  overflow: hidden;
   box-sizing: border-box;
 }
 

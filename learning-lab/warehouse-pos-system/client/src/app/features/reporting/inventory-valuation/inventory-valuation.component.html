@@ -1,0 +1,39 @@
+<div class="page inventory-valuation-page">
+  <app-page-header [title]="'reports.inventoryValuation.title' | translate"></app-page-header>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (inventoryValuation().length === 0) {
+        <p class="empty-state">{{ 'reports.emptyStates.noStock' | translate }}</p>
+      } @else {
+        <p class="grand-total">{{ 'reports.inventoryValuation.totalValue' | translate: { total: (inventoryValuationTotal() | number: '1.2-2') } }}</p>
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'reports.inventoryValuation.table.sku' | translate }}</th>
+              <th>{{ 'reports.inventoryValuation.table.item' | translate }}</th>
+              <th>{{ 'reports.inventoryValuation.table.category' | translate }}</th>
+              <th>{{ 'reports.inventoryValuation.table.onHand' | translate }}</th>
+              <th>{{ 'reports.inventoryValuation.table.unitPrice' | translate }}</th>
+              <th>{{ 'reports.inventoryValuation.table.totalValue' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of inventoryValuation(); track line.itemId) {
+              <tr>
+                <td>{{ line.sku }}</td>
+                <td>{{ line.itemName }}</td>
+                <td>{{ line.categoryName }}</td>
+                <td>{{ line.totalQuantityOnHand }}</td>
+                <td>{{ line.unitPrice | number: '1.2-2' }}</td>
+                <td>{{ line.totalValue | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

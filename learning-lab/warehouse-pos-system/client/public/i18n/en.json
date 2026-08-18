@@ -211,7 +211,8 @@
         "totalCost": "Total cost",
         "receivedValue": "Received value"
       }
-    }
+    },
+    "viewReport": "View report"
   },
   "items": {
     "create": {

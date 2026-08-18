@@ -1,0 +1,46 @@
+<div class="page low-stock-page">
+  <app-page-header [title]="'reports.lowStock.title' | translate"></app-page-header>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (lowStock().length === 0) {
+        <p class="empty-state good">
+          <mat-icon aria-hidden="true">check_circle</mat-icon>
+          {{ 'reports.lowStock.allGood' | translate }}
+        </p>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'reports.lowStock.table.status' | translate }}</th>
+              <th>{{ 'reports.lowStock.table.sku' | translate }}</th>
+              <th>{{ 'reports.lowStock.table.item' | translate }}</th>
+              <th>{{ 'reports.lowStock.table.location' | translate }}</th>
+              <th>{{ 'reports.lowStock.table.onHand' | translate }}</th>
+              <th>{{ 'reports.lowStock.table.reorderThreshold' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of lowStock(); track row.itemId + '-' + row.locationId) {
+              <tr>
+                <td>
+                  <span class="status-badge" [class]="stockSeverity(row)">
+                    <mat-icon aria-hidden="true">{{ stockSeverity(row) === 'critical' ? 'error' : 'warning' }}</mat-icon>
+                    {{ (stockSeverity(row) === 'critical' ? 'reports.lowStock.status.outOfStock' : 'reports.lowStock.status.lowStock') | translate }}
+                  </span>
+                </td>
+                <td>{{ row.sku }}</td>
+                <td>{{ row.itemName }}</td>
+                <td>{{ row.locationName }} ({{ row.locationCode }})</td>
+                <td>{{ row.quantityOnHand }}</td>
+                <td>{{ row.reorderThreshold }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

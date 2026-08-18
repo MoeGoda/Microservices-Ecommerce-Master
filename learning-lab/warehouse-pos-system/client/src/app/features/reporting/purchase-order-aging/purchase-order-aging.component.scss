@@ -1,0 +1,27 @@
+.empty-state {
+  color: var(--mat-sys-on-surface-variant);
+  font-style: italic;
+}
+
+.empty-state.good {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sba-success);
+  font-style: normal;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+
+  &.warning {
+    color: var(--sba-warning);
+  }
+
+  &.good {
+    color: var(--sba-success);
+  }
+}

@@ -2,14 +2,13 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { finalize, forkJoin } from 'rxjs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { PurchaseOrderAgingLineDto } from '../../../shared/models/purchasing.models';
 import { StockLevelRecordDto, StockMovementRecordDto } from '../../../shared/models/reporting.models';
@@ -32,11 +31,10 @@ import { WarehouseService } from '../warehouse.service';
     DecimalPipe,
     RouterLink,
     MatButtonModule,
-    MatCardModule,
-    MatIconModule,
     MatProgressSpinnerModule,
     EmptyStateComponent,
     PageHeaderComponent,
+    SectionHeaderComponent,
     StatusBadgeComponent,
     TranslatePipe,
   ],

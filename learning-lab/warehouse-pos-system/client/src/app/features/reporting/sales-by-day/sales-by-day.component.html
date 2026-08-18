@@ -1,0 +1,57 @@
+<div class="page sales-by-day-page">
+  <app-page-header [title]="'reports.salesByDay.title' | translate"></app-page-header>
+
+  @if (loading()) {
+    <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+  } @else {
+    <mat-card class="list-card">
+      <mat-card-content>
+        @if (salesByDay().length === 0) {
+          <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
+        } @else {
+          <div class="chart-wrap" (mouseleave)="hoveredSalesIndex.set(null)">
+            <svg
+              [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
+              preserveAspectRatio="xMidYMid meet"
+              class="sales-chart"
+              role="img"
+              [attr.aria-label]="'reports.salesByDay.chartAriaLabel' | translate"
+            >
+              @for (grid of salesChart()!.gridLines; track grid.value) {
+                <line class="gridline" [attr.x1]="leftPad" [attr.x2]="chartWidth - rightPad" [attr.y1]="grid.y" [attr.y2]="grid.y" />
+                <text class="grid-label" [attr.x]="leftPad - 6" [attr.y]="grid.y + 4" text-anchor="end">{{ grid.value | number: '1.0-0' }}</text>
+              }
+              <line class="baseline" [attr.x1]="leftPad" [attr.x2]="chartWidth - rightPad" [attr.y1]="salesChart()!.baselineY" [attr.y2]="salesChart()!.baselineY" />
+
+              @for (bar of salesChart()!.bars; track bar.fullDate; let i = $index) {
+                <g
+                  class="bar-group"
+                  [class.hovered]="hoveredSalesIndex() === i"
+                  tabindex="0"
+                  role="img"
+                  [attr.aria-label]="bar.fullDate + ': ' + (bar.value | number: '1.2-2')"
+                  (mouseenter)="hoveredSalesIndex.set(i)"
+                  (focus)="hoveredSalesIndex.set(i)"
+                  (blur)="hoveredSalesIndex.set(null)"
+                >
+                  <path class="bar" [attr.d]="bar.path" />
+                  @if (bar.showValueLabel) {
+                    <text class="bar-label" [attr.x]="bar.labelX" [attr.y]="bar.labelY" text-anchor="middle">{{ bar.value | number: '1.0-2' }}</text>
+                  }
+                  <text class="axis-label" [attr.x]="bar.axisLabelX" [attr.y]="salesChart()!.baselineY + 18" text-anchor="middle">{{ bar.dateLabel }}</text>
+                </g>
+              }
+            </svg>
+
+            @if (hoveredSalesBar(); as hovered) {
+              <div class="tooltip" [style.left.%]="(hovered.labelX / chartWidth) * 100" [style.top.%]="(hovered.labelY / chartHeight) * 100">
+                <strong>{{ hovered.value | number: '1.2-2' }}</strong>
+                <span>{{ hovered.fullDate }}</span>
+              </div>
+            }
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

@@ -1,0 +1,68 @@
+<div class="page sales-ledger-page">
+  <app-page-header [title]="'reports.salesLedger.title' | translate"></app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'reports.dateRange.from' | translate }}</mat-label>
+        <input matInput [matDatepicker]="fromPicker" formControlName="fromUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'reports.dateRange.to' | translate }}</mat-label>
+        <input matInput [matDatepicker]="toPicker" formControlName="toUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+        <mat-datepicker #toPicker></mat-datepicker>
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (salesLedger().items.length === 0) {
+        <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'reports.salesLedger.table.saleId' | translate }}</th>
+              <th>{{ 'reports.salesLedger.table.cashier' | translate }}</th>
+              <th>{{ 'reports.salesLedger.table.total' | translate }}</th>
+              <th>{{ 'reports.salesLedger.table.lines' | translate }}</th>
+              <th>{{ 'reports.salesLedger.table.completedAt' | translate }}</th>
+              <th>{{ 'reports.salesLedger.table.status' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (sale of salesLedger().items; track sale.saleId) {
+              <tr>
+                <td>#{{ sale.saleId }}</td>
+                <td>{{ cashierName(sale.cashierUserId) }}</td>
+                <td>{{ sale.total | number: '1.2-2' }}</td>
+                <td>{{ sale.lineCount }}</td>
+                <td>{{ sale.completedAtUtc | date: 'short' }}</td>
+                <td>
+                  <span class="status-badge" [class.warning]="sale.returnedAtUtc" [class.good]="!sale.returnedAtUtc">
+                    {{ (sale.returnedAtUtc ? 'reports.salesLedger.returned' : 'reports.salesLedger.completed') | translate }}
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="salesLedger().totalCount"
+          [pageSize]="salesLedger().pageSize"
+          [pageIndex]="salesLedger().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

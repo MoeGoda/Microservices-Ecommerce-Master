@@ -5,11 +5,9 @@
     <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
   } @else {
     <div class="dashboard-grid">
-      <mat-card class="dashboard-card">
-        <mat-card-header>
-          <mat-card-title>{{ 'warehouseDashboard.lowStock.title' | translate }}</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="inventory_2" tone="warning" [title]="'warehouseDashboard.lowStock.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
           @if (lowStock().length === 0) {
             <app-empty-state icon="inventory_2" [message]="'warehouseDashboard.lowStock.empty' | translate"></app-empty-state>
           } @else {
@@ -22,30 +20,26 @@
               }
             </ul>
           }
-        </mat-card-content>
-        <mat-card-actions>
+        </div>
+        <div class="dashboard-card-actions">
           <a mat-button routerLink="/reports">{{ 'warehouseDashboard.viewFullReport' | translate }}</a>
-        </mat-card-actions>
-      </mat-card>
+        </div>
+      </div>
 
-      <mat-card class="dashboard-card">
-        <mat-card-header>
-          <mat-card-title>{{ 'warehouseDashboard.inventoryValue.title' | translate }}</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="payments" tone="info" [title]="'warehouseDashboard.inventoryValue.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
           <p class="stat-figure">{{ inventoryTotalValue() | number: '1.2-2' }}</p>
           <p class="stat-caption">{{ 'warehouseDashboard.inventoryValue.itemCount' | translate: { count: inventoryItemCount() } }}</p>
-        </mat-card-content>
-        <mat-card-actions>
+        </div>
+        <div class="dashboard-card-actions">
           <a mat-button routerLink="/warehouse/inventory">{{ 'warehouseDashboard.viewInventory' | translate }}</a>
-        </mat-card-actions>
-      </mat-card>
+        </div>
+      </div>
 
-      <mat-card class="dashboard-card">
-        <mat-card-header>
-          <mat-card-title>{{ 'warehouseDashboard.aging.title' | translate }}</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="receipt_long" tone="danger" [title]="'warehouseDashboard.aging.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
           @if (agingOrders().length === 0) {
             <app-empty-state icon="receipt_long" [message]="'warehouseDashboard.aging.empty' | translate"></app-empty-state>
           } @else {
@@ -58,17 +52,15 @@
               }
             </ul>
           }
-        </mat-card-content>
-        <mat-card-actions>
+        </div>
+        <div class="dashboard-card-actions">
           <a mat-button routerLink="/purchase-orders">{{ 'warehouseDashboard.viewPurchaseOrders' | translate }}</a>
-        </mat-card-actions>
-      </mat-card>
+        </div>
+      </div>
 
-      <mat-card class="dashboard-card">
-        <mat-card-header>
-          <mat-card-title>{{ 'warehouseDashboard.recentActivity.title' | translate }}</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="history" tone="success" [title]="'warehouseDashboard.recentActivity.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
           @if (recentMovements().length === 0) {
             <app-empty-state icon="history" [message]="'warehouseDashboard.recentActivity.empty' | translate"></app-empty-state>
           } @else {
@@ -84,8 +76,8 @@
               }
             </ul>
           }
-        </mat-card-content>
-      </mat-card>
+        </div>
+      </div>
     </div>
   }
 </div>

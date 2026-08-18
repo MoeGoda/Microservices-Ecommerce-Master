@@ -1,0 +1,66 @@
+<div class="page stock-movements-report-page">
+  <app-page-header [title]="'reports.stockMovements.title' | translate"></app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'reports.dateRange.from' | translate }}</mat-label>
+        <input matInput [matDatepicker]="fromPicker" formControlName="fromUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'reports.dateRange.to' | translate }}</mat-label>
+        <input matInput [matDatepicker]="toPicker" formControlName="toUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+        <mat-datepicker #toPicker></mat-datepicker>
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (stockMovements().items.length === 0) {
+        <p class="empty-state">{{ 'reports.emptyStates.noMovements' | translate }}</p>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'reports.stockMovements.table.when' | translate }}</th>
+              <th>{{ 'reports.stockMovements.table.item' | translate }}</th>
+              <th>{{ 'reports.stockMovements.table.location' | translate }}</th>
+              <th>{{ 'reports.stockMovements.table.change' | translate }}</th>
+              <th>{{ 'reports.stockMovements.table.reason' | translate }}</th>
+              <th>{{ 'reports.stockMovements.table.reference' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (movement of stockMovements().items; track movement.transactionAtUtc + '-' + movement.itemId + '-' + movement.locationId) {
+              <tr>
+                <td>{{ movement.transactionAtUtc | date: 'short' }}</td>
+                <td>{{ movement.sku }} — {{ movement.itemName }}</td>
+                <td>{{ movement.locationName }} ({{ movement.locationCode }})</td>
+                <td [class.positive]="movement.quantityChange > 0" [class.negative]="movement.quantityChange < 0">
+                  {{ movement.quantityChange > 0 ? '+' : '' }}{{ movement.quantityChange }}
+                </td>
+                <td>{{ movement.reason }}</td>
+                <td>{{ movement.reference }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="stockMovements().totalCount"
+          [pageSize]="stockMovements().pageSize"
+          [pageIndex]="stockMovements().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

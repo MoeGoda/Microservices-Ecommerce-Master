@@ -1,0 +1,45 @@
+<div class="page purchase-order-aging-page">
+  <app-page-header [title]="'reports.poAging.title' | translate"></app-page-header>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (openPurchaseOrderAging().length === 0) {
+        <p class="empty-state good">
+          <mat-icon aria-hidden="true">check_circle</mat-icon>
+          {{ 'reports.poAging.allCaughtUp' | translate }}
+        </p>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'reports.poAging.table.orderNumber' | translate }}</th>
+              <th>{{ 'reports.poAging.table.supplier' | translate }}</th>
+              <th>{{ 'reports.poAging.table.status' | translate }}</th>
+              <th>{{ 'reports.poAging.table.age' | translate }}</th>
+              <th>{{ 'reports.poAging.table.totalCost' | translate }}</th>
+              <th>{{ 'reports.poAging.table.receivedValue' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (order of openPurchaseOrderAging(); track order.id) {
+              <tr>
+                <td>{{ order.orderNumber }}</td>
+                <td>{{ order.supplierName }}</td>
+                <td>{{ 'purchaseOrders.status.' + order.status | translate }}</td>
+                <td>
+                  <span class="status-badge" [class.warning]="order.ageDaysSinceOrdered! > 7" [class.good]="order.ageDaysSinceOrdered! <= 7">
+                    {{ 'reports.poAging.daysOld' | translate: { days: order.ageDaysSinceOrdered } }}
+                  </span>
+                </td>
+                <td>{{ order.totalCost | number: '1.2-2' }}</td>
+                <td>{{ order.receivedValue | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

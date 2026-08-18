@@ -1,375 +1,89 @@
 <div class="page reports-dashboard">
-  <h2>{{ 'reports.title' | translate }}</h2>
+  <app-page-header [title]="'reports.title' | translate"></app-page-header>
 
   @if (loading()) {
-    <mat-spinner diameter="32"></mat-spinner>
+    <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+  } @else {
+    <div class="dashboard-grid">
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="show_chart" tone="info" [title]="'reports.salesByDay.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure">{{ salesTotal() | number: '1.2-2' }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/sales-by-day">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="trending_up" tone="success" [title]="'reports.topSelling.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure text-figure">{{ topSellingName() ?? '—' }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/top-selling">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="inventory_2" tone="warning" [title]="'reports.lowStock.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure">{{ lowStockCount() }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/low-stock">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="receipt_long" tone="primary" [title]="'reports.salesLedger.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure">{{ salesCount() }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/sales-ledger">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="badge" tone="info" [title]="'reports.cashierPerformance.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure">{{ cashierCount() }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/cashier-performance">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="swap_horiz" tone="primary" [title]="'reports.stockMovements.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure">{{ movementsCount() }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/stock-movements">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="account_balance_wallet" tone="success" [title]="'reports.inventoryValuation.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure">{{ inventoryValue() | number: '1.2-2' }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/inventory-valuation">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+
+      <div class="surface-card dashboard-card">
+        <app-section-header icon="schedule" tone="danger" [title]="'reports.poAging.title' | translate"></app-section-header>
+        <div class="dashboard-card-body">
+          <p class="stat-figure">{{ openAgingCount() }}</p>
+        </div>
+        <div class="dashboard-card-actions">
+          <a mat-button routerLink="/reports/purchase-order-aging">{{ 'reports.viewReport' | translate }}</a>
+        </div>
+      </div>
+    </div>
   }
-
-  <div class="cards-grid">
-    <mat-card class="chart-card">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.salesByDay.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (salesByDay().length === 0) {
-          <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
-        } @else {
-          <div class="chart-wrap" (mouseleave)="hoveredSalesIndex.set(null)">
-            <svg
-              [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
-              preserveAspectRatio="xMidYMid meet"
-              class="sales-chart"
-              role="img"
-              [attr.aria-label]="'reports.salesByDay.chartAriaLabel' | translate"
-            >
-              @for (grid of salesChart()!.gridLines; track grid.value) {
-                <line class="gridline" [attr.x1]="leftPad" [attr.x2]="chartWidth - rightPad" [attr.y1]="grid.y" [attr.y2]="grid.y" />
-                <text class="grid-label" [attr.x]="leftPad - 6" [attr.y]="grid.y + 4" text-anchor="end">{{ grid.value | number: '1.0-0' }}</text>
-              }
-              <line class="baseline" [attr.x1]="leftPad" [attr.x2]="chartWidth - rightPad" [attr.y1]="salesChart()!.baselineY" [attr.y2]="salesChart()!.baselineY" />
-
-              @for (bar of salesChart()!.bars; track bar.fullDate; let i = $index) {
-                <g
-                  class="bar-group"
-                  [class.hovered]="hoveredSalesIndex() === i"
-                  tabindex="0"
-                  role="img"
-                  [attr.aria-label]="bar.fullDate + ': ' + (bar.value | number: '1.2-2')"
-                  (mouseenter)="hoveredSalesIndex.set(i)"
-                  (focus)="hoveredSalesIndex.set(i)"
-                  (blur)="hoveredSalesIndex.set(null)"
-                >
-                  <path class="bar" [attr.d]="bar.path" />
-                  @if (bar.showValueLabel) {
-                    <text class="bar-label" [attr.x]="bar.labelX" [attr.y]="bar.labelY" text-anchor="middle">{{ bar.value | number: '1.0-2' }}</text>
-                  }
-                  <text class="axis-label" [attr.x]="bar.axisLabelX" [attr.y]="salesChart()!.baselineY + 18" text-anchor="middle">{{ bar.dateLabel }}</text>
-                </g>
-              }
-            </svg>
-
-            @if (hoveredSalesBar(); as hovered) {
-              <div class="tooltip" [style.left.%]="(hovered.labelX / chartWidth) * 100" [style.top.%]="(hovered.labelY / chartHeight) * 100">
-                <strong>{{ hovered.value | number: '1.2-2' }}</strong>
-                <span>{{ hovered.fullDate }}</span>
-              </div>
-            }
-          </div>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.topSelling.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <mat-form-field appearance="outline" class="take-field">
-          <mat-label>{{ 'reports.topSelling.showLabel' | translate }}</mat-label>
-          <mat-select [formControl]="takeControl">
-            <mat-option [value]="5">{{ 'reports.topSelling.topN' | translate: { count: 5 } }}</mat-option>
-            <mat-option [value]="10">{{ 'reports.topSelling.topN' | translate: { count: 10 } }}</mat-option>
-            <mat-option [value]="20">{{ 'reports.topSelling.topN' | translate: { count: 20 } }}</mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        @if (topSelling().length === 0) {
-          <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
-        } @else {
-          <div class="top-selling-list">
-            @for (row of topSelling(); track row.itemId) {
-              <div class="top-selling-row" [title]="'reports.topSelling.rowTitle' | translate: { sku: row.sku, qty: row.totalQuantity }" tabindex="0">
-                <span class="item-name">{{ row.itemName }}</span>
-                <div class="bar-track">
-                  <div class="bar-fill" [style.width.%]="topSellingMax() > 0 ? (row.totalRevenue / topSellingMax()) * 100 : 0"></div>
-                </div>
-                <span class="bar-value">{{ row.totalRevenue | number: '1.2-2' }}</span>
-              </div>
-            }
-          </div>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card full-width">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.lowStock.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (lowStock().length === 0) {
-          <p class="empty-state good">
-            <mat-icon aria-hidden="true">check_circle</mat-icon>
-            {{ 'reports.lowStock.allGood' | translate }}
-          </p>
-        } @else {
-          <table class="data-grid">
-            <thead>
-              <tr>
-                <th>{{ 'reports.lowStock.table.status' | translate }}</th>
-                <th>{{ 'reports.lowStock.table.sku' | translate }}</th>
-                <th>{{ 'reports.lowStock.table.item' | translate }}</th>
-                <th>{{ 'reports.lowStock.table.location' | translate }}</th>
-                <th>{{ 'reports.lowStock.table.onHand' | translate }}</th>
-                <th>{{ 'reports.lowStock.table.reorderThreshold' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of lowStock(); track row.itemId + '-' + row.locationId) {
-                <tr>
-                  <td>
-                    <span class="status-badge" [class]="stockSeverity(row)">
-                      <mat-icon aria-hidden="true">{{ stockSeverity(row) === 'critical' ? 'error' : 'warning' }}</mat-icon>
-                      {{ (stockSeverity(row) === 'critical' ? 'reports.lowStock.status.outOfStock' : 'reports.lowStock.status.lowStock') | translate }}
-                    </span>
-                  </td>
-                  <td>{{ row.sku }}</td>
-                  <td>{{ row.itemName }}</td>
-                  <td>{{ row.locationName }} ({{ row.locationCode }})</td>
-                  <td>{{ row.quantityOnHand }}</td>
-                  <td>{{ row.reorderThreshold }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card full-width">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.dateRange.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <form [formGroup]="dateRangeForm" class="date-range-form">
-          <mat-form-field appearance="outline">
-            <mat-label>{{ 'reports.dateRange.from' | translate }}</mat-label>
-            <input matInput type="date" formControlName="fromDate" (change)="onDateRangeChange()" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>{{ 'reports.dateRange.to' | translate }}</mat-label>
-            <input matInput type="date" formControlName="toDate" (change)="onDateRangeChange()" />
-          </mat-form-field>
-        </form>
-        <p class="date-range-hint">{{ 'reports.dateRange.hint' | translate }}</p>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card full-width">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.salesLedger.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (loadingDateFiltered()) {
-          <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
-        } @else if (salesLedger().items.length === 0) {
-          <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
-        } @else {
-          <table class="data-grid">
-            <thead>
-              <tr>
-                <th>{{ 'reports.salesLedger.table.saleId' | translate }}</th>
-                <th>{{ 'reports.salesLedger.table.cashier' | translate }}</th>
-                <th>{{ 'reports.salesLedger.table.total' | translate }}</th>
-                <th>{{ 'reports.salesLedger.table.lines' | translate }}</th>
-                <th>{{ 'reports.salesLedger.table.completedAt' | translate }}</th>
-                <th>{{ 'reports.salesLedger.table.status' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (sale of salesLedger().items; track sale.saleId) {
-                <tr>
-                  <td>#{{ sale.saleId }}</td>
-                  <td>{{ cashierName(sale.cashierUserId) }}</td>
-                  <td>{{ sale.total | number: '1.2-2' }}</td>
-                  <td>{{ sale.lineCount }}</td>
-                  <td>{{ sale.completedAtUtc | date: 'short' }}</td>
-                  <td>
-                    <span class="status-badge" [class.warning]="sale.returnedAtUtc" [class.good]="!sale.returnedAtUtc">
-                      {{ (sale.returnedAtUtc ? 'reports.salesLedger.returned' : 'reports.salesLedger.completed') | translate }}
-                    </span>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-
-          <mat-paginator
-            [length]="salesLedger().totalCount"
-            [pageSize]="salesLedger().pageSize"
-            [pageIndex]="salesLedger().page - 1"
-            [pageSizeOptions]="[10, 20, 50]"
-            (page)="onSalesLedgerPageChange($event)"
-          ></mat-paginator>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card full-width">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.cashierPerformance.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (loadingDateFiltered()) {
-          <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
-        } @else if (cashierPerformance().length === 0) {
-          <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
-        } @else {
-          <table class="data-grid">
-            <thead>
-              <tr>
-                <th>{{ 'reports.cashierPerformance.table.cashier' | translate }}</th>
-                <th>{{ 'reports.cashierPerformance.table.completed' | translate }}</th>
-                <th>{{ 'reports.cashierPerformance.table.returned' | translate }}</th>
-                <th>{{ 'reports.cashierPerformance.table.totalRevenue' | translate }}</th>
-                <th>{{ 'reports.cashierPerformance.table.averageSale' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of cashierPerformance(); track row.cashierUserId) {
-                <tr>
-                  <td>{{ cashierName(row.cashierUserId) }}</td>
-                  <td>{{ row.completedSaleCount }}</td>
-                  <td>{{ row.returnedSaleCount }}</td>
-                  <td>{{ row.totalRevenue | number: '1.2-2' }}</td>
-                  <td>{{ row.averageSaleTotal | number: '1.2-2' }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card full-width">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.stockMovements.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (loadingDateFiltered()) {
-          <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
-        } @else if (stockMovements().items.length === 0) {
-          <p class="empty-state">{{ 'reports.emptyStates.noMovements' | translate }}</p>
-        } @else {
-          <table class="data-grid">
-            <thead>
-              <tr>
-                <th>{{ 'reports.stockMovements.table.when' | translate }}</th>
-                <th>{{ 'reports.stockMovements.table.item' | translate }}</th>
-                <th>{{ 'reports.stockMovements.table.location' | translate }}</th>
-                <th>{{ 'reports.stockMovements.table.change' | translate }}</th>
-                <th>{{ 'reports.stockMovements.table.reason' | translate }}</th>
-                <th>{{ 'reports.stockMovements.table.reference' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (movement of stockMovements().items; track movement.transactionAtUtc + '-' + movement.itemId + '-' + movement.locationId) {
-                <tr>
-                  <td>{{ movement.transactionAtUtc | date: 'short' }}</td>
-                  <td>{{ movement.sku }} — {{ movement.itemName }}</td>
-                  <td>{{ movement.locationName }} ({{ movement.locationCode }})</td>
-                  <td [class.positive]="movement.quantityChange > 0" [class.negative]="movement.quantityChange < 0">
-                    {{ movement.quantityChange > 0 ? '+' : '' }}{{ movement.quantityChange }}
-                  </td>
-                  <td>{{ movement.reason }}</td>
-                  <td>{{ movement.reference }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-
-          <mat-paginator
-            [length]="stockMovements().totalCount"
-            [pageSize]="stockMovements().pageSize"
-            [pageIndex]="stockMovements().page - 1"
-            [pageSizeOptions]="[10, 20, 50]"
-            (page)="onStockMovementsPageChange($event)"
-          ></mat-paginator>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card full-width">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.inventoryValuation.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (loadingValuation()) {
-          <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
-        } @else if (inventoryValuation().length === 0) {
-          <p class="empty-state">{{ 'reports.emptyStates.noStock' | translate }}</p>
-        } @else {
-          <p class="grand-total">{{ 'reports.inventoryValuation.totalValue' | translate: { total: (inventoryValuationTotal() | number: '1.2-2') } }}</p>
-          <table class="data-grid">
-            <thead>
-              <tr>
-                <th>{{ 'reports.inventoryValuation.table.sku' | translate }}</th>
-                <th>{{ 'reports.inventoryValuation.table.item' | translate }}</th>
-                <th>{{ 'reports.inventoryValuation.table.category' | translate }}</th>
-                <th>{{ 'reports.inventoryValuation.table.onHand' | translate }}</th>
-                <th>{{ 'reports.inventoryValuation.table.unitPrice' | translate }}</th>
-                <th>{{ 'reports.inventoryValuation.table.totalValue' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (line of inventoryValuation(); track line.itemId) {
-                <tr>
-                  <td>{{ line.sku }}</td>
-                  <td>{{ line.itemName }}</td>
-                  <td>{{ line.categoryName }}</td>
-                  <td>{{ line.totalQuantityOnHand }}</td>
-                  <td>{{ line.unitPrice | number: '1.2-2' }}</td>
-                  <td>{{ line.totalValue | number: '1.2-2' }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="chart-card full-width">
-      <mat-card-header>
-        <mat-card-title>{{ 'reports.poAging.title' | translate }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (loadingAging()) {
-          <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
-        } @else if (openPurchaseOrderAging().length === 0) {
-          <p class="empty-state good">
-            <mat-icon aria-hidden="true">check_circle</mat-icon>
-            {{ 'reports.poAging.allCaughtUp' | translate }}
-          </p>
-        } @else {
-          <table class="data-grid">
-            <thead>
-              <tr>
-                <th>{{ 'reports.poAging.table.orderNumber' | translate }}</th>
-                <th>{{ 'reports.poAging.table.supplier' | translate }}</th>
-                <th>{{ 'reports.poAging.table.status' | translate }}</th>
-                <th>{{ 'reports.poAging.table.age' | translate }}</th>
-                <th>{{ 'reports.poAging.table.totalCost' | translate }}</th>
-                <th>{{ 'reports.poAging.table.receivedValue' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (order of openPurchaseOrderAging(); track order.id) {
-                <tr>
-                  <td>{{ order.orderNumber }}</td>
-                  <td>{{ order.supplierName }}</td>
-                  <td>{{ 'purchaseOrders.status.' + order.status | translate }}</td>
-                  <td>
-                    <span class="status-badge" [class.warning]="order.ageDaysSinceOrdered! > 7" [class.good]="order.ageDaysSinceOrdered! <= 7">
-                      {{ 'reports.poAging.daysOld' | translate: { days: order.ageDaysSinceOrdered } }}
-                    </span>
-                  </td>
-                  <td>{{ order.totalCost | number: '1.2-2' }}</td>
-                  <td>{{ order.receivedValue | number: '1.2-2' }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        }
-      </mat-card-content>
-    </mat-card>
-  </div>
 </div>

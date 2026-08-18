@@ -73,6 +73,9 @@ a distributed transaction.
 **Phase M — Gradus-style shell rebuild, a real Warehouse navigation group, and app-wide UI consistency**
 - [x] **M — Data-driven sidebar (Warehouse + Purchasing accordion groups), 6 new Warehouse screens + 1 placeholder, and a reusable component set (page header, status badge, filter panel, searchable select, confirm dialog, empty state) applied across every list screen**
 
+**Phase N — SB Admin 2 theme reskin, and the Reports screen split into 8**
+- [x] **N — The whole app shell, cards, tables, and login screen rebuilt to match the StartBootstrap SB Admin 2 template (gradient sidebar, gray-100 canvas, white shadowed cards, uppercase table headers, split-card login) — the third and final style reference after two earlier ones (a dark EVOHUS-inspired shell, an unreachable Material Admin Pro link) were tried and rejected/abandoned. The former 970-line combined Reports dashboard is now a landing page of 8 real-data KPI tiles, each linking to its own routed report screen (Sales by Day, Top Selling, Low Stock, Sales Ledger, Cashier Performance, Stock Movements, Inventory Valuation, PO Aging) — the same "split the screen that outgrew itself" pattern K already used for Items.**
+
 ## A1 — Identity service
 
 **What it does:** issues JWTs after registering/logging in a user, backed by

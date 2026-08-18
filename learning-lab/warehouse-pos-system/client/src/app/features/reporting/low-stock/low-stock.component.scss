@@ -1,0 +1,41 @@
+:host {
+  --text-muted: #898781;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-critical: #d03b3b;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.empty-state.good {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--status-good);
+  font-style: normal;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+
+  &.critical {
+    color: var(--status-critical);
+  }
+
+  &.warning {
+    color: color-mix(in srgb, var(--status-warning) 70%, black);
+  }
+}

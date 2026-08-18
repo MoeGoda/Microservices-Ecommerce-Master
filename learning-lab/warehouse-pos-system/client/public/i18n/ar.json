@@ -211,7 +211,8 @@
         "totalCost": "التكلفة الإجمالية",
         "receivedValue": "القيمة المستلمة"
       }
-    }
+    },
+    "viewReport": "عرض التقرير"
   },
   "items": {
     "create": {

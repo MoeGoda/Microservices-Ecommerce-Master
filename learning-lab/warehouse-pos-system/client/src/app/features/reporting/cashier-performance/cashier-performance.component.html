@@ -1,0 +1,54 @@
+<div class="page cashier-performance-page">
+  <app-page-header [title]="'reports.cashierPerformance.title' | translate"></app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'reports.dateRange.from' | translate }}</mat-label>
+        <input matInput [matDatepicker]="fromPicker" formControlName="fromUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'reports.dateRange.to' | translate }}</mat-label>
+        <input matInput [matDatepicker]="toPicker" formControlName="toUtc" />
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+        <mat-datepicker #toPicker></mat-datepicker>
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loading()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (cashierPerformance().length === 0) {
+        <p class="empty-state">{{ 'reports.emptyStates.noSales' | translate }}</p>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'reports.cashierPerformance.table.cashier' | translate }}</th>
+              <th>{{ 'reports.cashierPerformance.table.completed' | translate }}</th>
+              <th>{{ 'reports.cashierPerformance.table.returned' | translate }}</th>
+              <th>{{ 'reports.cashierPerformance.table.totalRevenue' | translate }}</th>
+              <th>{{ 'reports.cashierPerformance.table.averageSale' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of cashierPerformance(); track row.cashierUserId) {
+              <tr>
+                <td>{{ cashierName(row.cashierUserId) }}</td>
+                <td>{{ row.completedSaleCount }}</td>
+                <td>{{ row.returnedSaleCount }}</td>
+                <td>{{ row.totalRevenue | number: '1.2-2' }}</td>
+                <td>{{ row.averageSaleTotal | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

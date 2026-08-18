@@ -1,0 +1,31 @@
+.filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  width: 100%;
+
+  mat-form-field {
+    flex: 1 1 200px;
+    min-width: 180px;
+  }
+}
+
+.empty-state {
+  color: var(--mat-sys-on-surface-variant);
+  font-style: italic;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+
+  &.warning {
+    color: var(--sba-warning);
+  }
+
+  &.good {
+    color: var(--sba-success);
+  }
+}
