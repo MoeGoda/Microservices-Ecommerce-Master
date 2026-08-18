@@ -1,9 +1,16 @@
+// N — solid tone colors, not the softer *-container tokens Phase M
+// started with. Direct translation of the reference demo's saturated
+// btn-danger/btn-success pills, still built on this app's own Material
+// tokens (var(--mat-sys-error)/(--mat-sys-tertiary)/etc.), not literal
+// hex codes — every existing usage of this component picks up the
+// bolder look from this one file.
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 10px;
+  padding: 3px 11px;
   border-radius: 999px;
   font: var(--mat-sys-label-small);
+  font-weight: 600;
   white-space: nowrap;
 
   &.tone-neutral {
@@ -12,22 +19,22 @@
   }
 
   &.tone-info {
-    background: var(--mat-sys-primary-container);
-    color: var(--mat-sys-on-primary-container);
+    background: var(--mat-sys-primary);
+    color: var(--mat-sys-on-primary);
   }
 
   &.tone-success {
-    background: var(--mat-sys-tertiary-container);
-    color: var(--mat-sys-on-tertiary-container);
+    background: var(--mat-sys-tertiary);
+    color: var(--mat-sys-on-tertiary);
   }
 
   &.tone-warning {
-    background: var(--mat-sys-secondary-container);
-    color: var(--mat-sys-on-secondary-container);
+    background: var(--mat-sys-secondary);
+    color: var(--mat-sys-on-secondary);
   }
 
   &.tone-danger {
-    background: var(--mat-sys-error-container);
-    color: var(--mat-sys-on-error-container);
+    background: var(--mat-sys-error);
+    color: var(--mat-sys-on-error);
   }
 }

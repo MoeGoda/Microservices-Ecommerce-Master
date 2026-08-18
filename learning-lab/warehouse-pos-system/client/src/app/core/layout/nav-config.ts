@@ -70,6 +70,26 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     ],
   },
   { kind: 'link', labelKey: 'toolbar.pos', route: '/pos', icon: 'point_of_sale', roles: POS_ROLES },
-  { kind: 'link', labelKey: 'toolbar.reports', route: '/reports', icon: 'bar_chart', roles: REPORTS_ROLES },
+  // N — the former single flat "Reports" link, generalized the same way
+  // K's one Warehouse toggle became a group in Phase M: eight separate
+  // report screens instead of one 970-line page combining all of them.
+  {
+    kind: 'group',
+    id: 'reports',
+    labelKey: 'toolbar.reportsGroup',
+    icon: 'bar_chart',
+    roles: REPORTS_ROLES,
+    children: [
+      { labelKey: 'toolbar.reportsDashboard', route: '/reports', icon: 'dashboard', exact: true },
+      { labelKey: 'toolbar.salesByDay', route: '/reports/sales-by-day', icon: 'show_chart' },
+      { labelKey: 'toolbar.topSelling', route: '/reports/top-selling', icon: 'trending_up' },
+      { labelKey: 'toolbar.lowStockReport', route: '/reports/low-stock', icon: 'inventory_2' },
+      { labelKey: 'toolbar.salesLedger', route: '/reports/sales-ledger', icon: 'receipt_long' },
+      { labelKey: 'toolbar.cashierPerformance', route: '/reports/cashier-performance', icon: 'badge' },
+      { labelKey: 'toolbar.stockMovementsReport', route: '/reports/stock-movements', icon: 'swap_horiz' },
+      { labelKey: 'toolbar.inventoryValuation', route: '/reports/inventory-valuation', icon: 'account_balance_wallet' },
+      { labelKey: 'toolbar.poAging', route: '/reports/purchase-order-aging', icon: 'schedule' },
+    ],
+  },
   { kind: 'link', labelKey: 'toolbar.users', route: '/users', icon: 'group', roles: USER_MANAGEMENT_ROLES },
 ];

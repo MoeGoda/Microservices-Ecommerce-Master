@@ -1,0 +1,10 @@
+@if (segments().length > 0) {
+  <nav class="breadcrumb" aria-label="breadcrumb">
+    @for (segment of segments(); track segment.labelKey; let last = $last) {
+      <span class="breadcrumb-item" [class.current]="last">{{ segment.labelKey | translate }}</span>
+      @if (!last) {
+        <span class="breadcrumb-separator" aria-hidden="true">›</span>
+      }
+    }
+  </nav>
+}

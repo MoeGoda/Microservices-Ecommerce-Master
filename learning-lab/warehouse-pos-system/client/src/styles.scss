@@ -12,14 +12,42 @@ html {
   // slightly denser layout (-1) — this app is data-dense (tables, forms,
   // stock figures), not a consumer app, so the default M3 comfortable
   // spacing reads as wasted space rather than polish.
+  // P — typography switched to Nunito to match the SB Admin 2 reference
+  // the user supplied directly (its own _variables.scss pins
+  // $font-family-sans-serif to Nunito); loaded via index.html's Google
+  // Fonts link alongside the existing Roboto import.
   @include mat.theme((
     color: (
       primary: mat.$blue-palette,
       tertiary: mat.$cyan-palette,
     ),
-    typography: Roboto,
+    typography: Nunito,
     density: -1,
   ));
+}
+
+// P — SB Admin 2's own palette (its scss/_variables.scss), used as plain
+// hex custom properties for the surfaces that are hand-built to mimic
+// that template's specific look (shell, cards, tables, login) rather
+// than routed through Angular Material's blue system palette, which
+// renders a visibly different blue. Material components elsewhere
+// (buttons, inputs, menus) keep using the mat.theme() tokens above —
+// this is scoped to the SB-Admin-2-styled chrome only.
+:root {
+  --sba-primary: #4e73df;
+  --sba-primary-dark: #224abe;
+  --sba-success: #1cc88a;
+  --sba-info: #36b9cc;
+  --sba-warning: #f6c23e;
+  --sba-danger: #e74a3b;
+  --sba-gray-100: #f8f9fc;
+  --sba-gray-200: #eaecf4;
+  --sba-gray-300: #dddfeb;
+  --sba-gray-500: #b7b9cc;
+  --sba-gray-600: #858796;
+  --sba-gray-800: #5a5c69;
+  --sba-border: #e3e6f0;
+  --sba-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
 }
 
 body {
@@ -28,10 +56,9 @@ body {
   // user's system settings.
   color-scheme: light;
 
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface-container-lowest);
+  // P — SB Admin 2's page canvas is a pale gray (gray-100), not white —
+  // it's what makes the white cards on top of it read as cards at all.
+  background-color: var(--sba-gray-100);
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-body-medium);
 
@@ -75,8 +102,14 @@ html, body { height: 100%; }
 }
 
 .surface-card {
-  background: var(--mat-sys-surface-container-low);
-  border-radius: 12px;
+  // P — SB Admin 2's `.card`: white, a hairline border, and a soft
+  // wide-spread shadow instead of Material's flat tonal fill — this is
+  // the single change that makes every list/detail screen's content
+  // read as "a card sitting on a gray page" the way the reference does.
+  background: #fff;
+  border: 1px solid var(--sba-border);
+  border-radius: 0.35rem;
+  box-shadow: var(--sba-shadow);
   padding: 20px;
   box-sizing: border-box;
 }
@@ -107,29 +140,35 @@ table.data-grid {
   width: 100%;
   border-collapse: collapse;
 
+  // P — SB Admin 2's DataTables header: small, bold, uppercase, muted
+  // gray-600 on a gray-200 band — replaces the plain Material tonal
+  // header so every list table matches the reference's table.html look.
   th {
     position: sticky;
     top: 0;
-    background: var(--mat-sys-surface-container-low);
+    background: var(--sba-gray-200);
     text-align: start;
-    font: var(--mat-sys-label-large);
-    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--sba-gray-600);
     padding: 10px 12px;
-    border-bottom: 2px solid var(--mat-sys-outline-variant);
+    border-bottom: 1px solid var(--sba-border);
   }
 
   td {
     padding: 10px 12px;
-    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    border-bottom: 1px solid var(--sba-border);
     font: var(--mat-sys-body-medium);
   }
 
   tbody tr:nth-child(even) {
-    background: var(--mat-sys-surface-container-lowest);
+    background: var(--sba-gray-100);
   }
 
   tbody tr:hover {
-    background: var(--mat-sys-surface-container);
+    background: var(--sba-gray-200);
   }
 }
 

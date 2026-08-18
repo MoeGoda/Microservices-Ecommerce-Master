@@ -1,0 +1,42 @@
+:host {
+  display: block;
+}
+
+// P — SB Admin 2's `.card-header`: a pale gray-100 band, a hairline
+// bottom border, and a bold title colored by tone — not a full
+// solid-color band. Mirrors index.html's "Earnings Overview" /
+// "Revenue Sources" card headers (`<h6 class="m-0 font-weight-bold
+// text-primary">`) rather than the earlier Bootstrap-cshtml-inspired
+// solid `bg-primary text-white` band this replaces.
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--sba-gray-100);
+  border-bottom: 1px solid var(--sba-border);
+  border-radius: 0.35rem 0.35rem 0 0;
+  font: var(--mat-sys-title-small);
+  font-weight: 800;
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+
+  &.tone-primary,
+  &.tone-info {
+    color: var(--sba-primary);
+  }
+
+  &.tone-success {
+    color: var(--sba-success);
+  }
+
+  &.tone-warning {
+    color: var(--sba-warning);
+  }
+
+  &.tone-danger {
+    color: var(--sba-danger);
+  }
+}

@@ -14,6 +14,7 @@ import { NAV_ENTRIES, NavEntry } from './core/layout/nav-config';
 import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
 import { NotificationDto } from './shared/models/notification.models';
 import { TranslatePipe } from './core/i18n/translate.pipe';
+import { BreadcrumbComponent } from './shared/components/breadcrumb/breadcrumb.component';
 import { LanguageSwitcherComponent } from './shared/components/language-switcher/language-switcher.component';
 
 // K — a per-type icon for the notification feed dropdown, the "Facebook
@@ -46,6 +47,7 @@ export function notificationIcon(type: string): string {
     MatSidenavModule,
     MatListModule,
     TranslatePipe,
+    BreadcrumbComponent,
     LanguageSwitcherComponent,
   ],
   templateUrl: './app.html',
@@ -62,12 +64,12 @@ export class App {
 
   // M — generalized from K's single hardcoded warehouseGroupOpen signal:
   // any number of NAV_ENTRIES groups can now exist, each tracked by id in
-  // one Set. Both groups start open (same "don't look collapsed/broken
-  // on reload" reasoning K used for the one group it had) — POS/Reports/
+  // one Set. All three groups start open (same "don't look collapsed/
+  // broken on reload" reasoning K used for the one group it had) — POS/
   // Users stay flat single links since they have only one destination
   // each, same as before.
   readonly navEntries: readonly NavEntry[] = NAV_ENTRIES;
-  readonly openGroups = signal<ReadonlySet<string>>(new Set(['warehouse', 'purchasing']));
+  readonly openGroups = signal<ReadonlySet<string>>(new Set(['warehouse', 'purchasing', 'reports']));
 
   readonly userInitial = computed(() => {
     const name = this.authService.currentUser()?.userName;

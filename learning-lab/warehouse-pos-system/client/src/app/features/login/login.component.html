@@ -1,13 +1,20 @@
 <div class="login-page">
-  <mat-card class="login-card">
-    <mat-card-header>
-      <mat-card-title>{{ 'login.title' | translate }}</mat-card-title>
-      <mat-card-subtitle>{{ 'login.subtitle' | translate }}</mat-card-subtitle>
-    </mat-card-header>
+  <div class="login-card">
+    <!-- P — the branded left panel stands in for SB Admin 2's login.html
+         unsplash `.bg-login-image` half: this app has no such photo, so
+         rather than fabricate an unrelated stock image, the same brand
+         gradient/icon/name used everywhere else fills that half. -->
+    <div class="login-brand">
+      <mat-icon aria-hidden="true">storefront</mat-icon>
+      <span class="login-brand-name">{{ 'common.appName' | translate }}</span>
+    </div>
 
-    <mat-card-content>
+    <div class="login-form-panel">
+      <h1 class="login-title">{{ 'login.title' | translate }}</h1>
+      <p class="login-subtitle">{{ 'login.subtitle' | translate }}</p>
+
       <form [formGroup]="form" (ngSubmit)="submit()">
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width pill-field">
           <mat-label>{{ 'login.username' | translate }}</mat-label>
           <input matInput formControlName="userName" autocomplete="username" />
           @if (form.controls.userName.touched && form.controls.userName.invalid) {
@@ -15,7 +22,7 @@
           }
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width pill-field">
           <mat-label>{{ 'login.password' | translate }}</mat-label>
           <input matInput type="password" formControlName="password" autocomplete="current-password" />
           @if (form.controls.password.touched && form.controls.password.invalid) {
@@ -37,6 +44,6 @@
           }
         </button>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 </div>
