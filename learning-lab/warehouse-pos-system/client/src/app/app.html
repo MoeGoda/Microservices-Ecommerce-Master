@@ -120,6 +120,8 @@
               mat-list-item
               type="button"
               class="nav-group-toggle"
+              [attr.data-tone]="entry.tone"
+              [class.open]="isGroupOpen(entry.id)"
               [attr.aria-expanded]="isGroupOpen(entry.id)"
               (click)="toggleGroup(entry.id)"
             >
@@ -132,6 +134,7 @@
                 <a
                   mat-list-item
                   class="nav-sub-link"
+                  [attr.data-tone]="entry.tone"
                   [routerLink]="child.route"
                   routerLinkActive="active-nav-link"
                   [routerLinkActiveOptions]="{ exact: !!child.exact }"
@@ -142,7 +145,7 @@
               }
             }
           } @else {
-            <a mat-list-item [routerLink]="entry.route" routerLinkActive="active-nav-link">
+            <a mat-list-item class="nav-flat-link" [routerLink]="entry.route" routerLinkActive="active-nav-link" [attr.data-tone]="entry.tone">
               <mat-icon matListItemIcon>{{ entry.icon }}</mat-icon>
               <span matListItemTitle>{{ entry.labelKey | translate }}</span>
             </a>

@@ -9,12 +9,21 @@ import { ADMIN_ROLES, POS_ROLES, REPORTS_ROLES, USER_MANAGEMENT_ROLES } from '..
 // signal per group. Every route/role pairing here matches what
 // app.routes.ts already guards — this config only changes how they're
 // presented in the sidebar, not what's reachable or by whom.
+// A category color, not a Material semantic color — reused from the
+// SB Admin 2 palette already defined in styles.scss (--sba-primary/
+// success/info/warning/danger) plus one addition (purple) for a 6th
+// group, so each accordion group/flat link reads as its own "section"
+// at a glance (colored icon + a colored left accent bar when open/
+// active) rather than every row being identically gray.
+export type NavTone = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'purple';
+
 export interface NavLinkEntry {
   readonly kind: 'link';
   readonly labelKey: string;
   readonly route: string;
   readonly icon: string;
   readonly roles: readonly string[];
+  readonly tone: NavTone;
 }
 
 export interface NavChildLink {
@@ -35,6 +44,7 @@ export interface NavGroupEntry {
   readonly labelKey: string;
   readonly icon: string;
   readonly roles: readonly string[];
+  readonly tone: NavTone;
   readonly children: readonly NavChildLink[];
 }
 
@@ -59,6 +69,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     labelKey: 'toolbar.warehouseGroup',
     icon: 'inventory_2',
     roles: ADMIN_ROLES,
+    tone: 'primary',
     children: [
       { labelKey: 'toolbar.items', route: '/items', icon: 'category' },
       { labelKey: 'toolbar.warehouseDashboard', route: '/warehouse', icon: 'dashboard', exact: true },
@@ -76,13 +87,14 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     labelKey: 'toolbar.purchasingGroup',
     icon: 'storefront',
     roles: ADMIN_ROLES,
+    tone: 'warning',
     children: [
       { labelKey: 'toolbar.suppliers', route: '/suppliers', icon: 'local_shipping' },
       { labelKey: 'toolbar.purchaseOrders', route: '/purchase-orders', icon: 'receipt_long' },
     ],
   },
-  { kind: 'link', labelKey: 'toolbar.pos', route: '/pos', icon: 'point_of_sale', roles: POS_ROLES },
-  { kind: 'link', labelKey: 'toolbar.customers', route: '/customers', icon: 'people', roles: POS_ROLES },
+  { kind: 'link', labelKey: 'toolbar.pos', route: '/pos', icon: 'point_of_sale', roles: POS_ROLES, tone: 'success' },
+  { kind: 'link', labelKey: 'toolbar.customers', route: '/customers', icon: 'people', roles: POS_ROLES, tone: 'info' },
   { kind: 'category', labelKey: 'toolbar.categoryInsights' },
   // N — the former single flat "Reports" link, generalized the same way
   // K's one Warehouse toggle became a group in Phase M: eight separate
@@ -93,6 +105,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     labelKey: 'toolbar.reportsGroup',
     icon: 'bar_chart',
     roles: REPORTS_ROLES,
+    tone: 'purple',
     children: [
       { labelKey: 'toolbar.reportsDashboard', route: '/reports', icon: 'dashboard', exact: true },
       { labelKey: 'toolbar.salesByDay', route: '/reports/sales-by-day', icon: 'show_chart' },
@@ -106,5 +119,5 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     ],
   },
   { kind: 'category', labelKey: 'toolbar.categoryAdministration' },
-  { kind: 'link', labelKey: 'toolbar.users', route: '/users', icon: 'group', roles: USER_MANAGEMENT_ROLES },
+  { kind: 'link', labelKey: 'toolbar.users', route: '/users', icon: 'group', roles: USER_MANAGEMENT_ROLES, tone: 'danger' },
 ];

@@ -40,6 +40,12 @@ html {
   --sba-info: #36b9cc;
   --sba-warning: #f6c23e;
   --sba-danger: #e74a3b;
+  // T — a 6th category color, added alongside the existing five so the
+  // sidebar's Reports group can have its own accent rather than reusing
+  // one already claimed by Warehouse/Purchasing/POS/Customers/Users —
+  // same Bootstrap-family palette this app's SB Admin 2 look already
+  // draws from (Bootstrap's own $purple).
+  --sba-purple: #6f42c1;
   --sba-gray-100: #f8f9fc;
   --sba-gray-200: #eaecf4;
   --sba-gray-300: #dddfeb;

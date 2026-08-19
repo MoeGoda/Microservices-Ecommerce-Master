@@ -240,6 +240,53 @@ $topbar-text-muted: rgba(255, 255, 255, 0.5);
   margin: 0 8px;
 }
 
+// T — every group/link in NAV_ENTRIES now carries a `tone` (nav-config.ts's
+// NavTone), rendered here as a `data-tone` ATTRIBUTE rather than a class —
+// deliberately, so it coexists with routerLinkActive's own imperative
+// class manipulation on the very same <a> element (mixing a `[class]`
+// string binding with a directive that also writes classes is a known
+// Angular footgun: one can silently clobber the other on the next change
+// detection pass; a plain attribute never touches `class` at all). Each
+// tone just sets one custom property, --nav-tone, that every rule below
+// reads — reusing the SAME six colors the rest of the app already draws
+// from (styles.scss's --sba-primary/success/info/warning/danger, plus
+// --sba-purple added alongside this) so "Warehouse is blue, Purchasing
+// is amber, POS is green, Customers is teal, Reports is purple, Users is
+// red" reads as one consistent system, not five one-off picks.
+[data-tone='primary'] {
+  --nav-tone: var(--sba-primary);
+}
+[data-tone='success'] {
+  --nav-tone: var(--sba-success);
+}
+[data-tone='info'] {
+  --nav-tone: var(--sba-info);
+}
+[data-tone='warning'] {
+  --nav-tone: var(--sba-warning);
+}
+[data-tone='danger'] {
+  --nav-tone: var(--sba-danger);
+}
+[data-tone='purple'] {
+  --nav-tone: var(--sba-purple);
+}
+
+// Every row's own icon always carries its category's color, whether
+// open/active or not — this is the main "categorized at a glance" cue,
+// low-key enough not to fight the still-neutral gray/black text next to it.
+// Set as the SAME custom property `.app-sidenav` already sets once,
+// globally, for every list-item icon (--mdc-list-list-item-leading-icon-
+// color) — MDC's own compiled styles read that property internally, so
+// overriding it here (custom properties simply cascade/inherit down to
+// this narrower, per-row scope) is the reliable way to recolor a list
+// item's icon, rather than fighting Material's internal rule with a
+// plain `color` declaration and an unpredictable specificity contest.
+[data-tone] {
+  --mdc-list-list-item-leading-icon-color: var(--nav-tone);
+  --mdc-list-list-item-hover-leading-icon-color: var(--nav-tone);
+}
+
 // M — the group toggle row visually matches a plain nav link (same icon
 // slot, same title styling) so the only structural cue that it's a
 // section header rather than a destination is the trailing chevron —
@@ -254,14 +301,37 @@ $topbar-text-muted: rgba(255, 255, 255, 0.5);
   width: 100%;
   font-weight: 600;
   color: $sidenav-text-active;
+  // T — a transparent placeholder so opening the group only ever
+  // recolors this border rather than shifting layout by introducing it.
+  border-inline-start: 3px solid transparent;
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+
+  // T — "stay open" was already this app's real behavior (openGroups is
+  // a Set, toggling one id never touches the others — see app.ts), the
+  // same "multiple panels can be open at once" idea as a Bootstrap
+  // "Stay Open" accordion. This just gives that open state a visible,
+  // colored cue instead of only the chevron rotating.
+  &.open {
+    border-inline-start-color: var(--nav-tone);
+    background: color-mix(in srgb, var(--nav-tone) 7%, white);
+  }
 }
 
 // R — the sidenav toggle now doubles as a real desktop collapse control
 // (Material Admin Pro's own hamburger sits in the topbar at every
 // width, not just on mobile) — always visible, not hidden above the
 // old 768px breakpoint.
+// T — recolored from a flat gray fill to each row's own --nav-tone (a
+// light tint background + a solid left accent bar), same treatment as
+// the group toggle's `.open` state above, so "this is where I am" and
+// "this is which section I'm in" are the same visual signal. The
+// border lives in a separate, compound-selector rule below (not here)
+// specifically so it wins over .nav-sub-link/.nav-flat-link's own
+// transparent-border baseline regardless of source order — two classes
+// beats one at equal specificity, where relying on declaration order
+// alone would be fragile.
 .active-nav-link {
-  background: $sidenav-hover-bg;
+  background: color-mix(in srgb, var(--nav-tone, #{$sidenav-hover-bg}) 12%, white);
   color: $sidenav-text-active;
   font-weight: 700;
 }
@@ -281,10 +351,30 @@ $topbar-text-muted: rgba(255, 255, 255, 0.5);
 
 .nav-sub-link {
   padding-inline-start: 16px;
+  border-inline-start: 3px solid transparent;
 
   ::ng-deep .mdc-list-item__content {
     padding-inline-start: 12px;
   }
+}
+
+// T — the flat, single-destination entries (POS, Customers, Users — no
+// children, so no toggle/chevron at all) get the same transparent
+// placeholder border as the group toggle and its children, so their
+// .active-nav-link state doesn't shift layout by introducing the border
+// only once active.
+.nav-flat-link {
+  border-inline-start: 3px solid transparent;
+}
+
+// T — the compound form (two classes) beats either .nav-sub-link or
+// .active-nav-link alone at equal specificity — this is what actually
+// makes the colored border win once a sub-link/flat-link becomes active,
+// instead of being reset back to transparent by whichever of the two
+// single-class rules above happens to come later in the file.
+.nav-sub-link.active-nav-link,
+.nav-flat-link.active-nav-link {
+  border-inline-start-color: var(--nav-tone);
 }
 
 // --- Notifications dropdown ---
