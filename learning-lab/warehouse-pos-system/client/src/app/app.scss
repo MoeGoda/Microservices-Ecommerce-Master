@@ -26,7 +26,8 @@ $sidenav-text-muted: rgba(255, 255, 255, 0.5);
 $sidenav-text-active: #ffffff;
 
 .app-sidenav {
-  width: 268px;
+  // 14rem — SB Admin 2's own $sidebar-base-width, not an approximation.
+  width: 224px;
   border-inline-end: none;
   background: linear-gradient(180deg, var(--sba-primary) 0%, var(--sba-primary-dark) 100%);
   color: $sidenav-text;
@@ -68,6 +69,68 @@ $sidenav-text-active: #ffffff;
   top: 0;
   z-index: 10;
   box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+  // 4.375rem — SB Admin 2's own $topbar-base-height, not Material's
+  // default toolbar height.
+  height: 70px;
+}
+
+.sidenav-divider {
+  border-top-color: rgba(255, 255, 255, 0.15);
+  margin-bottom: 8px;
+}
+
+// P — SB Admin 2's topbar leads with a search box before the icon
+// cluster (`.navbar-search`: a light rounded input, no floating
+// label). Real functionality behind it (filters NAV_ENTRIES via
+// app.ts's navSearchControl/navSearchResults) — this app has no
+// global entity-search backend to wire a fake one to.
+.nav-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 320px;
+  max-width: 40vw;
+  margin-inline-start: 12px;
+  padding: 0 12px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--sba-gray-100);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--sba-gray-600);
+    flex-shrink: 0;
+  }
+
+  input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    outline: none;
+    font: var(--mat-sys-body-medium);
+    color: var(--sba-gray-800);
+
+    &::placeholder {
+      color: var(--sba-gray-600);
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .nav-search {
+    display: none;
+  }
+}
+
+.topbar-divider {
+  display: inline-block;
+  width: 1px;
+  height: 32px;
+  background: var(--sba-border);
+  margin: 0 8px;
 }
 
 // M — the group toggle row visually matches a plain nav link (same icon
@@ -161,20 +224,40 @@ $sidenav-text-active: #ffffff;
   white-space: normal;
 }
 
+// P — SB Admin 2's alert dropdown gives each row's icon circle a solid
+// bg-color by kind (`icon-circle bg-primary`/`bg-success`/`bg-warning`)
+// at 2.5rem (40px) — matched here exactly; a *read* row still gets its
+// tone's color (just at lower opacity), not the flat neutral gray this
+// had before, so the kind of event stays legible even after it's read.
 .notification-icon {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: var(--mat-sys-surface-container-highest);
-  color: var(--mat-sys-on-surface-variant);
+  background: var(--sba-gray-200);
+  color: var(--sba-gray-600);
 
-  &.unread {
-    background: var(--mat-sys-primary-container);
-    color: var(--mat-sys-on-primary-container);
+  &.tone-success {
+    background: color-mix(in srgb, var(--sba-success) 25%, white);
+    color: color-mix(in srgb, var(--sba-success) 70%, black);
+  }
+
+  &.tone-warning {
+    background: color-mix(in srgb, var(--sba-warning) 30%, white);
+    color: color-mix(in srgb, var(--sba-warning) 60%, black);
+  }
+
+  &.unread.tone-success {
+    background: var(--sba-success);
+    color: #fff;
+  }
+
+  &.unread.tone-warning {
+    background: var(--sba-warning);
+    color: #fff;
   }
 
   mat-icon {

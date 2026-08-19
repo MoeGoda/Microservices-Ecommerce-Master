@@ -59,7 +59,8 @@
     "markAllRead": "تعليم الكل كمقروء",
     "noNotifications": "لا توجد إشعارات حتى الآن.",
     "signOut": "تسجيل الخروج",
-    "language": "اللغة"
+    "language": "اللغة",
+    "searchPlaceholder": "بحث..."
   },
   "login": {
     "title": "المستودع ونقاط البيع",

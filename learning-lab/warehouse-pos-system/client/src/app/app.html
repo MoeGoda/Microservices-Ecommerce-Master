@@ -5,6 +5,7 @@
         <mat-icon aria-hidden="true">storefront</mat-icon>
         <span>{{ 'common.appName' | translate }}</span>
       </div>
+      <mat-divider class="sidenav-divider"></mat-divider>
       <mat-nav-list>
         <!-- M — generalized from K's one hardcoded Warehouse toggle into a
              loop over NAV_ENTRIES, so any number of groups (Warehouse,
@@ -57,8 +58,29 @@
         <button mat-icon-button (click)="sidenav.toggle()" class="sidenav-toggle" aria-label="Toggle navigation">
           <mat-icon>menu</mat-icon>
         </button>
+
+        <div class="nav-search">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          <input
+            type="text"
+            [formControl]="navSearchControl"
+            [matAutocomplete]="navAuto"
+            [placeholder]="'toolbar.searchPlaceholder' | translate"
+            [attr.aria-label]="'toolbar.searchPlaceholder' | translate"
+          />
+        </div>
+        <mat-autocomplete #navAuto="matAutocomplete" (optionSelected)="onNavSearchSelect($event)">
+          @for (result of navSearchResults(); track result.route) {
+            <mat-option [value]="result.route">
+              <mat-icon aria-hidden="true">{{ result.icon }}</mat-icon>
+              {{ result.labelKey | translate }}
+            </mat-option>
+          }
+        </mat-autocomplete>
+
         <span class="spacer"></span>
         <app-language-switcher></app-language-switcher>
+        <span class="topbar-divider"></span>
 
         <button
           mat-icon-button
@@ -86,7 +108,12 @@
           } @else {
             @for (n of notificationFeed.notifications(); track n.id) {
               <button mat-menu-item class="notification-row" [class.unread]="!n.isRead" (click)="markRead(n)">
-                <span class="notification-icon" [class.unread]="!n.isRead">
+                <span
+                  class="notification-icon"
+                  [class.unread]="!n.isRead"
+                  [class.tone-success]="notificationTone(n.type) === 'success'"
+                  [class.tone-warning]="notificationTone(n.type) === 'warning'"
+                >
                   <mat-icon aria-hidden="true">{{ notificationIcon(n.type) }}</mat-icon>
                 </span>
                 <span class="notification-text">

@@ -1,5 +1,8 @@
 import { Component, computed, effect, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
@@ -10,6 +13,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { AuthService } from './core/auth/auth.service';
+import { I18nService } from './core/i18n/i18n.service';
 import { NAV_ENTRIES, NavEntry } from './core/layout/nav-config';
 import { NotificationFeedService } from './core/notification-feed/notification-feed.service';
 import { NotificationDto } from './shared/models/notification.models';
@@ -32,12 +36,47 @@ export function notificationIcon(type: string): string {
   return NOTIFICATION_ICONS[type] ?? 'notifications';
 }
 
+// P — SB Admin 2's own notification dropdown colors each alert's icon
+// circle by kind (bg-primary/bg-success/bg-warning) rather than one
+// flat tone for every row; this is the closest real equivalent — the
+// two notification types this app actually has, mapped to the two
+// tones that read as "a sale happened" (success) vs. "something needs
+// attention" (warning).
+const NOTIFICATION_TONES: Record<string, 'success' | 'warning'> = {
+  SaleCompleted: 'success',
+  LowStock: 'warning',
+};
+
+export function notificationTone(type: string): 'success' | 'warning' {
+  return NOTIFICATION_TONES[type] ?? 'warning';
+}
+
+interface SearchableNavItem {
+  readonly labelKey: string;
+  readonly route: string;
+  readonly icon: string;
+  readonly roles: readonly string[];
+}
+
+// P — SB Admin 2's topbar leads with a search box (`.navbar-search`);
+// this app has no global entity-search backend, so rather than fake
+// one, this is a real quick-nav search — flattened once from
+// NAV_ENTRIES's groups/links, filtered by the *translated* label so it
+// matches what's actually on screen in either language.
+const SEARCHABLE_NAV_ITEMS: readonly SearchableNavItem[] = NAV_ENTRIES.flatMap((entry) =>
+  entry.kind === 'group'
+    ? entry.children.map((child) => ({ labelKey: child.labelKey, route: child.route, icon: child.icon, roles: entry.roles }))
+    : [{ labelKey: entry.labelKey, route: entry.route, icon: entry.icon, roles: entry.roles }],
+);
+
 @Component({
   selector: 'app-root',
   imports: [
+    ReactiveFormsModule,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
+    MatAutocompleteModule,
     MatToolbarModule,
     MatButtonModule,
     MatDividerModule,
@@ -77,10 +116,28 @@ export class App {
   });
 
   readonly notificationIcon = notificationIcon;
+  readonly notificationTone = notificationTone;
+
+  readonly navSearchControl = new FormControl('', { nonNullable: true });
+  // computed() only tracks *signal* reads — a plain `.value` read on a
+  // FormControl never triggers it to re-run, since valueChanges is an
+  // Observable, not a signal. Bridging it through toSignal() is what
+  // actually makes navSearchResults recompute as the user types.
+  private readonly navSearchQuery = toSignal(this.navSearchControl.valueChanges, { initialValue: '' });
+  readonly navSearchResults = computed(() => {
+    const query = this.navSearchQuery().trim().toLowerCase();
+    const user = this.authService.currentUser();
+    const visible = SEARCHABLE_NAV_ITEMS.filter((item) => !!user && item.roles.includes(user.role));
+    if (!query) {
+      return visible;
+    }
+    return visible.filter((item) => this.i18n.t(item.labelKey).toLowerCase().includes(query));
+  });
 
   constructor(
     readonly authService: AuthService,
     readonly notificationFeed: NotificationFeedService,
+    private readonly i18n: I18nService,
     private readonly router: Router,
     breakpointObserver: BreakpointObserver,
   ) {
@@ -114,6 +171,12 @@ export class App {
   canSee(roles: readonly string[]): boolean {
     const user = this.authService.currentUser();
     return !!user && roles.includes(user.role);
+  }
+
+  onNavSearchSelect(event: MatAutocompleteSelectedEvent): void {
+    const route = event.option.value as string;
+    this.navSearchControl.setValue('');
+    this.router.navigateByUrl(route);
   }
 
   isGroupOpen(id: string): boolean {
