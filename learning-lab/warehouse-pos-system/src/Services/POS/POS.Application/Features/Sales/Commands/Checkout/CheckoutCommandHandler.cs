@@ -21,17 +21,20 @@ namespace POS.Application.Features.Sales.Commands.Checkout
 
         private readonly ISaleRepository _saleRepository;
         private readonly ISaleLineRepository _saleLineRepository;
+        private readonly ICustomerRepository _customerRepository;
         private readonly IOutboxRepository _outboxRepository;
         private readonly IUnitOfWork _unitOfWork;
 
         public CheckoutCommandHandler(
             ISaleRepository saleRepository,
             ISaleLineRepository saleLineRepository,
+            ICustomerRepository customerRepository,
             IOutboxRepository outboxRepository,
             IUnitOfWork unitOfWork)
         {
             _saleRepository = saleRepository;
             _saleLineRepository = saleLineRepository;
+            _customerRepository = customerRepository;
             _outboxRepository = outboxRepository;
             _unitOfWork = unitOfWork;
         }
@@ -56,6 +59,20 @@ namespace POS.Application.Features.Sales.Commands.Checkout
             sale.CompletedAt = DateTime.UtcNow;
             sale.StockSyncStatus = StockSyncStatus.Pending;
             await _saleRepository.UpdateAsync(sale);
+
+            // Earn 1 point per $10 of the completed sale's Total, only when
+            // a customer was attached (SetSaleCustomerCommand) before
+            // checkout — walk-in sales with no CustomerId earn nothing,
+            // there's no one to credit.
+            if (sale.CustomerId.HasValue)
+            {
+                var customer = await _customerRepository.GetById(sale.CustomerId.Value);
+                if (customer is not null)
+                {
+                    customer.LoyaltyPoints += (int)Math.Floor(sale.Total / 10m);
+                    await _customerRepository.UpdateAsync(customer);
+                }
+            }
 
             // The Outbox pattern: the message, every delivery it fans out
             // to, and the Sale's own Status change above all commit in

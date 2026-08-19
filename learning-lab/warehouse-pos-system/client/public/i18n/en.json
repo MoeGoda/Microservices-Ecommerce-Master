@@ -41,6 +41,7 @@
     "stockCounts": "Stock Counts",
     "items": "Items",
     "pos": "POS",
+    "customers": "Customers",
     "reports": "Reports",
     "reportsGroup": "Reports",
     "reportsDashboard": "Dashboard",
@@ -90,7 +91,9 @@
       "item": "Item",
       "price": "Price",
       "qty": "Qty",
-      "lineTotal": "Line total"
+      "discount": "Discount %",
+      "lineTotal": "Line total",
+      "promoApplied": "An automatic promotion is already applied to this line"
     },
     "register": {
       "saleTitle": "Sale #{{id}}",
@@ -100,10 +103,109 @@
       "addButton": "Add",
       "removeLine": "Remove line",
       "emptyRow": "Scan a barcode to add the first line.",
+      "receiptDiscountLabel": "Receipt discount %",
+      "taxExempt": "Tax exempt",
       "cancelSale": "Cancel sale",
       "checkout": "Checkout"
     },
     "totalLabel": "Total",
+    "totals": {
+      "subtotal": "Subtotal",
+      "discount": "Discount",
+      "net": "Net total",
+      "tax": "Tax"
+    },
+    "actions": {
+      "heldSales": "Held sales",
+      "hold": "Hold",
+      "openDrawer": "Open drawer",
+      "cashIn": "Cash in",
+      "cashOut": "Cash out",
+      "xReport": "X report",
+      "closeDrawer": "Close drawer"
+    },
+    "customers": {
+      "searchLabel": "Customer",
+      "searchPlaceholder": "Search by name or phone",
+      "newCustomer": "New customer",
+      "detach": "Remove customer",
+      "name": "Name",
+      "nameRequired": "Name is required.",
+      "phone": "Phone",
+      "email": "Email",
+      "emailInvalid": "Enter a valid email address.",
+      "loyaltyPoints": "Loyalty points",
+      "balance": "Balance",
+      "adjustBalance": "Adjust balance",
+      "balanceDelta": "Amount (+/-)",
+      "balanceReason": "Reason",
+      "applyAdjustment": "Apply",
+      "create": {
+        "title": "New customer"
+      },
+      "edit": {
+        "title": "Edit customer"
+      },
+      "admin": {
+        "title": "Customers",
+        "emptyRow": "No customers yet."
+      },
+      "toasts": {
+        "created": "Customer {{name}} created.",
+        "updated": "Customer {{name}} updated.",
+        "balanceAdjusted": "Balance adjusted."
+      }
+    },
+    "heldSales": {
+      "title": "Held sales",
+      "empty": "No sales are currently on hold.",
+      "walkIn": "Walk-in",
+      "items": "items"
+    },
+    "cashDrawer": {
+      "status": {
+        "open": "Drawer open · float {{openingFloat}}",
+        "closed": "Drawer closed"
+      },
+      "amount": "Amount",
+      "amountRequired": "Enter an amount greater than 0.",
+      "reason": "Reason",
+      "reasonRequired": "A reason is required.",
+      "cashIn": {
+        "title": "Cash in"
+      },
+      "cashOut": {
+        "title": "Cash out"
+      },
+      "open": {
+        "title": "Open cash drawer",
+        "openingFloat": "Opening float",
+        "openingFloatRequired": "Enter an opening float of 0 or more.",
+        "submit": "Open"
+      },
+      "close": {
+        "title": "Close cash drawer",
+        "closingCount": "Counted cash",
+        "closingCountRequired": "Enter the counted cash amount.",
+        "submit": "Close"
+      },
+      "xReport": {
+        "title": "X report",
+        "openingFloat": "Opening float",
+        "cashIn": "Cash in",
+        "cashOut": "Cash out",
+        "completedSales": "Completed sales",
+        "salesTotal": "Sales total (all tenders)",
+        "expectedCash": "Expected cash in drawer",
+        "disclaimer": "Sales total isn't included in the expected-cash figure — there is no payment-method record, so it isn't known how much of it was paid in cash."
+      },
+      "toasts": {
+        "opened": "Cash drawer opened.",
+        "closed": "Cash drawer closed.",
+        "cashInRecorded": "Cash in recorded.",
+        "cashOutRecorded": "Cash out recorded."
+      }
+    },
     "receipt": {
       "title": "Receipt — Sale #{{id}}",
       "completedSubtitle": "Completed {{completedAt}} · stock sync: {{syncStatus}}",

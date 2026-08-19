@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using POS.Application.Common;
 using POS.Application.Contracts.Infrastructure;
 using POS.Application.Contracts.Persistence;
 using POS.Infrastructure.Http;
@@ -20,8 +21,16 @@ namespace POS.Infrastructure
 
             services.AddScoped<ISaleRepository, SaleRepository>();
             services.AddScoped<ISaleLineRepository, SaleLineRepository>();
+            services.AddScoped<ICustomerRepository, CustomerRepository>();
+            services.AddScoped<ICashDrawerRepository, CashDrawerRepository>();
             services.AddScoped<IOutboxRepository, OutboxRepository>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // Same IOptions<T> binding pattern SmtpSettings already uses
+            // (Notifications.Infrastructure) — RatePercent defaults to
+            // 8.5 (TaxSettings' own default) if "Tax" is absent from
+            // appsettings.json entirely.
+            services.Configure<TaxSettings>(configuration.GetSection("Tax"));
 
             // Same JwtSettings section every service binds (Common.Security)
             // — ServiceAuthHandler needs Secret/Issuer/Audience to mint a

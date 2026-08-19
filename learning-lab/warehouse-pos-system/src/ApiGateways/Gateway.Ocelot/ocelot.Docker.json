@@ -399,6 +399,20 @@
           "Port": 5298
         }
       ]
-    }
+    },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] },
+    { "DownstreamHostAndPorts": [{ "Host": "pos-api", "Port": 5258 }] }
   ]
 }

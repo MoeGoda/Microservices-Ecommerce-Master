@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Common.ExceptionHandling;
 using Common.RequestCulture;
 using Common.Security;
@@ -40,7 +41,15 @@ builder.Services.AddHealthChecks().AddDbContextCheck<PosContext>();
 // exact same spot before Warehouse.API showed up.
 builder.Services.AddHostedService<OutboxBackgroundService>();
 
-builder.Services.AddControllers();
+// RecordCashMovementCommand.Type is the first request body in this
+// service to bind a raw enum (CashMovementType) straight from JSON —
+// every enum before this only ever went the other way, DTOs that map it
+// to a string via .ToString() (Sale.Status, StockSyncStatus). Without
+// this converter, System.Text.Json expects the numeric underlying value
+// ("0"/"1") instead of "CashIn"/"CashOut", which is what every other
+// enum-like value in this API's wire format already looks like.
+builder.Services.AddControllers()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

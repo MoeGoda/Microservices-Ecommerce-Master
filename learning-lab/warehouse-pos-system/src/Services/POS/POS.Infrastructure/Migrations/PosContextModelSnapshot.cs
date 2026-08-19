@@ -22,6 +22,110 @@ namespace POS.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("POS.Domain.Entities.CashDrawerSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CashierUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("ClosingCount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("OpeningFloat")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CashDrawerSessions");
+                });
+
+            modelBuilder.Entity("POS.Domain.Entities.CashMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("CashDrawerSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CashDrawerSessionId");
+
+                    b.ToTable("CashMovements");
+                });
+
+            modelBuilder.Entity("POS.Domain.Entities.Customer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Balance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("LoyaltyPoints")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Customers");
+                });
+
             modelBuilder.Entity("POS.Domain.Entities.OutboxDelivery", b =>
                 {
                     b.Property<int>("Id")
@@ -104,8 +208,20 @@ namespace POS.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsTaxExempt")
+                        .HasColumnType("bit");
+
                     b.Property<int>("LocationId")
                         .HasColumnType("int");
+
+                    b.Property<decimal?>("ManualReceiptDiscountPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("NetTotal")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("ReturnedAt")
                         .HasColumnType("datetime2");
@@ -116,10 +232,15 @@ namespace POS.Infrastructure.Migrations
                     b.Property<int>("StockSyncStatus")
                         .HasColumnType("int");
 
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("Total")
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
 
                     b.ToTable("Sales");
                 });
@@ -145,6 +266,9 @@ namespace POS.Infrastructure.Migrations
 
                     b.Property<decimal>("LineTotal")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("ManualDiscountPercent")
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<decimal?>("OriginalUnitPrice")
                         .HasColumnType("decimal(18,2)");
@@ -173,6 +297,17 @@ namespace POS.Infrastructure.Migrations
                     b.ToTable("SaleLines");
                 });
 
+            modelBuilder.Entity("POS.Domain.Entities.CashMovement", b =>
+                {
+                    b.HasOne("POS.Domain.Entities.CashDrawerSession", "CashDrawerSession")
+                        .WithMany()
+                        .HasForeignKey("CashDrawerSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CashDrawerSession");
+                });
+
             modelBuilder.Entity("POS.Domain.Entities.OutboxDelivery", b =>
                 {
                     b.HasOne("POS.Domain.Entities.OutboxMessage", "OutboxMessage")
@@ -182,6 +317,16 @@ namespace POS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("OutboxMessage");
+                });
+
+            modelBuilder.Entity("POS.Domain.Entities.Sale", b =>
+                {
+                    b.HasOne("POS.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("POS.Domain.Entities.SaleLine", b =>

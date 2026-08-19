@@ -23,12 +23,39 @@ namespace POS.Domain.Entities
 
         public SaleStatus Status { get; set; } = SaleStatus.InProgress;
 
-        // The sum of every SaleLine.LineTotal for this sale. Kept here
-        // (rather than computed on every read by summing lines) for the
-        // same reason StockLevel.QuantityOnHand is a maintained value
-        // rather than a live SUM() — whichever command handler adds or
-        // removes a line has to keep this in sync in the same transaction;
-        // see AddSaleLineCommandHandler.
+        // Real FK, not a cross-service int — Customer lives in this same
+        // POS database (see Customer.cs). Null for the (still common)
+        // case of a walk-in sale with nobody attached.
+        public int? CustomerId { get; set; }
+        public Customer? Customer { get; set; }
+
+        // A whole-sale percentage discount, on top of whatever each
+        // line's own promotion/manual discount already applied —
+        // "Receipt discounts" in the register's action panel. Applied to
+        // the line-total sum before tax; see NetTotal's own comment.
+        public decimal? ManualReceiptDiscountPercent { get; set; }
+
+        // Toggled by SetTaxExemptCommand — when true, TaxAmount is
+        // forced to zero regardless of TaxSettings.RatePercent.
+        public bool IsTaxExempt { get; set; }
+
+        // The sum of every SaleLine.LineTotal for this sale, after
+        // ManualReceiptDiscountPercent is applied — i.e. what tax is
+        // actually computed against. Same "maintained value, not a live
+        // SUM()" reasoning as Total below; recomputed alongside it every
+        // time a line changes or a discount/tax-exempt flag is set, not
+        // just at checkout, so the register shows a live breakdown as
+        // items are scanned.
+        public decimal NetTotal { get; set; }
+
+        public decimal TaxAmount { get; set; }
+
+        // NetTotal + TaxAmount. Kept here (rather than computed on every
+        // read) for the same reason StockLevel.QuantityOnHand is a
+        // maintained value rather than a live SUM() — whichever command
+        // handler changes a line or a discount has to keep this (and
+        // NetTotal/TaxAmount above) in sync in the same transaction; see
+        // AddSaleLineCommandHandler.
         public decimal Total { get; set; }
 
         public DateTime? CompletedAt { get; set; }

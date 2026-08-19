@@ -13,5 +13,11 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
         public int SaleId { get; set; }
         public string Barcode { get; set; } = null!;
         public int Quantity { get; set; }
+
+        // Cashier-entered — "Line discount" in the register's action
+        // panel. Only honored when Warehouse didn't already resolve an
+        // active promotion for this item (see the handler); the two
+        // never stack.
+        public decimal? ManualDiscountPercent { get; set; }
     }
 }

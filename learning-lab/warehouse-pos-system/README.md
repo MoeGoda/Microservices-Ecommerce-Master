@@ -76,6 +76,9 @@ a distributed transaction.
 **Phase N — SB Admin 2 theme reskin, and the Reports screen split into 8**
 - [x] **N — The whole app shell, cards, tables, and login screen rebuilt to match the StartBootstrap SB Admin 2 template (gradient sidebar, gray-100 canvas, white shadowed cards, uppercase table headers, split-card login) — the third and final style reference after two earlier ones (a dark EVOHUS-inspired shell, an unreachable Material Admin Pro link) were tried and rejected/abandoned. The former 970-line combined Reports dashboard is now a landing page of 8 real-data KPI tiles, each linking to its own routed report screen (Sales by Day, Top Selling, Low Stock, Sales Ledger, Cashier Performance, Stock Movements, Inventory Valuation, PO Aging) — the same "split the screen that outgrew itself" pattern K already used for Items.**
 
+**Phase T — POS build-out: customers/loyalty, discounts + tax, cash drawer, held sales**
+- [x] **T — Real `Customer` entity (loyalty points, manual balance) inside POS.Domain; per-line and receipt-level manual discounts; a live tax breakdown (`TaxSettings`, shared `SaleTotalsCalculator`); a held-sales query; a cash-drawer session/movement/X-report/close flow — the register screen rebuilt in this app's own Material language (not the ERPLY/XD-POS references' flat-color skin) to surface all of it, plus a new Customers admin grid.**
+
 ## A1 — Identity service
 
 **What it does:** issues JWTs after registering/logging in a user, backed by
@@ -3393,4 +3396,113 @@ to "make Warehouse pretty," it was scoped to make the whole app consistent.
 # → switch to Arabic — the two new sidebar groups, every new screen, and
 #   every retrofitted filter panel are fully translated, RTL mirrors the
 #   layout the same as every other screen
+```
+
+## T — POS build-out: customers/loyalty, discounts + tax, cash drawer, held sales
+
+**What it does:** two ERPLY/XD-POS reference screenshots showed a much
+denser register than C4's original one — customer/loyalty lookup,
+per-line and receipt-level discounts, a tax breakdown, held sales, and a
+cash-drawer action grid. A background investigation confirmed most of
+that was genuinely missing (no `Customer` entity anywhere, no discount
+or tax field on `Sale`/`SaleLine`, no cash-drawer concept, no held-sales
+query) rather than just unstyled — so this is a real backend build-out,
+not a restyle, with the new register screen restyled into this app's own
+Material language (cards, buttons, icons matching the rest of the app)
+rather than the references' flat-color touch-button skin.
+
+**`Customer` lives inside `POS.Domain`, not a new microservice** — the
+same reasoning that already kept Suppliers/Purchase Orders inside
+Warehouse rather than a separate Purchasing service: loyalty points and
+balance are only meaningful in the context of Sales. Unlike
+`Sale.LocationId`/`CashierUserId` (plain ints, cross-service references
+to Warehouse/Identity), `Sale.CustomerId` is a real FK, since both rows
+live in the same database. `CashDrawerSession`/`CashMovement` are new
+entities in the same domain, tracking a register's shift independently
+of any one `Sale`.
+
+**`Sale` gains `CustomerId`, `ManualReceiptDiscountPercent`,
+`IsTaxExempt`, `NetTotal`, `TaxAmount`; `SaleLine` gains
+`ManualDiscountPercent`.** A shared `SaleTotalsCalculator.Recompute()`
+helper — not five copies of the same formula — is called from every
+handler that changes a line, a discount, or the tax-exempt flag
+(`AddSaleLine`, `RemoveSaleLine`, `SetLineDiscount`, `SetReceiptDiscount`,
+`SetTaxExempt`), so the register shows a live tax breakdown as items are
+scanned rather than only at checkout. The tax rate is `TaxSettings`
+(`RatePercent`, default 8.5), bound via `IOptions<TaxSettings>` from
+`appsettings.json`'s new `"Tax"` section — the same pattern
+Notifications' `SmtpSettings` already uses. A manual line discount and
+an automatic Warehouse promotion are mutually exclusive on the same
+line — whichever the item already carries wins, the other is rejected.
+
+**"Held sales" cost nothing at the domain level.**
+`StartSaleCommandHandler` never blocked more than one concurrent
+InProgress sale, and there was no unique index anywhere stopping it —
+multiple held sales already worked; the only missing piece was a query
+(`GetInProgressSalesQuery`, `GET /Pos/Sales?locationId=`) to list them
+back. "Hold" in the Angular client is just clearing the local view
+without cancelling — the sale stays InProgress in the database exactly
+as it always could.
+
+**The cash drawer is real, but deliberately scoped.** `OpenCashDrawer`/
+`RecordCashMovement`/`GetCashDrawerXReport`/`CloseCashDrawer` track an
+opening float, cash-in/cash-out movements, and a closing count per
+location — one open session per location at a time. The X-report's
+`SalesTotal` is shown separately from `ExpectedCashInDrawer`, never
+folded into it: this app has no payment-method/split-tender field on
+`Sale` anywhere, so there is no way to know how much of a sale's total
+was actually paid in cash. Reporting it as "expected cash" would be a
+fabricated number dressed up as a real one — the dialog says so
+explicitly. Loyalty points accrue at checkout (1 point per $10 of
+`Sale.Total`) only when a customer was attached before checkout; a
+walk-in sale earns nothing, because there is no one to credit.
+
+**Customer balance is a manual adjustment, not a ledger.**
+`AdjustCustomerBalanceCommand` takes a signed delta and a required
+reason; it changes `Customer.Balance` directly. There is no
+transaction history table behind it — deliberately out of scope, the
+same way multi-jurisdiction tax rules, split-tender payments, and a
+separate Salesman role were left out to keep this a coherent feature set
+rather than open-ended scope creep.
+
+**One real bug this phase's own runtime verification caught:**
+`RecordCashMovementCommand.Type` (a `CashMovementType` enum) was the
+first request body in POS.API to bind an enum straight from JSON.
+Every enum before this only ever went the other way — a DTO mapping it
+to a string via `.ToString()` (`Sale.Status`, `StockSyncStatus`) —
+so nothing had ever needed System.Text.Json's default numeric-only enum
+deserialization to accept a string. `POS.API/Program.cs` now registers a
+global `JsonStringEnumConverter`, so `"CashIn"`/`"CashOut"` round-trip
+the same as every other string-shaped value in this API's wire format.
+
+**Verified end-to-end against the real stack**, not just build-clean:
+every new endpoint was exercised through the gateway with real HTTP
+calls (create/search/update a customer, start a sale, attach/detach the
+customer, scan two lines, set a 10% line discount and a 5% receipt
+discount, toggle tax-exempt, confirm the live tax/net/total math at each
+step, list held sales, checkout, confirm loyalty points landed correctly
+for both a small sale that rounds to 0 points and a larger one that
+doesn't, open/cash-in/cash-out/X-report/close the cash drawer, and
+return a completed sale) — and the same flows were driven through the
+actual Angular UI with Playwright (customer search-and-attach, inline
+per-line discount input, the cash-drawer action bar and its four
+dialogs, the held-sales picker, the Customers admin grid), in both
+English and Arabic/RTL.
+
+**Try it:**
+```bash
+# Sign in as the seeded admin (Admin@12345), then in the Angular app:
+# → "POS" in the side rail — the register screen now has a customer
+#   search box, a Discount % column per line, a Receipt discount field,
+#   a Tax exempt checkbox, and a live Subtotal/Discount/Net/Tax/Total
+#   breakdown
+# → "Open drawer" in the bar above the register, then "Cash in"/
+#   "Cash out"/"X report" once it's open, and "Close drawer" to end
+#   the shift with a counted-cash entry
+# → "Held sales" lists every InProgress sale across the register —
+#   click one to resume it exactly where it was left
+# → "Customers" in the side rail — a plain admin grid (search, create,
+#   edit) over the same Customer records the register's search box uses
+# → switch to Arabic — every new label above, plus the cash-drawer and
+#   customer dialogs, are fully translated and RTL-mirrored
 ```

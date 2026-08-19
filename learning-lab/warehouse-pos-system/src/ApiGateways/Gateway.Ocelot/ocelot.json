@@ -424,6 +424,119 @@
       "UpstreamPathTemplate": "/Notifications/read-all",
       "UpstreamHttpMethod": [ "POST" ],
       "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "_comment": "T4/T5 — POS build-out: held-sales list, per-sale customer/discount/tax-exempt actions, Customers CRUD, and cash-drawer session/movement/x-report routes. Appended here (not inserted alongside the older /Pos/Sales block above) so every existing route's index — and therefore its matching ocelot.Docker.json host override, which is merged purely by array position — stays unchanged.",
+      "DownstreamPathTemplate": "/api/v1/Sales",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/customer",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/customer",
+      "UpstreamHttpMethod": [ "PUT" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/lines/{lineId}/discount",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/lines/{lineId}/discount",
+      "UpstreamHttpMethod": [ "PUT" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/receipt-discount",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/receipt-discount",
+      "UpstreamHttpMethod": [ "PUT" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Sales/{id}/tax-exempt",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Sales/{id}/tax-exempt",
+      "UpstreamHttpMethod": [ "PUT" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Customers",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Customers",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Customers/{id}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Customers/{id}",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Customers",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Customers",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Customers/{id}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Customers/{id}",
+      "UpstreamHttpMethod": [ "PUT" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/Customers/{id}/balance-adjustments",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/Customers/{id}/balance-adjustments",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/CashDrawer/open",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/CashDrawer/open",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/CashDrawer/movements",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/CashDrawer/movements",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/CashDrawer/{sessionId}/x-report",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/CashDrawer/{sessionId}/x-report",
+      "UpstreamHttpMethod": [ "GET" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
+    },
+    {
+      "DownstreamPathTemplate": "/api/v1/CashDrawer/{sessionId}/close",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5258 }],
+      "UpstreamPathTemplate": "/Pos/CashDrawer/{sessionId}/close",
+      "UpstreamHttpMethod": [ "POST" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] }
     }
   ],
   "GlobalConfiguration": {

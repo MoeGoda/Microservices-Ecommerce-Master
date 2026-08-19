@@ -16,7 +16,25 @@ namespace POS.Infrastructure.Repositories
 
         public async Task<Sale?> GetById(int id)
         {
-            return await _context.Sales.FirstOrDefaultAsync(s => s.Id == id);
+            return await _context.Sales.Include(s => s.Customer).FirstOrDefaultAsync(s => s.Id == id);
+        }
+
+        public async Task<IEnumerable<Sale>> GetInProgress(int? locationId)
+        {
+            var query = _context.Sales.Include(s => s.Customer).Where(s => s.Status == SaleStatus.InProgress);
+            if (locationId.HasValue)
+            {
+                query = query.Where(s => s.LocationId == locationId.Value);
+            }
+
+            return await query.ToListAsync();
+        }
+
+        public async Task<IEnumerable<Sale>> GetCompletedSince(int locationId, DateTime sinceUtc)
+        {
+            return await _context.Sales
+                .Where(s => s.LocationId == locationId && s.Status == SaleStatus.Completed && s.CompletedAt >= sinceUtc)
+                .ToListAsync();
         }
 
         // Stages only — see IUnitOfWork. StartSaleCommand is the one

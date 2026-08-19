@@ -1,8 +1,11 @@
 using Common.Exceptions;
 using MediatR;
+using Microsoft.Extensions.Options;
+using POS.Application.Common;
 using POS.Application.Contracts.Infrastructure;
 using POS.Application.Contracts.Persistence;
 using POS.Application.Exceptions;
+using POS.Application.Features.Sales;
 using POS.Application.Models;
 using POS.Domain.Entities;
 
@@ -14,17 +17,20 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
         private readonly ISaleLineRepository _saleLineRepository;
         private readonly IWarehouseCatalogClient _warehouseCatalogClient;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly TaxSettings _taxSettings;
 
         public AddSaleLineCommandHandler(
             ISaleRepository saleRepository,
             ISaleLineRepository saleLineRepository,
             IWarehouseCatalogClient warehouseCatalogClient,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            IOptions<TaxSettings> taxSettings)
         {
             _saleRepository = saleRepository;
             _saleLineRepository = saleLineRepository;
             _warehouseCatalogClient = warehouseCatalogClient;
             _unitOfWork = unitOfWork;
+            _taxSettings = taxSettings.Value;
         }
 
         public async Task<SaleDto> Handle(AddSaleLineCommand request, CancellationToken cancellationToken)
@@ -54,7 +60,12 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
                 throw new InsufficientStockException(item.Sku, request.Quantity, availableQuantity);
             }
 
-            var lineTotal = item.UnitPrice * request.Quantity;
+            // A manual discount never stacks on top of an automatic
+            // promotion — if Warehouse already resolved one for this
+            // item, the manual discount the cashier typed is dropped
+            // rather than silently combined with it.
+            var manualDiscountPercent = item.PromotionId is null ? request.ManualDiscountPercent : null;
+            var lineTotal = item.UnitPrice * request.Quantity * (1 - (manualDiscountPercent ?? 0) / 100m);
 
             var line = new SaleLine
             {
@@ -70,18 +81,19 @@ namespace POS.Application.Features.Sales.Commands.AddSaleLine
                 // correct regardless of whether a promotion applied.
                 OriginalUnitPrice = item.OriginalUnitPrice,
                 PromotionId = item.PromotionId,
+                ManualDiscountPercent = manualDiscountPercent,
                 Quantity = request.Quantity,
-                LineTotal = lineTotal,
+                LineTotal = Math.Round(lineTotal, 2),
             };
             await _saleLineRepository.AddAsync(line);
 
-            sale.Total += lineTotal;
+            var lines = (await _saleLineRepository.GetBySale(sale.Id)).Append(line);
+            SaleTotalsCalculator.Recompute(sale, lines, _taxSettings.RatePercent);
             await _saleRepository.UpdateAsync(sale);
 
             await _unitOfWork.SaveChangesAsync();
 
-            var lines = await _saleLineRepository.GetBySale(sale.Id);
-            return SaleDto.FromEntity(sale, lines);
+            return SaleDto.FromEntity(sale, await _saleLineRepository.GetBySale(sale.Id));
         }
     }
 }

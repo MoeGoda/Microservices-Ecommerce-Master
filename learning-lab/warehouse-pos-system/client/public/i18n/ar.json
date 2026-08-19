@@ -41,6 +41,7 @@
     "stockCounts": "جرد المخزون",
     "items": "المنتجات",
     "pos": "نقطة البيع",
+    "customers": "العملاء",
     "reports": "التقارير",
     "reportsGroup": "التقارير",
     "reportsDashboard": "لوحة التحكم",
@@ -90,7 +91,9 @@
       "item": "المنتج",
       "price": "السعر",
       "qty": "الكمية",
-      "lineTotal": "إجمالي السطر"
+      "discount": "الخصم %",
+      "lineTotal": "إجمالي السطر",
+      "promoApplied": "يوجد عرض تلقائي مطبق على هذا السطر بالفعل"
     },
     "register": {
       "saleTitle": "عملية بيع رقم {{id}}",
@@ -100,10 +103,109 @@
       "addButton": "إضافة",
       "removeLine": "حذف السطر",
       "emptyRow": "مسح باركود لإضافة أول سطر.",
+      "receiptDiscountLabel": "خصم الفاتورة %",
+      "taxExempt": "معفى من الضريبة",
       "cancelSale": "إلغاء البيع",
       "checkout": "الدفع"
     },
     "totalLabel": "الإجمالي",
+    "totals": {
+      "subtotal": "الإجمالي الفرعي",
+      "discount": "الخصم",
+      "net": "الصافي",
+      "tax": "الضريبة"
+    },
+    "actions": {
+      "heldSales": "العمليات المعلقة",
+      "hold": "تعليق",
+      "openDrawer": "فتح الدرج",
+      "cashIn": "إدخال نقدية",
+      "cashOut": "إخراج نقدية",
+      "xReport": "تقرير X",
+      "closeDrawer": "إغلاق الدرج"
+    },
+    "customers": {
+      "searchLabel": "العميل",
+      "searchPlaceholder": "البحث بالاسم أو الهاتف",
+      "newCustomer": "عميل جديد",
+      "detach": "إزالة العميل",
+      "name": "الاسم",
+      "nameRequired": "الاسم مطلوب.",
+      "phone": "الهاتف",
+      "email": "البريد الإلكتروني",
+      "emailInvalid": "أدخل بريدًا إلكترونيًا صحيحًا.",
+      "loyaltyPoints": "نقاط الولاء",
+      "balance": "الرصيد",
+      "adjustBalance": "تعديل الرصيد",
+      "balanceDelta": "المبلغ (+/-)",
+      "balanceReason": "السبب",
+      "applyAdjustment": "تطبيق",
+      "create": {
+        "title": "عميل جديد"
+      },
+      "edit": {
+        "title": "تعديل العميل"
+      },
+      "admin": {
+        "title": "العملاء",
+        "emptyRow": "لا يوجد عملاء حتى الآن."
+      },
+      "toasts": {
+        "created": "تم إنشاء العميل {{name}}.",
+        "updated": "تم تحديث العميل {{name}}.",
+        "balanceAdjusted": "تم تعديل الرصيد."
+      }
+    },
+    "heldSales": {
+      "title": "العمليات المعلقة",
+      "empty": "لا توجد عمليات بيع معلقة حاليًا.",
+      "walkIn": "عميل عابر",
+      "items": "عناصر"
+    },
+    "cashDrawer": {
+      "status": {
+        "open": "الدرج مفتوح · الرصيد الافتتاحي {{openingFloat}}",
+        "closed": "الدرج مغلق"
+      },
+      "amount": "المبلغ",
+      "amountRequired": "أدخل مبلغًا أكبر من 0.",
+      "reason": "السبب",
+      "reasonRequired": "السبب مطلوب.",
+      "cashIn": {
+        "title": "إدخال نقدية"
+      },
+      "cashOut": {
+        "title": "إخراج نقدية"
+      },
+      "open": {
+        "title": "فتح درج النقدية",
+        "openingFloat": "الرصيد الافتتاحي",
+        "openingFloatRequired": "أدخل رصيدًا افتتاحيًا 0 أو أكثر.",
+        "submit": "فتح"
+      },
+      "close": {
+        "title": "إغلاق درج النقدية",
+        "closingCount": "النقدية المعدودة",
+        "closingCountRequired": "أدخل مبلغ النقدية المعدودة.",
+        "submit": "إغلاق"
+      },
+      "xReport": {
+        "title": "تقرير X",
+        "openingFloat": "الرصيد الافتتاحي",
+        "cashIn": "إدخال نقدية",
+        "cashOut": "إخراج نقدية",
+        "completedSales": "عمليات البيع المكتملة",
+        "salesTotal": "إجمالي المبيعات (كل طرق الدفع)",
+        "expectedCash": "النقدية المتوقعة في الدرج",
+        "disclaimer": "إجمالي المبيعات غير مُدرج في رقم النقدية المتوقعة — لا يوجد سجل لطريقة الدفع، فلا يُعرف كم منه تم دفعه نقدًا."
+      },
+      "toasts": {
+        "opened": "تم فتح درج النقدية.",
+        "closed": "تم إغلاق درج النقدية.",
+        "cashInRecorded": "تم تسجيل الإدخال النقدي.",
+        "cashOutRecorded": "تم تسجيل الإخراج النقدي."
+      }
+    },
     "receipt": {
       "title": "إيصال — عملية بيع رقم {{id}}",
       "completedSubtitle": "تم الإتمام في {{completedAt}} · مزامنة المخزون: {{syncStatus}}",

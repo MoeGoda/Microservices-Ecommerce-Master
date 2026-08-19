@@ -6,6 +6,7 @@ import { ItemsListComponent } from './features/warehouse/items-list/items-list.c
 import { ItemCreateComponent } from './features/warehouse/item-create/item-create.component';
 import { ItemDetailComponent } from './features/warehouse/item-detail/item-detail.component';
 import { PosRegisterComponent } from './features/pos/pos-register.component';
+import { CustomersAdminComponent } from './features/pos/customers-admin/customers-admin.component';
 import { ReportsDashboardComponent } from './features/reporting/reports-dashboard/reports-dashboard.component';
 import { SalesByDayComponent } from './features/reporting/sales-by-day/sales-by-day.component';
 import { TopSellingComponent } from './features/reporting/top-selling/top-selling.component';
@@ -39,6 +40,10 @@ export const routes: Routes = [
   { path: 'items/new', component: ItemCreateComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
   { path: 'items/:id', component: ItemDetailComponent, canActivate: [authGuard, roleGuard(ADMIN_ROLES)] },
   { path: 'pos', component: PosRegisterComponent, canActivate: [authGuard, roleGuard(POS_ROLES)] },
+  // T9 — customers are POS data (loyalty/balance only mean anything in
+  // the context of a sale), so this uses POS_ROLES, the same guard as
+  // /pos, not ADMIN_ROLES.
+  { path: 'customers', component: CustomersAdminComponent, canActivate: [authGuard, roleGuard(POS_ROLES)] },
   { path: 'reports', component: ReportsDashboardComponent, canActivate: [authGuard, roleGuard(REPORTS_ROLES)] },
   // N — the former single flat /reports page, split into its own
   // routed screen per widget (same reasoning as K's Items split),

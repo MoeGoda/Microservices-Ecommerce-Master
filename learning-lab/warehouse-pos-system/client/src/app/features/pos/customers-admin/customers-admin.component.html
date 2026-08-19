@@ -1,0 +1,70 @@
+<div class="page customers-admin">
+  <app-page-header [title]="'pos.customers.admin.title' | translate">
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      {{ 'pos.customers.newCustomer' | translate }}
+    </button>
+  </app-page-header>
+
+  <app-filter-panel (search)="onSearch()" (reset)="onResetFilters()">
+    <form [formGroup]="filterForm" class="filter-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'pos.customers.searchLabel' | translate }}</mat-label>
+        <input matInput formControlName="search" [placeholder]="'pos.customers.searchPlaceholder' | translate" (keyup.enter)="onSearch()" />
+      </mat-form-field>
+    </form>
+  </app-filter-panel>
+
+  <mat-card class="list-card">
+    <mat-card-content>
+      @if (loadingCustomers()) {
+        <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
+      } @else if (pagedCustomers().items.length === 0) {
+        <app-empty-state icon="people" [message]="'pos.customers.admin.emptyRow' | translate"></app-empty-state>
+      } @else {
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>{{ 'pos.customers.name' | translate }}</th>
+              <th>{{ 'pos.customers.phone' | translate }}</th>
+              <th>{{ 'pos.customers.email' | translate }}</th>
+              <th>{{ 'pos.customers.loyaltyPoints' | translate }}</th>
+              <th>{{ 'pos.customers.balance' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (customer of pagedCustomers().items; track customer.id) {
+              <tr>
+                <td>{{ customer.name }}</td>
+                <td>{{ customer.phone }}</td>
+                <td>{{ customer.email }}</td>
+                <td>{{ customer.loyaltyPoints }}</td>
+                <td>{{ customer.balance | number: '1.2-2' }}</td>
+                <td>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="'common.edit' | translate"
+                    [matTooltip]="'common.edit' | translate"
+                    (click)="openEditDialog(customer)"
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <mat-paginator
+          [length]="pagedCustomers().totalCount"
+          [pageSize]="pagedCustomers().pageSize"
+          [pageIndex]="pagedCustomers().page - 1"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onCustomersPageChange($event)"
+        ></mat-paginator>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

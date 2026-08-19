@@ -1,0 +1,34 @@
+<h2 mat-dialog-title>{{ 'pos.cashDrawer.xReport.title' | translate }}</h2>
+
+<mat-dialog-content>
+  @if (loading()) {
+    <div class="loading-row">
+      <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+    </div>
+  } @else if (report(); as report) {
+    <div class="report-grid">
+      <span class="label">{{ 'pos.cashDrawer.xReport.openingFloat' | translate }}</span>
+      <span class="value">{{ report.openingFloat | number: '1.2-2' }}</span>
+
+      <span class="label">{{ 'pos.cashDrawer.xReport.cashIn' | translate }}</span>
+      <span class="value">{{ report.cashInTotal | number: '1.2-2' }}</span>
+
+      <span class="label">{{ 'pos.cashDrawer.xReport.cashOut' | translate }}</span>
+      <span class="value">{{ report.cashOutTotal | number: '1.2-2' }}</span>
+
+      <span class="label">{{ 'pos.cashDrawer.xReport.completedSales' | translate }}</span>
+      <span class="value">{{ report.completedSaleCount }}</span>
+
+      <span class="label">{{ 'pos.cashDrawer.xReport.salesTotal' | translate }}</span>
+      <span class="value">{{ report.salesTotal | number: '1.2-2' }}</span>
+
+      <span class="label total-label">{{ 'pos.cashDrawer.xReport.expectedCash' | translate }}</span>
+      <span class="value total-value">{{ report.expectedCashInDrawer | number: '1.2-2' }}</span>
+    </div>
+    <p class="disclaimer">{{ 'pos.cashDrawer.xReport.disclaimer' | translate }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close>{{ 'common.close' | translate }}</button>
+</mat-dialog-actions>

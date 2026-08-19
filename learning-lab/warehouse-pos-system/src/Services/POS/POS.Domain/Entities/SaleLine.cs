@@ -30,6 +30,14 @@ namespace POS.Domain.Entities
         public decimal? OriginalUnitPrice { get; set; }
         public int? PromotionId { get; set; }
 
+        // A cashier-entered percentage discount — "Line discount" in the
+        // register's action panel. Mutually exclusive with an automatic
+        // promotion: AddSaleLineCommandHandler/SetLineDiscountCommandHandler
+        // only ever set this when PromotionId is null, since a line
+        // already snapshotting an automatic discount shouldn't also get
+        // a manual one stacked on top.
+        public decimal? ManualDiscountPercent { get; set; }
+
         // Always in the item's Warehouse base unit — a barcode scan at the
         // register resolves to one unit of whatever Warehouse considers
         // "the base unit" for that item (see Warehouse's Item.BaseUnitOfMeasure,

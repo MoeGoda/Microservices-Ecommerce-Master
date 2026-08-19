@@ -1,0 +1,59 @@
+.loading-row {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.held-sale-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 420px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.held-sale-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+}
+
+.held-sale-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+
+  .document-number {
+    font-weight: 600;
+  }
+
+  .customer-name {
+    font-size: 0.8125rem;
+    opacity: 0.7;
+  }
+}
+
+.held-sale-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.8125rem;
+
+  .total {
+    font-weight: 600;
+  }
+}

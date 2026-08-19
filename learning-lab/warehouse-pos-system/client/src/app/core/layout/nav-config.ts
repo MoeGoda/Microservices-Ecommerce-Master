@@ -82,6 +82,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     ],
   },
   { kind: 'link', labelKey: 'toolbar.pos', route: '/pos', icon: 'point_of_sale', roles: POS_ROLES },
+  { kind: 'link', labelKey: 'toolbar.customers', route: '/customers', icon: 'people', roles: POS_ROLES },
   { kind: 'category', labelKey: 'toolbar.categoryInsights' },
   // N — the former single flat "Reports" link, generalized the same way
   // K's one Warehouse toggle became a group in Phase M: eight separate

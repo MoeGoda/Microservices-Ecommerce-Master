@@ -1,0 +1,31 @@
+<h2 mat-dialog-title>{{ 'pos.heldSales.title' | translate }}</h2>
+
+<mat-dialog-content>
+  @if (loading()) {
+    <div class="loading-row">
+      <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+    </div>
+  } @else if (sales().length === 0) {
+    <app-empty-state icon="pause_circle" [message]="'pos.heldSales.empty' | translate" />
+  } @else {
+    <div class="held-sale-list">
+      @for (sale of sales(); track sale.id) {
+        <button type="button" class="held-sale-row" (click)="resume(sale)">
+          <div class="held-sale-main">
+            <span class="document-number">{{ sale.documentNumber }}</span>
+            <span class="customer-name">{{ sale.customerName ?? ('pos.heldSales.walkIn' | translate) }}</span>
+          </div>
+          <div class="held-sale-meta">
+            <span>{{ sale.lines.length }} {{ 'pos.heldSales.items' | translate }}</span>
+            <span class="total">{{ sale.total | number: '1.2-2' }}</span>
+          </div>
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      }
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close>{{ 'common.close' | translate }}</button>
+</mat-dialog-actions>

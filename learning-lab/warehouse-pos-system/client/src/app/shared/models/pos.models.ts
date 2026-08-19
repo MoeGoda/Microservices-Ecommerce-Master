@@ -14,6 +14,9 @@ export interface SaleLineDto {
   // price either way; these are purely "was X, now Y" receipt detail.
   originalUnitPrice: number | null;
   promotionId: number | null;
+  // Cashier-entered — never set alongside promotionId (the two are
+  // mutually exclusive on the backend).
+  manualDiscountPercent: number | null;
   quantity: number;
   lineTotal: number;
 }
@@ -23,9 +26,17 @@ export interface SaleLineDto {
 // view below is just this same DTO rendered once Status is Completed.
 export interface SaleDto {
   id: number;
+  // Derived from Id ("POS-000123"), not a separately stored/editable field.
+  documentNumber: string;
   locationId: number;
   cashierUserId: number;
+  customerId: number | null;
+  customerName: string | null;
   status: 'InProgress' | 'Completed' | 'Cancelled' | 'Returned';
+  manualReceiptDiscountPercent: number | null;
+  isTaxExempt: boolean;
+  netTotal: number;
+  taxAmount: number;
   total: number;
   completedAt: string | null;
   // Set only once Status transitions to Returned — mirrors completedAt's
@@ -48,4 +59,60 @@ export interface StartSaleRequest {
 export interface AddSaleLineRequest {
   barcode: string;
   quantity: number;
+  manualDiscountPercent?: number | null;
+}
+
+export interface CustomerDto {
+  id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  loyaltyPoints: number;
+  balance: number;
+}
+
+export interface CreateCustomerRequest {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+}
+
+export interface UpdateCustomerRequest {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+}
+
+export interface AdjustCustomerBalanceRequest {
+  delta: number;
+  reason: string;
+}
+
+export interface CashDrawerSessionDto {
+  id: number;
+  locationId: number;
+  cashierUserId: number;
+  openingFloat: number;
+  openedAt: string;
+  closedAt: string | null;
+  closingCount: number | null;
+}
+
+export interface CashMovementDto {
+  id: number;
+  type: 'CashIn' | 'CashOut';
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface CashDrawerXReportDto {
+  sessionId: number;
+  openedAt: string;
+  openingFloat: number;
+  cashInTotal: number;
+  cashOutTotal: number;
+  completedSaleCount: number;
+  salesTotal: number;
+  expectedCashInDrawer: number;
 }

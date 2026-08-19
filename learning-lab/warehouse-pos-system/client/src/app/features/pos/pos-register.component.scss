@@ -1,9 +1,49 @@
 // .page (styles.scss) supplies the flex/gap/padding/margin baseline every
 // screen shares — this override just narrows it: a register is a single
 // focused task, not a data-dense admin table, so it doesn't need the
-// 1280px width every other screen gets.
+// 1280px width every other screen gets. Widened from C4's original 720px
+// to fit the new discount column + adjustments row without wrapping.
 .pos-register {
-  max-width: 720px;
+  max-width: 860px;
+}
+
+.cash-drawer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container, #f0f0f0);
+}
+
+.cash-drawer-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.cash-drawer-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+
+  button mat-icon {
+    margin-inline-end: 4px;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    vertical-align: text-bottom;
+  }
 }
 
 .form-row,
@@ -25,8 +65,36 @@
   width: 100px;
 }
 
+.customer-panel {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.customer-search-field {
+  flex: 1 1 auto;
+  min-width: 240px;
+}
+
+.customer-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: var(--mat-sys-secondary-container, #e0e0e0);
+
+  .customer-name {
+    font-weight: 600;
+    margin-inline-start: 4px;
+  }
+}
+
 .data-grid {
   margin: 12px 0;
+  width: 100%;
 }
 
 .empty-row {
@@ -35,19 +103,63 @@
   text-align: center;
 }
 
-.totals-row {
+.discount-input {
+  width: 64px;
+  padding: 4px 6px;
+  border: 1px solid var(--mat-sys-outline, #ccc);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.promo-note {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.adjustments-row {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.receipt-discount-field {
+  width: 200px;
+}
+
+.totals-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  margin: 12px 0;
+}
+
+.totals-line {
+  display: flex;
+  gap: 24px;
+  min-width: 220px;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.total-line {
   font-size: 1.2rem;
   font-weight: 600;
-  margin: 8px 0;
+  border-top: 1px solid var(--mat-sys-outline-variant, #ddd);
+  padding-top: 4px;
 }
 
 .action-row {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.receipt-customer {
+  font-weight: 500;
 }
 
 .sync-failed-note {

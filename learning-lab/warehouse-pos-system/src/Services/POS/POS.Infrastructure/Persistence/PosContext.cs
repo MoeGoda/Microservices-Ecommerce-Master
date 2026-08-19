@@ -13,12 +13,58 @@ namespace POS.Infrastructure.Persistence
         public DbSet<SaleLine> SaleLines => Set<SaleLine>();
         public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
         public DbSet<OutboxDelivery> OutboxDeliveries => Set<OutboxDelivery>();
+        public DbSet<Customer> Customers => Set<Customer>();
+        public DbSet<CashDrawerSession> CashDrawerSessions => Set<CashDrawerSession>();
+        public DbSet<CashMovement> CashMovements => Set<CashMovement>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Sale>(builder =>
             {
                 builder.Property(s => s.Total).HasColumnType("decimal(18,2)");
+                builder.Property(s => s.NetTotal).HasColumnType("decimal(18,2)");
+                builder.Property(s => s.TaxAmount).HasColumnType("decimal(18,2)");
+                builder.Property(s => s.ManualReceiptDiscountPercent).HasColumnType("decimal(5,2)");
+
+                // Restrict, not Cascade/SetNull: a completed sale's
+                // history has to survive independent of the Customer row
+                // it was rung up against — the same "history outlives the
+                // master record" reasoning StockLevel/StockTransaction's
+                // Restrict relationship to Item already uses in
+                // Warehouse. Deleting a Customer with sales on file is
+                // blocked, not silently unlinked.
+                builder.HasOne(s => s.Customer)
+                       .WithMany()
+                       .HasForeignKey(s => s.CustomerId)
+                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Customer>(builder =>
+            {
+                builder.Property(c => c.Name).IsRequired().HasMaxLength(200);
+                builder.Property(c => c.Phone).HasMaxLength(30);
+                builder.Property(c => c.Email).HasMaxLength(200);
+                builder.Property(c => c.Balance).HasColumnType("decimal(18,2)");
+            });
+
+            modelBuilder.Entity<CashDrawerSession>(builder =>
+            {
+                builder.Property(s => s.OpeningFloat).HasColumnType("decimal(18,2)");
+                builder.Property(s => s.ClosingCount).HasColumnType("decimal(18,2)");
+            });
+
+            modelBuilder.Entity<CashMovement>(builder =>
+            {
+                builder.Property(m => m.Amount).HasColumnType("decimal(18,2)");
+                builder.Property(m => m.Reason).HasMaxLength(200);
+
+                // A movement has no meaning independent of the session it
+                // was recorded against — same cascade reasoning as
+                // SaleLine's relationship to Sale below.
+                builder.HasOne(m => m.CashDrawerSession)
+                       .WithMany()
+                       .HasForeignKey(m => m.CashDrawerSessionId)
+                       .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<OutboxMessage>(builder =>
@@ -54,6 +100,7 @@ namespace POS.Infrastructure.Persistence
                 builder.Property(l => l.UnitPrice).HasColumnType("decimal(18,2)");
                 builder.Property(l => l.OriginalUnitPrice).HasColumnType("decimal(18,2)");
                 builder.Property(l => l.LineTotal).HasColumnType("decimal(18,2)");
+                builder.Property(l => l.ManualDiscountPercent).HasColumnType("decimal(5,2)");
 
                 // Cascade, not Restrict: a SaleLine has no meaning
                 // independent of its Sale (same reasoning as

@@ -11,6 +11,7 @@ namespace POS.Application.Models
         public decimal UnitPrice { get; set; }
         public decimal? OriginalUnitPrice { get; set; }
         public int? PromotionId { get; set; }
+        public decimal? ManualDiscountPercent { get; set; }
         public int Quantity { get; set; }
         public decimal LineTotal { get; set; }
 
@@ -25,6 +26,7 @@ namespace POS.Application.Models
                 UnitPrice = line.UnitPrice,
                 OriginalUnitPrice = line.OriginalUnitPrice,
                 PromotionId = line.PromotionId,
+                ManualDiscountPercent = line.ManualDiscountPercent,
                 Quantity = line.Quantity,
                 LineTotal = line.LineTotal,
             };

@@ -1,0 +1,34 @@
+<h2 mat-dialog-title>{{ (type === 'CashIn' ? 'pos.cashDrawer.cashIn.title' : 'pos.cashDrawer.cashOut.title') | translate }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'pos.cashDrawer.amount' | translate }}</mat-label>
+        <input matInput type="number" step="0.01" min="0.01" formControlName="amount" />
+        @if (form.controls.amount.touched && form.controls.amount.invalid) {
+          <mat-error>{{ 'pos.cashDrawer.amountRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'pos.cashDrawer.reason' | translate }}</mat-label>
+        <input matInput formControlName="reason" />
+        @if (form.controls.reason.touched && form.controls.reason.invalid) {
+          <mat-error>{{ 'pos.cashDrawer.reasonRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ 'common.cancel' | translate }}</button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+      } @else {
+        {{ 'common.save' | translate }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>
