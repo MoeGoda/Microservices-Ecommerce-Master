@@ -1,48 +1,151 @@
 @if (authService.currentUser(); as currentUser) {
+  <!-- S1 — the topbar is now a full-width sibling above the sidenav
+       container instead of living inside mat-sidenav-content, so it
+       spans the entire screen edge-to-edge the way the reference does
+       — the sidebar starts below it, not beside it top-to-bottom.
+       Angular template reference variables aren't order-dependent, so
+       this button can still call (click)="sidenav.toggle()" even
+       though #sidenav is declared further down the same template. -->
+  <mat-toolbar class="app-topbar">
+    <button mat-icon-button (click)="sidenav.toggle()" class="sidenav-toggle" aria-label="Toggle navigation">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <div class="app-brand">
+      <mat-icon aria-hidden="true">storefront</mat-icon>
+      <span>{{ 'common.appName' | translate }}</span>
+    </div>
+
+    <div class="nav-search">
+      <mat-icon aria-hidden="true">search</mat-icon>
+      <input
+        type="text"
+        [formControl]="navSearchControl"
+        [matAutocomplete]="navAuto"
+        [placeholder]="'toolbar.searchPlaceholder' | translate"
+        [attr.aria-label]="'toolbar.searchPlaceholder' | translate"
+      />
+    </div>
+    <mat-autocomplete #navAuto="matAutocomplete" (optionSelected)="onNavSearchSelect($event)">
+      @for (result of navSearchResults(); track result.route) {
+        <mat-option [value]="result.route">
+          <mat-icon aria-hidden="true">{{ result.icon }}</mat-icon>
+          {{ result.labelKey | translate }}
+        </mat-option>
+      }
+    </mat-autocomplete>
+
+    <span class="spacer"></span>
+    <app-language-switcher></app-language-switcher>
+    <span class="topbar-divider"></span>
+
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="notificationMenu"
+      [matBadge]="notificationFeed.unreadCount() || null"
+      matBadgeColor="warn"
+      matBadgeSize="small"
+      [attr.aria-label]="'toolbar.notifications' | translate"
+      [attr.title]="'toolbar.notifications' | translate"
+    >
+      <mat-icon>notifications</mat-icon>
+    </button>
+    <mat-menu #notificationMenu="matMenu" class="notification-menu">
+      <div class="notification-menu-header" (click)="$event.stopPropagation()">
+        <span>{{ 'toolbar.notifications' | translate }}</span>
+        @if (notificationFeed.unreadCount() > 0) {
+          <button mat-button (click)="markAllRead()">{{ 'toolbar.markAllRead' | translate }}</button>
+        }
+      </div>
+      @if (notificationFeed.notifications().length === 0) {
+        <div class="notification-empty">
+          <mat-icon aria-hidden="true">notifications_none</mat-icon>
+          <span>{{ 'toolbar.noNotifications' | translate }}</span>
+        </div>
+      } @else {
+        @for (n of notificationFeed.notifications(); track n.id) {
+          <button mat-menu-item class="notification-row" [class.unread]="!n.isRead" (click)="markRead(n)">
+            <span
+              class="notification-icon"
+              [class.unread]="!n.isRead"
+              [class.tone-success]="notificationTone(n.type) === 'success'"
+              [class.tone-warning]="notificationTone(n.type) === 'warning'"
+            >
+              <mat-icon aria-hidden="true">{{ notificationIcon(n.type) }}</mat-icon>
+            </span>
+            <span class="notification-text">
+              <span class="notification-message">{{ n.message }}</span>
+              <span class="notification-time">{{ relativeTime(n.createdAt) }}</span>
+            </span>
+            @if (!n.isRead) {
+              <span class="notification-unread-dot" aria-hidden="true"></span>
+            }
+          </button>
+        }
+      }
+    </mat-menu>
+
+    <button mat-button class="profile-trigger" [matMenuTriggerFor]="profileMenu">
+      <span class="profile-avatar">{{ userInitial() }}</span>
+      <span class="profile-name">{{ currentUser.userName }}</span>
+      <mat-icon aria-hidden="true">arrow_drop_down</mat-icon>
+    </button>
+    <mat-menu #profileMenu="matMenu" class="profile-menu">
+      <div class="profile-menu-header" (click)="$event.stopPropagation()">
+        <span class="profile-avatar large">{{ userInitial() }}</span>
+        <div class="profile-menu-details">
+          <span class="profile-menu-name">{{ currentUser.userName }}</span>
+          <span class="profile-menu-role">{{ 'roles.' + currentUser.role | translate }}</span>
+        </div>
+      </div>
+      <mat-divider></mat-divider>
+      <button mat-menu-item (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        <span>{{ 'toolbar.signOut' | translate }}</span>
+      </button>
+    </mat-menu>
+  </mat-toolbar>
+
   <mat-sidenav-container class="app-shell">
     <mat-sidenav #sidenav [mode]="sidenavMode()" [opened]="sidenavOpened()" class="app-sidenav">
       <mat-nav-list>
-        <!-- M — generalized from K's one hardcoded Warehouse toggle into a
-             loop over NAV_ENTRIES, so any number of groups (Warehouse,
-             Purchasing, ...) can exist without a hand-written signal per
-             group. Behavior is identical to before: a group is a plain
-             toggle button (navigates nowhere itself), a link is a
-             routerLink, both gated by the same role-array check the
-             route guards themselves use. -->
-        @for (entry of navEntries; track entry.labelKey) {
-          @if (canSee(entry.roles)) {
-            @if (entry.kind === 'group') {
-              <button
-                mat-list-item
-                type="button"
-                class="nav-group-toggle"
-                [attr.aria-expanded]="isGroupOpen(entry.id)"
-                (click)="toggleGroup(entry.id)"
-              >
-                <mat-icon matListItemIcon>{{ entry.icon }}</mat-icon>
-                <span matListItemTitle>{{ entry.labelKey | translate }}</span>
-                <mat-icon class="nav-group-chevron" [class.open]="isGroupOpen(entry.id)" aria-hidden="true">expand_more</mat-icon>
-              </button>
-              @if (isGroupOpen(entry.id)) {
-                @for (child of entry.children; track child.route) {
-                  <a
-                    mat-list-item
-                    class="nav-sub-link"
-                    [routerLink]="child.route"
-                    routerLinkActive="active-nav-link"
-                    [routerLinkActiveOptions]="{ exact: !!child.exact }"
-                  >
-                    <mat-icon matListItemIcon>{{ child.icon }}</mat-icon>
-                    <span matListItemTitle>{{ child.labelKey | translate }}</span>
-                  </a>
-                }
+        <!-- S3 — visibleNavEntries() already role-filters and only
+             includes a category heading when something under it is
+             actually visible to the current user, so this loop is
+             just render logic now, no canSee() check needed here. -->
+        @for (entry of visibleNavEntries(); track entry.labelKey) {
+          @if (entry.kind === 'category') {
+            <div class="sidenav-category">{{ entry.labelKey | translate }}</div>
+          } @else if (entry.kind === 'group') {
+            <button
+              mat-list-item
+              type="button"
+              class="nav-group-toggle"
+              [attr.aria-expanded]="isGroupOpen(entry.id)"
+              (click)="toggleGroup(entry.id)"
+            >
+              <mat-icon matListItemIcon>{{ entry.icon }}</mat-icon>
+              <span matListItemTitle>{{ entry.labelKey | translate }}</span>
+              <mat-icon class="nav-group-chevron" [class.open]="isGroupOpen(entry.id)" aria-hidden="true">expand_more</mat-icon>
+            </button>
+            @if (isGroupOpen(entry.id)) {
+              @for (child of entry.children; track child.route) {
+                <a
+                  mat-list-item
+                  class="nav-sub-link"
+                  [routerLink]="child.route"
+                  routerLinkActive="active-nav-link"
+                  [routerLinkActiveOptions]="{ exact: !!child.exact }"
+                >
+                  <mat-icon matListItemIcon>{{ child.icon }}</mat-icon>
+                  <span matListItemTitle>{{ child.labelKey | translate }}</span>
+                </a>
               }
-            } @else {
-              <a mat-list-item [routerLink]="entry.route" routerLinkActive="active-nav-link">
-                <mat-icon matListItemIcon>{{ entry.icon }}</mat-icon>
-                <span matListItemTitle>{{ entry.labelKey | translate }}</span>
-              </a>
             }
+          } @else {
+            <a mat-list-item [routerLink]="entry.route" routerLinkActive="active-nav-link">
+              <mat-icon matListItemIcon>{{ entry.icon }}</mat-icon>
+              <span matListItemTitle>{{ entry.labelKey | translate }}</span>
+            </a>
           }
         }
       </mat-nav-list>
@@ -61,105 +164,6 @@
     </mat-sidenav>
 
     <mat-sidenav-content>
-      <mat-toolbar class="app-topbar">
-        <button mat-icon-button (click)="sidenav.toggle()" class="sidenav-toggle" aria-label="Toggle navigation">
-          <mat-icon>menu</mat-icon>
-        </button>
-        <div class="app-brand">
-          <mat-icon aria-hidden="true">storefront</mat-icon>
-          <span>{{ 'common.appName' | translate }}</span>
-        </div>
-
-        <div class="nav-search">
-          <mat-icon aria-hidden="true">search</mat-icon>
-          <input
-            type="text"
-            [formControl]="navSearchControl"
-            [matAutocomplete]="navAuto"
-            [placeholder]="'toolbar.searchPlaceholder' | translate"
-            [attr.aria-label]="'toolbar.searchPlaceholder' | translate"
-          />
-        </div>
-        <mat-autocomplete #navAuto="matAutocomplete" (optionSelected)="onNavSearchSelect($event)">
-          @for (result of navSearchResults(); track result.route) {
-            <mat-option [value]="result.route">
-              <mat-icon aria-hidden="true">{{ result.icon }}</mat-icon>
-              {{ result.labelKey | translate }}
-            </mat-option>
-          }
-        </mat-autocomplete>
-
-        <span class="spacer"></span>
-        <app-language-switcher></app-language-switcher>
-        <span class="topbar-divider"></span>
-
-        <button
-          mat-icon-button
-          [matMenuTriggerFor]="notificationMenu"
-          [matBadge]="notificationFeed.unreadCount() || null"
-          matBadgeColor="warn"
-          matBadgeSize="small"
-          [attr.aria-label]="'toolbar.notifications' | translate"
-          [attr.title]="'toolbar.notifications' | translate"
-        >
-          <mat-icon>notifications</mat-icon>
-        </button>
-        <mat-menu #notificationMenu="matMenu" class="notification-menu">
-          <div class="notification-menu-header" (click)="$event.stopPropagation()">
-            <span>{{ 'toolbar.notifications' | translate }}</span>
-            @if (notificationFeed.unreadCount() > 0) {
-              <button mat-button (click)="markAllRead()">{{ 'toolbar.markAllRead' | translate }}</button>
-            }
-          </div>
-          @if (notificationFeed.notifications().length === 0) {
-            <div class="notification-empty">
-              <mat-icon aria-hidden="true">notifications_none</mat-icon>
-              <span>{{ 'toolbar.noNotifications' | translate }}</span>
-            </div>
-          } @else {
-            @for (n of notificationFeed.notifications(); track n.id) {
-              <button mat-menu-item class="notification-row" [class.unread]="!n.isRead" (click)="markRead(n)">
-                <span
-                  class="notification-icon"
-                  [class.unread]="!n.isRead"
-                  [class.tone-success]="notificationTone(n.type) === 'success'"
-                  [class.tone-warning]="notificationTone(n.type) === 'warning'"
-                >
-                  <mat-icon aria-hidden="true">{{ notificationIcon(n.type) }}</mat-icon>
-                </span>
-                <span class="notification-text">
-                  <span class="notification-message">{{ n.message }}</span>
-                  <span class="notification-time">{{ relativeTime(n.createdAt) }}</span>
-                </span>
-                @if (!n.isRead) {
-                  <span class="notification-unread-dot" aria-hidden="true"></span>
-                }
-              </button>
-            }
-          }
-        </mat-menu>
-
-        <button mat-button class="profile-trigger" [matMenuTriggerFor]="profileMenu">
-          <span class="profile-avatar">{{ userInitial() }}</span>
-          <span class="profile-name">{{ currentUser.userName }}</span>
-          <mat-icon aria-hidden="true">arrow_drop_down</mat-icon>
-        </button>
-        <mat-menu #profileMenu="matMenu" class="profile-menu">
-          <div class="profile-menu-header" (click)="$event.stopPropagation()">
-            <span class="profile-avatar large">{{ userInitial() }}</span>
-            <div class="profile-menu-details">
-              <span class="profile-menu-name">{{ currentUser.userName }}</span>
-              <span class="profile-menu-role">{{ 'roles.' + currentUser.role | translate }}</span>
-            </div>
-          </div>
-          <mat-divider></mat-divider>
-          <button mat-menu-item (click)="logout()">
-            <mat-icon>logout</mat-icon>
-            <span>{{ 'toolbar.signOut' | translate }}</span>
-          </button>
-        </mat-menu>
-      </mat-toolbar>
-
       <app-breadcrumb></app-breadcrumb>
       <router-outlet></router-outlet>
     </mat-sidenav-content>

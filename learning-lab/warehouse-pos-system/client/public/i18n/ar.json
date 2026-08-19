@@ -61,7 +61,10 @@
     "signOut": "تسجيل الخروج",
     "language": "اللغة",
     "searchPlaceholder": "بحث...",
-    "loggedInAs": "مسجل الدخول باسم"
+    "loggedInAs": "مسجل الدخول باسم",
+    "categoryOperations": "العمليات",
+    "categoryInsights": "الإحصاءات",
+    "categoryAdministration": "الإدارة"
   },
   "login": {
     "title": "المستودع ونقاط البيع",

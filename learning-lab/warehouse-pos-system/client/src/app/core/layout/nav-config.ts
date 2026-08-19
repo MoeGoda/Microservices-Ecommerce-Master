@@ -38,9 +38,21 @@ export interface NavGroupEntry {
   readonly children: readonly NavChildLink[];
 }
 
-export type NavEntry = NavLinkEntry | NavGroupEntry;
+// S3 — a plain, non-interactive section label (Material Admin Pro's own
+// "Interface"/"UI Toolkit" rows), grouping the groups/links below it
+// until the next category. Deliberately has no `roles` of its own —
+// App.visibleNavEntries only keeps a category in the rendered list once
+// it's confirmed at least one entry under it is visible to the current
+// user, so it never introduces a role check of its own to get wrong.
+export interface NavCategoryEntry {
+  readonly kind: 'category';
+  readonly labelKey: string;
+}
+
+export type NavEntry = NavLinkEntry | NavGroupEntry | NavCategoryEntry;
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
+  { kind: 'category', labelKey: 'toolbar.categoryOperations' },
   {
     kind: 'group',
     id: 'warehouse',
@@ -70,6 +82,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     ],
   },
   { kind: 'link', labelKey: 'toolbar.pos', route: '/pos', icon: 'point_of_sale', roles: POS_ROLES },
+  { kind: 'category', labelKey: 'toolbar.categoryInsights' },
   // N — the former single flat "Reports" link, generalized the same way
   // K's one Warehouse toggle became a group in Phase M: eight separate
   // report screens instead of one 970-line page combining all of them.
@@ -91,5 +104,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       { labelKey: 'toolbar.poAging', route: '/reports/purchase-order-aging', icon: 'schedule' },
     ],
   },
+  { kind: 'category', labelKey: 'toolbar.categoryAdministration' },
   { kind: 'link', labelKey: 'toolbar.users', route: '/users', icon: 'group', roles: USER_MANAGEMENT_ROLES },
 ];

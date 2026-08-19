@@ -61,7 +61,10 @@
     "signOut": "Sign out",
     "language": "Language",
     "searchPlaceholder": "Search...",
-    "loggedInAs": "Logged in as"
+    "loggedInAs": "Logged in as",
+    "categoryOperations": "Operations",
+    "categoryInsights": "Insights",
+    "categoryAdministration": "Administration"
   },
   "login": {
     "title": "Warehouse & POS",

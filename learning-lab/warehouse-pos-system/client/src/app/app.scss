@@ -2,12 +2,15 @@
   flex: 1 1 auto;
 }
 
-// G — the whole app shell (sidenav + topbar) below the sidenav-container
-// needs a fixed viewport height for mat-sidenav's own scrolling behavior
-// to kick in, instead of the page growing taller than the screen and
-// pushing the toolbar down off-screen on a long list/table.
+// G — mat-sidenav's own scrolling behavior needs a fixed height to kick
+// in, instead of the page growing taller than the screen and pushing
+// content down off-screen on a long list/table.
+// S1 — the topbar is now a full-width sibling ABOVE this container
+// (not nested inside mat-sidenav-content), so this height has to leave
+// room for it — 70px, matching .app-topbar's own height below — or the
+// two together would add up to more than the viewport.
 .app-shell {
-  height: 100vh;
+  height: calc(100vh - 70px);
 }
 
 // R — the user's actual Material Admin Pro screenshots (not the earlier
@@ -49,6 +52,46 @@ $sidenav-border: #eceef1;
   --mdc-list-list-item-hover-state-layer-opacity: 0.04;
   --mdc-list-list-item-focus-state-layer-color: #000000;
   --mdc-list-list-item-focus-state-layer-opacity: 0.04;
+
+  // S2 — `.mat-drawer-inner-container` (confirmed via computed style,
+  // not guessed) is the element that actually scrolls; left at its
+  // default it renders the platform's native scrollbar, arrow buttons
+  // included on some browser/OS combinations — obviously out of place
+  // next to a themed admin sidebar. A thin custom scrollbar has no
+  // arrow buttons by construction, in both engines.
+  ::ng-deep .mat-drawer-inner-container {
+    scrollbar-width: thin;
+    scrollbar-color: #{$sidenav-icon} transparent;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #{$sidenav-icon};
+      border-radius: 3px;
+    }
+  }
+}
+
+// S3 — a plain, non-interactive section label (Material Admin Pro's own
+// "Interface"/"UI Toolkit" rows) grouping the real groups/links below
+// it. Not a button, not a link — nothing to click, so no hover state.
+.sidenav-category {
+  padding: 18px 20px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sba-gray-600);
+
+  &:first-child {
+    padding-top: 12px;
+  }
 }
 
 // R — the "Logged in as: {name}" mini-card the reference sidebar ends

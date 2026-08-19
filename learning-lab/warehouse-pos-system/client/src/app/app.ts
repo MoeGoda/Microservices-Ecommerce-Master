@@ -63,11 +63,14 @@ interface SearchableNavItem {
 // one, this is a real quick-nav search — flattened once from
 // NAV_ENTRIES's groups/links, filtered by the *translated* label so it
 // matches what's actually on screen in either language.
-const SEARCHABLE_NAV_ITEMS: readonly SearchableNavItem[] = NAV_ENTRIES.flatMap((entry) =>
-  entry.kind === 'group'
+const SEARCHABLE_NAV_ITEMS: readonly SearchableNavItem[] = NAV_ENTRIES.flatMap((entry) => {
+  if (entry.kind === 'category') {
+    return [];
+  }
+  return entry.kind === 'group'
     ? entry.children.map((child) => ({ labelKey: child.labelKey, route: child.route, icon: child.icon, roles: entry.roles }))
-    : [{ labelKey: entry.labelKey, route: entry.route, icon: entry.icon, roles: entry.roles }],
-);
+    : [{ labelKey: entry.labelKey, route: entry.route, icon: entry.icon, roles: entry.roles }];
+});
 
 @Component({
   selector: 'app-root',
@@ -107,8 +110,37 @@ export class App {
   // broken on reload" reasoning K used for the one group it had) — POS/
   // Users stay flat single links since they have only one destination
   // each, same as before.
-  readonly navEntries: readonly NavEntry[] = NAV_ENTRIES;
   readonly openGroups = signal<ReadonlySet<string>>(new Set(['warehouse', 'purchasing', 'reports']));
+
+  // S3 — role-filtering folded in here (rather than a per-entry
+  // canSee() check in the template) specifically so a category
+  // heading can be dropped when nothing under it survives the filter,
+  // instead of rendering a label over an empty section. A pending
+  // category is only pushed once something real follows it, and only
+  // once even if several entries in a row are visible.
+  readonly visibleNavEntries = computed<readonly NavEntry[]>(() => {
+    const user = this.authService.currentUser();
+    if (!user) {
+      return [];
+    }
+    const result: NavEntry[] = [];
+    let pendingCategory: NavEntry | null = null;
+    for (const entry of NAV_ENTRIES) {
+      if (entry.kind === 'category') {
+        pendingCategory = entry;
+        continue;
+      }
+      if (!entry.roles.includes(user.role)) {
+        continue;
+      }
+      if (pendingCategory) {
+        result.push(pendingCategory);
+        pendingCategory = null;
+      }
+      result.push(entry);
+    }
+    return result;
+  });
 
   readonly userInitial = computed(() => {
     const name = this.authService.currentUser()?.userName;
@@ -161,16 +193,6 @@ export class App {
         this.notificationFeed.disconnect();
       }
     });
-  }
-
-  // Mirrors roleGuard's own check — the toolbar shouldn't even offer a
-  // link the user's role can't actually use, same "don't show a door
-  // that leads to a 403" reasoning as the route guard itself. Generalized
-  // from four one-off canSeeX() methods (K) into one taking any
-  // NAV_ENTRIES roles array, since groups are now data, not template.
-  canSee(roles: readonly string[]): boolean {
-    const user = this.authService.currentUser();
-    return !!user && roles.includes(user.role);
   }
 
   onNavSearchSelect(event: MatAutocompleteSelectedEvent): void {
