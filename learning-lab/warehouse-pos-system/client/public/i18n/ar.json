@@ -60,7 +60,8 @@
     "noNotifications": "لا توجد إشعارات حتى الآن.",
     "signOut": "تسجيل الخروج",
     "language": "اللغة",
-    "searchPlaceholder": "بحث..."
+    "searchPlaceholder": "بحث...",
+    "loggedInAs": "مسجل الدخول باسم"
   },
   "login": {
     "title": "المستودع ونقاط البيع",

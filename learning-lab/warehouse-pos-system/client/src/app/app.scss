@@ -10,80 +10,137 @@
   height: 100vh;
 }
 
-// P — the sidebar the user actually asked for, taken directly from the
-// StartBootstrap SB Admin 2 zip they supplied (supersedes the near-black
-// EVOHUS-style slate this had before, which was explicitly rejected):
-// its index.html sidebar is `bg-gradient-primary sidebar-dark` — a
-// top-to-bottom gradient from the template's primary blue down to a
-// darker blue, white/faded-white text, same idea SB Admin 2's own
-// scss/utilities/_background.scss `.bg-gradient-primary` mixin produces
-// (`linear-gradient(180deg, primary 10%, darken(primary, 15%) 100%)`).
-// Still scoped to .app-sidenav alone via plain CSS custom property
-// overrides (not a global mat.theme() switch) — same mechanism already
-// proven for MatSnackBar's toast classes below (--mdc-snackbar-*).
-$sidenav-text: rgba(255, 255, 255, 0.8);
-$sidenav-text-muted: rgba(255, 255, 255, 0.5);
-$sidenav-text-active: #ffffff;
+// R — the user's actual Material Admin Pro screenshots (not the earlier
+// unreachable link, and not the SB Admin 2 zip either — that turned
+// out to be the wrong theme) show a *light* sidebar with gray outlined
+// icons and dark text, and the brand name living in a *dark*, near-
+// black topbar instead — the inverse of SB Admin 2's blue-gradient
+// sidebar + white topbar this replaces. Still scoped via plain CSS
+// custom property overrides on .app-sidenav/.app-topbar individually
+// (not a global mat.theme() switch) — same mechanism already proven
+// for MatSnackBar's toast classes below (--mdc-snackbar-*).
+$sidenav-bg: #ffffff;
+$sidenav-text: #5b6470;
+$sidenav-icon: #adb5bd;
+$sidenav-text-active: #1a1a1a;
+$sidenav-hover-bg: #f1f3f5;
+$sidenav-border: #eceef1;
 
 .app-sidenav {
-  // 14rem — SB Admin 2's own $sidebar-base-width, not an approximation.
+  // 14rem — SB Admin 2's own $sidebar-base-width; Material Admin Pro's
+  // reference screenshots use the same rough column width, still a
+  // sane fit for this app's own nav depth.
   width: 224px;
-  border-inline-end: none;
-  background: linear-gradient(180deg, var(--sba-primary) 0%, var(--sba-primary-dark) 100%);
+  border-inline-end: 1px solid $sidenav-border;
+  background: $sidenav-bg;
   color: $sidenav-text;
+  display: flex;
+  flex-direction: column;
+
+  mat-nav-list {
+    flex: 1 1 auto;
+  }
 
   --mdc-list-list-item-label-text-color: #{$sidenav-text};
-  --mdc-list-list-item-leading-icon-color: #{$sidenav-text-muted};
+  --mdc-list-list-item-leading-icon-color: #{$sidenav-icon};
   --mdc-list-list-item-hover-label-text-color: #{$sidenav-text-active};
   --mdc-list-list-item-hover-leading-icon-color: #{$sidenav-text-active};
-  --mdc-list-list-item-hover-state-layer-color: #ffffff;
-  --mdc-list-list-item-hover-state-layer-opacity: 0.08;
-  --mdc-list-list-item-focus-state-layer-color: #ffffff;
-  --mdc-list-list-item-focus-state-layer-opacity: 0.08;
+  --mdc-list-list-item-hover-state-layer-color: #000000;
+  --mdc-list-list-item-hover-state-layer-opacity: 0.04;
+  --mdc-list-list-item-focus-state-layer-color: #000000;
+  --mdc-list-list-item-focus-state-layer-opacity: 0.04;
 }
 
-.app-brand {
+// R — the "Logged in as: {name}" mini-card the reference sidebar ends
+// on, instead of another nav row.
+.sidenav-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  font: var(--mat-sys-title-medium);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 22px 20px 16px;
-  color: $sidenav-text-active;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  margin-bottom: 8px;
-
-  mat-icon {
-    font-size: 26px;
-    width: 26px;
-    height: 26px;
-    color: $sidenav-text-active;
-  }
+  padding: 14px 16px;
+  border-top: 1px solid $sidenav-border;
+  background: #fafbfc;
 }
+
+.sidenav-footer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sidenav-footer-label {
+  font-size: 11px;
+  color: var(--sba-gray-600);
+}
+
+.sidenav-footer-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: $sidenav-text-active;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// R — Material Admin Pro's topbar is dark near-black, not white/blue,
+// and carries the brand text itself (the sidebar has none). Scoped the
+// same way the sidebar's own color override is: plain custom
+// properties on .app-topbar, not a global dark-mode theme switch — the
+// rest of the app (every card, table, form) stays on its light theme.
+$topbar-bg: #1e1e1e;
+$topbar-text: rgba(255, 255, 255, 0.85);
+$topbar-text-muted: rgba(255, 255, 255, 0.5);
 
 .app-topbar {
   position: sticky;
   top: 0;
   z-index: 10;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
-  // 4.375rem — SB Admin 2's own $topbar-base-height, not Material's
-  // default toolbar height.
+  box-shadow: 0 1px 3px rgb(0 0 0 / 24%);
+  // 4.375rem — SB Admin 2's own $topbar-base-height; still a good fit
+  // for the reference's own topbar proportions.
   height: 70px;
+  background: $topbar-bg;
+  color: $topbar-text;
+
+  // Custom properties inherit through the render tree regardless of
+  // Angular's view-encapsulation boundaries, so this reaches every
+  // mat-icon-button/mat-button in the topbar (including inside
+  // app-language-switcher) without touching those components' own
+  // files.
+  --mdc-icon-button-icon-color: #{$topbar-text};
+  --mat-icon-button-state-layer-color: #ffffff;
+  --mdc-text-button-label-text-color: #{$topbar-text};
 }
 
-.sidenav-divider {
-  border-top-color: rgba(255, 255, 255, 0.15);
-  margin-bottom: 8px;
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: var(--mat-sys-title-medium);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  margin-inline-end: 8px;
+
+  mat-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    color: #ffffff;
+  }
 }
 
-// P — SB Admin 2's topbar leads with a search box before the icon
-// cluster (`.navbar-search`: a light rounded input, no floating
-// label). Real functionality behind it (filters NAV_ENTRIES via
-// app.ts's navSearchControl/navSearchResults) — this app has no
-// global entity-search backend to wire a fake one to.
+@media (max-width: 600px) {
+  .app-brand span {
+    display: none;
+  }
+}
+
+// R — real functionality (filters NAV_ENTRIES via app.ts's
+// navSearchControl/navSearchResults), restyled to sit on the topbar's
+// new dark background — a translucent-white pill instead of SB Admin
+// 2's light-gray one.
 .nav-search {
   display: flex;
   align-items: center;
@@ -94,13 +151,13 @@ $sidenav-text-active: #ffffff;
   padding: 0 12px;
   height: 36px;
   border-radius: 999px;
-  background: var(--sba-gray-100);
+  background: rgba(255, 255, 255, 0.1);
 
   mat-icon {
     font-size: 18px;
     width: 18px;
     height: 18px;
-    color: var(--sba-gray-600);
+    color: #{$topbar-text-muted};
     flex-shrink: 0;
   }
 
@@ -111,10 +168,10 @@ $sidenav-text-active: #ffffff;
     background: transparent;
     outline: none;
     font: var(--mat-sys-body-medium);
-    color: var(--sba-gray-800);
+    color: #ffffff;
 
     &::placeholder {
-      color: var(--sba-gray-600);
+      color: #{$topbar-text-muted};
     }
   }
 }
@@ -129,7 +186,7 @@ $sidenav-text-active: #ffffff;
   display: inline-block;
   width: 1px;
   height: 32px;
-  background: var(--sba-border);
+  background: rgba(255, 255, 255, 0.15);
   margin: 0 8px;
 }
 
@@ -138,26 +195,23 @@ $sidenav-text-active: #ffffff;
 // section header rather than a destination is the trailing chevron —
 // the same visual language Gradus-style admin templates use.
 .nav-group-toggle {
-  font-weight: 500;
+  // A raw <button mat-list-item> doesn't get the browser's default
+  // button border reset the way mat-flat-button etc. do — this was a
+  // real, longstanding bug (a plain 2px outset UA border ringing every
+  // group toggle), just easy to miss against the darker sidebars this
+  // had before. Only visible clearly now against the light background.
+  border: none;
+  width: 100%;
+  font-weight: 600;
   color: $sidenav-text-active;
 }
 
-// The sidenav toggle only matters below the responsive breakpoint where
-// the sidenav switches to `mode="over"` (see the media query below) — on
-// a wide screen the nav is always visible and the button would just be
-// dead weight taking up toolbar space.
-.sidenav-toggle {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .sidenav-toggle {
-    display: inline-flex;
-  }
-}
-
+// R — the sidenav toggle now doubles as a real desktop collapse control
+// (Material Admin Pro's own hamburger sits in the topbar at every
+// width, not just on mobile) — always visible, not hidden above the
+// old 768px breakpoint.
 .active-nav-link {
-  background: rgba(255, 255, 255, 0.14);
+  background: $sidenav-hover-bg;
   color: $sidenav-text-active;
   font-weight: 700;
 }
@@ -168,6 +222,7 @@ $sidenav-text-active: #ffffff;
 .nav-group-chevron {
   margin-inline-start: auto;
   transition: transform 0.15s ease-out;
+  color: $sidenav-icon;
 
   &.open {
     transform: rotate(180deg);

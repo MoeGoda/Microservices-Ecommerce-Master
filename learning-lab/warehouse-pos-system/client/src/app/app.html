@@ -1,11 +1,6 @@
 @if (authService.currentUser(); as currentUser) {
   <mat-sidenav-container class="app-shell">
     <mat-sidenav #sidenav [mode]="sidenavMode()" [opened]="sidenavOpened()" class="app-sidenav">
-      <div class="app-brand">
-        <mat-icon aria-hidden="true">storefront</mat-icon>
-        <span>{{ 'common.appName' | translate }}</span>
-      </div>
-      <mat-divider class="sidenav-divider"></mat-divider>
       <mat-nav-list>
         <!-- M — generalized from K's one hardcoded Warehouse toggle into a
              loop over NAV_ENTRIES, so any number of groups (Warehouse,
@@ -51,6 +46,18 @@
           }
         }
       </mat-nav-list>
+
+      <!-- R — Material Admin Pro's own sidebar ends with a small
+           "Logged in as: {name}" card, not another nav row — this is
+           the same real user identity already shown in the topbar's
+           profile menu, just also surfaced here to match that layout. -->
+      <div class="sidenav-footer">
+        <span class="profile-avatar">{{ userInitial() }}</span>
+        <div class="sidenav-footer-text">
+          <span class="sidenav-footer-label">{{ 'toolbar.loggedInAs' | translate }}</span>
+          <span class="sidenav-footer-name">{{ currentUser.userName }}</span>
+        </div>
+      </div>
     </mat-sidenav>
 
     <mat-sidenav-content>
@@ -58,6 +65,10 @@
         <button mat-icon-button (click)="sidenav.toggle()" class="sidenav-toggle" aria-label="Toggle navigation">
           <mat-icon>menu</mat-icon>
         </button>
+        <div class="app-brand">
+          <mat-icon aria-hidden="true">storefront</mat-icon>
+          <span>{{ 'common.appName' | translate }}</span>
+        </div>
 
         <div class="nav-search">
           <mat-icon aria-hidden="true">search</mat-icon>
@@ -154,8 +165,11 @@
     </mat-sidenav-content>
   </mat-sidenav-container>
 } @else {
-  <mat-toolbar class="app-topbar" color="primary">
-    <span>{{ 'common.appName' | translate }}</span>
+  <mat-toolbar class="app-topbar">
+    <div class="app-brand">
+      <mat-icon aria-hidden="true">storefront</mat-icon>
+      <span>{{ 'common.appName' | translate }}</span>
+    </div>
     <span class="spacer"></span>
     <app-language-switcher></app-language-switcher>
   </mat-toolbar>

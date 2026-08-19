@@ -60,7 +60,8 @@
     "noNotifications": "No notifications yet.",
     "signOut": "Sign out",
     "language": "Language",
-    "searchPlaceholder": "Search..."
+    "searchPlaceholder": "Search...",
+    "loggedInAs": "Logged in as"
   },
   "login": {
     "title": "Warehouse & POS",
