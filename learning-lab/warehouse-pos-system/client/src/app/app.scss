@@ -131,6 +131,13 @@ $topbar-text-muted: rgba(255, 255, 255, 0.5);
   }
 }
 
+// R2 — the reference's hamburger sits inside its own filled circular
+// button, not floating bare on the dark bar the way this had it.
+.sidenav-toggle {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+}
+
 @media (max-width: 600px) {
   .app-brand span {
     display: none;
